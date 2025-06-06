@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import _layout from "./_layout";
 import Toast from "react-native-toast-message";
 import { useEffect } from "react";
+import React from "react";
 
 // Call the _layout component in the NavigationContainer instead of running from the index.tsx file, which allows for customized first screens
 export default function Index() {
