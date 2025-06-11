@@ -13,7 +13,7 @@ import {
 import ItemProduct from "@/components/item_product";
 import { FlashList } from "@shopify/flash-list";
 import React, { useEffect, useState } from "react";
-import AxiosInstance from "../helpers/Axioslnstance";
+import AxiosInstance from "../helpers/AxiosInstance";
 import { MyContext } from "@/helpers/MyContext";
 
 interface Category {

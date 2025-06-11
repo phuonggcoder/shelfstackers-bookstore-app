@@ -1,4 +1,4 @@
-import AxiosInstance from "@/helpers/Axioslnstance";
+import AxiosInstance from "@/helpers/AxiosInstance";
 import { MyContext } from "@/helpers/MyContext";
 import { Redirect } from "expo-router";
 import React, { useState } from "react";
@@ -196,44 +196,48 @@ const styles = StyleSheet.create({
     height: "100%",
     padding: 10,
     backgroundColor: "#FFFFFF",
-   
+    
   },
-  containercon:{
-  width: 80,
-  height: 80,
-  marginTop:20,
-  
+
+  containercon: {
+    width: 80,
+    height: 80,
+    marginTop: 20,
   },
+
   imgApp: {
-  width: 80,
-  height: 39.5,
-  marginBottom: 30,
+    width: 80,
+    height: 39.5,
+    marginBottom: 30,
   },
+
   textLight: {
     fontSize: 24,
     color: "#000",
     fontWeight: "bold",
-    fontFamily:"Lexend",
+    fontFamily: "Lexend",
   },
+
   textGray: {
     fontSize: 14,
     color: "#A1A1A1",
-    marginTop:10,
+    marginTop: 10,
     fontWeight: "bold",
   },
-  logingoapp:{
-  width: 343,
-  height: 56,
-  flexDirection: "row",          // ➜ Đặt các phần tử con nằm ngang
-  justifyContent: "space-between", // ➜ Cách đều các phần tử
-  alignItems: "center", 
-  marginBottom:20,
-  marginTop:10,
-  
+
+  logingoapp: {
+    width: 343,
+    height: 56,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 10,
   },
-   buttonSignInGoogle: {
+
+  buttonSignInGoogle: {
     width: 165.5,
-    height:56,
+    height: 56,
     borderRadius: 30,
     marginTop: 10,
     padding: 15,
@@ -243,11 +247,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EDEDED",
   },
-  imglogin:{
-  width:"100%",
-  marginBottom:10,
+
+  imglogin: {
+    width: "100%",
+    marginBottom: 10,
   },
-  
+
   inputContainer: {
     width: "100%",
     marginTop: 10,
@@ -256,62 +261,69 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
-  Email:{
+
+  Email: {
     color: "#BFBFBF",
-    marginTop:15
+    marginTop: 15,
   },
+
   input: {
-    color: "#DFDFDF",
-    width:100,
-    height:30,
-    outlineColor: "#000",
-    borderColor: "#000",
-    borderWidth: 0,
-  },
+  color: "#000",
+  flex: 1,               
+  borderColor: "#000",
+  borderWidth: 0,
+},
+
   eyeIcon: {
     position: "absolute",
-    alignItems:"center",
-    marginTop:5,
+    alignItems: "center",
+    marginTop: 5,
     right: 14,
   },
+
   buttonSignIn: {
     width: "100%",
-    height:56,
+    height: 56,
     borderRadius: 30,
     marginTop: 20,
     padding: 15,
-    backgroundColor: "#EDEDED",
+    backgroundColor: "#3255FB", 
     alignItems: "center",
   },
+
   textSignIn: {
-    color: "#BFBFBF",
-    fontSize:17,
+    color: "#fff", 
+    fontSize: 17,
     fontWeight: "bold",
   },
- 
+
   iconGoogle: {
     position: "absolute",
     left: 30,
   },
+
   textSignInGoogle: {
     color: "#000",
     fontWeight: "bold",
   },
- rememberContainer: {
-  flexDirection: "row",          // ➜ Đặt các phần tử con nằm ngang
-  justifyContent: "space-between", // ➜ Cách đều các phần tử
-  alignItems: "center", 
- 
- },
-  textforgot:{
-  color: '#3255FB',   
-  fontWeight: 'bold' 
+
+  rememberContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-   rememberText: {
+
+  textforgot: {
+    color: '#3255FB',
+    fontWeight: 'bold'
+  },
+
+  rememberText: {
     marginLeft: 8,
     fontSize: 16,
     color: '#000',
   },
+
   bottomContainer: {
     marginTop: 30,
     width: "100%",
@@ -321,24 +333,28 @@ const styles = StyleSheet.create({
     position: "relative",
     flex: 1,
   },
+
   text: {
     color: "#52555A",
     fontSize: 15,
     fontWeight: "bold",
     textAlign: "center",
     position: "absolute",
-    marginTop:130,
+    marginTop: 130,
   },
+
   textLink: {
     color: "#3255FB",
     fontSize: 12,
     fontWeight: "bold",
   },
+
   errorText: {
     color: "red",
     fontSize: 12,
     marginTop: 5,
   },
+
   overlay: {
     position: "absolute",
     top: 0,
@@ -349,6 +365,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
+
 });
 
 export default LogIn;

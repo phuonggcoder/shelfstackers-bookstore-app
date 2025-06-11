@@ -7,7 +7,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
+import { addToCartApi } from '../helpers/CartAPI'; 
 
 const MyCart = ({}) => {
   const [promoCode, setPromoCode] = useState('FIRSTBOOK');
@@ -76,6 +78,29 @@ const MyCart = ({}) => {
   const discount = 15;
   const grandTotal = itemTotal - discount;
 
+  const handleCheckout = async () => {
+  try {
+    const cartArray = Array.isArray(cartItems) ? cartItems : [cartItems];
+
+    for (const item of cartArray) {
+      if (item?.id && item?.quantity) {
+        await addToCartApi(item.id, item.quantity);
+      }
+    }
+
+    Alert.alert('Success', 'Checkout successfully!');
+    console.log('Checkout response: success');
+  } catch (error) {
+    Alert.alert('Error', 'Checkout failed');
+    console.error(error);
+  }
+};
+
+
+
+
+
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.headerContainer}>
@@ -83,7 +108,7 @@ const MyCart = ({}) => {
           <Text style={styles.backButton}>←</Text>
         </TouchableOpacity>
         <Text style={styles.header}>My Cart</Text>
-        <View style={{ width: 24 }} /> {/* để giữ căn giữa tiêu đề */}
+        <View style={{ width: 24 }} />
       </View>
 
       {cartItems.map(item => (
@@ -94,9 +119,13 @@ const MyCart = ({}) => {
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.price}>${item.price.toFixed(2)}</Text>
             <View style={styles.quantity}>
-              <TouchableOpacity onPress={() => decreaseQty(item.id)}><Text style={styles.btn}>−</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => decreaseQty(item.id)}>
+                <Text style={styles.btn}>−</Text>
+              </TouchableOpacity>
               <Text style={styles.qty}>{item.quantity}</Text>
-              <TouchableOpacity onPress={() => increaseQty(item.id)}><Text style={styles.btn}>＋</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => increaseQty(item.id)}>
+                <Text style={styles.btn}>＋</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -127,7 +156,7 @@ const MyCart = ({}) => {
         onChangeText={setPromoCode}
         placeholder="Enter Promo Code"
       />
-      <Text style={styles.checkMark}></Text>
+
 
       <View style={styles.summary}>
         <Text style={styles.summaryText}>Item Total</Text>
@@ -144,7 +173,7 @@ const MyCart = ({}) => {
         <Text style={styles.totalValue}>${grandTotal.toFixed(2)}</Text>
       </View>
 
-      <TouchableOpacity style={styles.checkoutBtn}>
+      <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout}>
         <Text style={styles.checkoutText}>Proceed to Checkout</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -170,38 +199,154 @@ const styles = StyleSheet.create({
     color: '#1E90FF',
     paddingHorizontal: 5,
   },
-  cartItem: { flexDirection: 'row', marginBottom: 20 },
-  image: { width: 70, height: 100, borderRadius: 8 },
-  info: { marginLeft: 15, flex: 1 },
-  author: { color: '#555' },
-  title: { fontWeight: 'bold', fontSize: 16, marginVertical: 2 },
-  price: { color: '#000' },
-  quantity: { flexDirection: 'row', marginTop: 5, alignItems: 'center' },
-  btn: { fontSize: 22, width: 30, textAlign: 'center', color: '#1E90FF' },
-  qty: { marginHorizontal: 10, fontSize: 16 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold' },
-  seeAll: { color: '#007BFF' },
-  similarScroll: { marginTop: 10 },
-  similarItem: { width: 120, marginRight: 15 },
-  similarImage: { width: 120, height: 150, borderRadius: 8 },
-  similarAuthor: { fontSize: 12, color: '#555', marginTop: 5 },
-  similarTitle: { fontSize: 13, fontWeight: 'bold' },
-  similarPriceRow: { flexDirection: 'row', alignItems: 'center' },
-  similarPrice: { color: '#000', fontWeight: 'bold', marginRight: 5 },
-  similarOldPrice: { color: '#999', textDecorationLine: 'line-through', fontSize: 12 },
+  cartItem: { 
+    flexDirection: 'row', 
+    marginBottom: 20 
+  },
+
+  image: { 
+    width: 70, 
+    height: 100, 
+    borderRadius: 8 
+  },
+
+  info: { 
+    marginLeft: 15, 
+    flex: 1 
+  },
+
+  author: { 
+    color: '#555' 
+  },
+
+  title: { 
+    fontWeight: 'bold', 
+    fontSize: 16, 
+    marginVertical: 2 
+  },
+
+  price: { 
+    color: '#000' 
+  },
+
+  quantity: { 
+    flexDirection: 'row', 
+    marginTop: 5, 
+    alignItems: 'center' 
+  },
+
+  btn: { 
+    fontSize: 22,
+    width: 30, 
+    textAlign: 'center', 
+    color: '#1E90FF' 
+  },
+
+  qty: { 
+    marginHorizontal: 10, 
+    fontSize: 16 
+  },
+
+  sectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginTop: 20 
+  },
+
+  sectionTitle: { 
+    fontSize: 16, 
+    fontWeight: 'bold' 
+  },
+
+  seeAll: { 
+    color: '#007BFF' 
+  },
+
+  similarScroll: { 
+    marginTop: 10 
+  },
+
+  similarItem: { 
+    width: 120, 
+    marginRight: 15 
+  },
+
+  similarImage: { 
+    width: 120, 
+    height: 150, 
+    borderRadius: 8 
+  },
+
+  similarAuthor: { 
+    fontSize: 12, 
+    color: '#555', 
+    marginTop: 5 
+  },
+
+  similarTitle: { 
+    fontSize: 13, 
+    fontWeight: 'bold' 
+  },
+
+  similarPriceRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+
+  similarPrice: { 
+    color: '#000', 
+    fontWeight: 'bold', 
+    marginRight: 5 
+  },
+
+  similarOldPrice: { 
+    color: '#999', 
+    textDecorationLine: 'line-through', 
+    fontSize: 12 
+  },
+
   promoInput: {
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 10, padding: 10, marginTop: 20, paddingRight: 50
+    borderWidth: 1, 
+    borderColor: '#ccc', 
+    borderRadius: 10, 
+    padding: 10, 
+    marginTop: 20, 
+    paddingRight: 50
   },
-  checkMark: { position: 'absolute', right: 30, top: 580, fontSize: 18 },
-  summary: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  summaryText: { fontSize: 16 },
-  totalLabel: { fontSize: 18, fontWeight: 'bold' },
-  totalValue: { fontSize: 18, fontWeight: 'bold' },
+
+  summary: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginTop: 10 
+  },
+
+  summaryText: { 
+    fontSize: 16 
+  },
+
+  totalLabel: { 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+
+  totalValue: { 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+
   checkoutBtn: {
-    backgroundColor: '#1E90FF', padding: 15, borderRadius: 10, marginTop: 20, alignItems: 'center',
+    backgroundColor: '#1E90FF', 
+    padding: 15, 
+    borderRadius: 10, 
+    marginTop: 20, 
+    alignItems: 'center',
   },
-  checkoutText: { color: '#fff', fontWeight: 'bold' },
+
+  checkoutText: { 
+    color: '#fff', 
+    fontWeight: 'bold' 
+  },
+
 });
 
 export default MyCart;

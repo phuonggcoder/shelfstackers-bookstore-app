@@ -1,4 +1,4 @@
-import AxiosInstance from "@/helpers/Axioslnstance";
+import AxiosInstance from "@/helpers/AxiosInstance";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -174,6 +174,7 @@ const Register: React.FC = ({ navigation }: any) => {
           style={styles.eyeIcon}
         />
       </View>
+
       {/* Display error message for re-typed password */}
       {error.rePassword && (
         <Text style={styles.errorText}>{error.rePassword}</Text>
@@ -182,18 +183,17 @@ const Register: React.FC = ({ navigation }: any) => {
       <TouchableOpacity style={styles.buttonRegister} onPress={handleRegister}>
         <Text style={styles.textRegister}>Register</Text>
       </TouchableOpacity>
+
       {/* Link to LogIn screen */}
       <View style={styles.loginContainer}>
       <Text style={styles.text}>
         Already have an account?{" "}
-        <Text
-          style={styles.textLink}
-          onPress={() => navigation.navigate("LogIn")}
-        >
-          Login
-        </Text>
+        <TouchableOpacity onPress={() => router.push("/Login")}>
+          <Text style={styles.textLink}>Login</Text>
+        </TouchableOpacity>
       </Text>
     </View>
+
       {/* Loading overlay */}
       {loading && (
         <View style={styles.overlay}>

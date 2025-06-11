@@ -10,7 +10,7 @@ import {
   View,
   Modal,
 } from "react-native";
-import AxiosInstance from "@/helpers/Axioslnstance";
+import AxiosInstance from "@/helpers/AxiosInstance";
 
 const AccountSettings: React.FC = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
