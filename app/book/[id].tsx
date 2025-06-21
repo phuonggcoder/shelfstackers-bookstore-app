@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Animated, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getBookById } from '../../services/api';
+import BottomAlert from '../../components/BottomAlert';
+import { useAuth } from '../../context/AuthContext';
+import { addToCart, getBookById } from '../../services/api';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
 
@@ -19,6 +21,15 @@ const BookDetailsScreen = () => {
 
   const footerAnim = useRef(new Animated.Value(0)).current;
   const lastOffsetY = useRef(0);
+  const { token } = useAuth();
+  const [addingCart, setAddingCart] = useState(false);
+  const [cartSuccess, setCartSuccess] = useState(false);
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
+  const router = useRouter();
+
+  // Animated overlay state
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
   const handleScroll = (event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -54,6 +65,24 @@ const BookDetailsScreen = () => {
     }
   }, [id]);
 
+  // Show/hide overlay with animation when alert changes
+  useEffect(() => {
+    if (showLoginAlert) {
+      setOverlayVisible(true);
+      Animated.timing(overlayAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(overlayAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setOverlayVisible(false));
+    }
+  }, [showLoginAlert]);
+
   if (!book) {
     return (
       <View style={styles.loadingContainer}>
@@ -72,143 +101,210 @@ const BookDetailsScreen = () => {
 
   const truncatedHtml = isExpanded ? book.description : book.description.slice(0, 200) + '...';
 
+  const handleFavorite = (bookId: string | string[] | undefined) => {
+    // Xử lý logic yêu thích sách ở đây
+    console.log('Yêu thích sách:', bookId);
+  };
+
+  // Thêm vào giỏ hàng
+  const handleAddToCart = async () => {
+    if (!token) {
+      setShowLoginAlert(true);
+      return;
+    }
+    if (!book) return;
+    setAddingCart(true);
+    try {
+      await addToCart(token, book._id, 1);
+      setCartSuccess(true);
+      setTimeout(() => setCartSuccess(false), 1500);
+    } finally {
+      setAddingCart(false);
+    }
+  };
+
+  // Buy now: sang trang order review
+  const handleBuyNow = () => {
+    if (!token) {
+      setShowLoginAlert(true);
+      return;
+    }
+    if (!book) return;
+    router.push({ pathname: '/order-review', params: { bookId: book._id } });
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <Stack.Screen 
-          options={{ 
-            title: '',
-            headerTransparent: false, // Show header background
-            headerStyle: {
-              backgroundColor: '#fff', // White background
-            },
-            headerTitle: '', // No title
-            headerTintColor: 'black', // Make back icon black
-            headerShadowVisible: true, // Show subtle shadow/border (Expo Router/NativeStack)
-            headerLeft: ({ canGoBack, tintColor }) => (
-              canGoBack ? (
-                <TouchableOpacity onPress={() => window.history.back()} style={{ marginLeft: 10 }}>
-                  <Ionicons name="arrow-back" size={24} color={tintColor || 'black'} />
-                </TouchableOpacity>
-              ) : null
-            ),
-            headerRight: () => (
-              <View style={{ flexDirection: 'row' }}>
-                <TouchableOpacity style={{ marginRight: 15 }}>
-                  <Ionicons name="heart-outline" size={24} color="black" />
-                </TouchableOpacity>
-                <TouchableOpacity style={{ marginRight: 15 }}>
-                  <Ionicons name="share-outline" size={24} color="black" />
-                </TouchableOpacity>
-                <TouchableOpacity>
-                  <Ionicons name="cart-outline" size={24} color="black" />
-                </TouchableOpacity>
+      {/* Overlay: phủ toàn màn hình, click vào sẽ tắt alert, nằm dưới BottomAlert */}
+      {overlayVisible && (
+        <TouchableWithoutFeedback onPress={() => setShowLoginAlert(false)}>
+          <Animated.View
+            pointerEvents="auto"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              opacity: overlayAnim,
+              zIndex: 10,
+            }}
+          />
+        </TouchableWithoutFeedback>
+      )}
+      {/* BottomAlert nằm trên overlay */}
+      <BottomAlert
+        visible={showLoginAlert}
+        type="info"
+        title="Bạn chưa đăng nhập"
+        description="Vui lòng đăng nhập để sử dụng đầy đủ chức năng."
+        buttonText="Đăng nhập"
+        showCloseIcon
+        onButtonPress={() => {
+          setShowLoginAlert(false);
+          setTimeout(() => router.push('/(auth)/login'), 100);
+        }}
+        onClose={() => setShowLoginAlert(false)}
+        onRequestClose={() => setShowLoginAlert(false)}
+        onSwipeDown={() => setShowLoginAlert(false)}
+        contentContainerStyle={{}}
+        bottomInset={insets.bottom}
+      />
+      <Stack.Screen 
+        options={{ 
+          title: '',
+          headerTransparent: false, // Show header background
+          headerStyle: {
+            backgroundColor: '#fff', // White background
+          },
+          headerTitle: '', // No title
+          headerTintColor: 'black', // Make back icon black
+          headerShadowVisible: true, // Show subtle shadow/border (Expo Router/NativeStack)
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
+              <Ionicons name="arrow-back" size={24} color="black" />
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity style={{ marginRight: 15 }} onPress={() => handleFavorite(id)}>
+                <Ionicons name="heart-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginRight: 15 }}>
+                <Ionicons name="share-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAddToCart}>
+                <Ionicons name="cart-outline" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+          ),
+        }} 
+      />
+      <ScrollView 
+          style={styles.container}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+      >
+          {images.length > 1 ? (
+              <View style={styles.sliderContainer}>
+                  <FlatList
+                      ref={flatListRef}
+                      data={images}
+                      renderItem={({ item }) => (
+                          <Image source={{ uri: item }} style={[styles.sliderImage, { width }]} />
+                      )}
+                      horizontal
+                      pagingEnabled
+                      showsHorizontalScrollIndicator={false}
+                      onMomentumScrollEnd={onMomentumScrollEnd}
+                      keyExtractor={(item, index) => `${item}-${index}`}
+                      onEndReached={() => {
+                          flatListRef.current?.scrollToIndex({ animated: true, index: 0 });
+                      }}
+                      onEndReachedThreshold={0.5}
+                  />
+                  <View style={styles.pagination}>
+                      {images.map((_, index) => (
+                          <View
+                              key={index}
+                              style={[
+                                  styles.dot,
+                                  activeIndex === index ? styles.activeDot : null,
+                              ]}
+                          />
+                      ))}
+                  </View>
               </View>
-            ),
-          }} 
-        />
-        <ScrollView 
-            style={styles.container}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-        >
-            {images.length > 1 ? (
-                <View style={styles.sliderContainer}>
-                    <FlatList
-                        ref={flatListRef}
-                        data={images}
-                        renderItem={({ item }) => (
-                            <Image source={{ uri: item }} style={[styles.sliderImage, { width }]} />
-                        )}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        onMomentumScrollEnd={onMomentumScrollEnd}
-                        keyExtractor={(item, index) => `${item}-${index}`}
-                        onEndReached={() => {
-                            flatListRef.current?.scrollToIndex({ animated: true, index: 0 });
-                        }}
-                        onEndReachedThreshold={0.5}
-                    />
-                    <View style={styles.pagination}>
-                        {images.map((_, index) => (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.dot,
-                                    activeIndex === index ? styles.activeDot : null,
-                                ]}
-                            />
-                        ))}
-                    </View>
-                </View>
-            ) : (
-                <View style={styles.sliderContainer}>
-                    <Image source={{ uri: images[0] }} style={[styles.sliderImage, { width }]} />
-                </View>
-            )}
+          ) : (
+              <View style={styles.sliderContainer}>
+                  <Image source={{ uri: images[0] }} style={[styles.sliderImage, { width }]} />
+              </View>
+          )}
 
-            <View style={styles.infoCard}>
-                <Text style={styles.title}>{book.title}</Text>
-                <Text style={styles.author}>By {book.author}</Text>
-                <View style={styles.statsContainer}>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>Pages</Text>
-                        <Text style={styles.statValue}>316</Text>
-                    </View>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>Language</Text>
-                        <Text style={styles.statValue}>{book.language}</Text>
-                    </View>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>Ratings</Text>
-                        <Text style={styles.statValue}>5.0</Text>
-                    </View>
-                </View>
-            </View>
+          <View style={styles.infoCard}>
+              <Text style={styles.title}>{book.title}</Text>
+              <Text style={styles.author}>By {book.author}</Text>
+              <View style={styles.statsContainer}>
+                  <View style={styles.stat}>
+                      <Text style={styles.statLabel}>Pages</Text>
+                      <Text style={styles.statValue}>316</Text>
+                  </View>
+                  <View style={styles.stat}>
+                      <Text style={styles.statLabel}>Language</Text>
+                      <Text style={styles.statValue}>{book.language}</Text>
+                  </View>
+                  <View style={styles.stat}>
+                      <Text style={styles.statLabel}>Ratings</Text>
+                      <Text style={styles.statValue}>5.0</Text>
+                  </View>
+              </View>
+          </View>
 
-            <View style={styles.priceContainer}>
-                <Text style={styles.price}>{formatVND(book.price)}</Text>
-                <Text style={styles.oldPrice}>{formatVND(book.price * 1.2)}</Text>
-            </View>
-            
-            <View style={styles.descriptionContainer}>
-                <Text style={styles.sectionTitle}>Descriptions</Text>
-                <RenderHTML contentWidth={width} source={{ html: truncatedHtml }} />
-                <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-                    <Text style={styles.readMore}>{isExpanded ? 'Read Less' : 'Read More'}</Text>
-                </TouchableOpacity>
-            </View>
+          <View style={styles.priceContainer}>
+              <Text style={styles.price}>{formatVND(book.price)}</Text>
+              <Text style={styles.oldPrice}>{formatVND(book.price * 1.2)}</Text>
+          </View>
+          
+          <View style={styles.descriptionContainer}>
+              <Text style={styles.sectionTitle}>Descriptions</Text>
+              <RenderHTML contentWidth={width} source={{ html: truncatedHtml }} />
+              <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+                  <Text style={styles.readMore}>{isExpanded ? 'Read Less' : 'Read More'}</Text>
+              </TouchableOpacity>
+          </View>
 
-            <View style={styles.authorContainer}>
-                <Text style={styles.sectionTitle}>Author</Text>
-                <View style={styles.authorInfo}>
-                    <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} />
-                    <View>
-                        <Text style={styles.authorName}>{book.author}</Text>
-                        <Text style={styles.authorSubtitle}>Author</Text>
-                    </View>
-                    <TouchableOpacity style={styles.profileButton}>
-                        <Text style={styles.profileButtonText}>View Profile</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-            
-            <View style={{height: 100}} /> 
-        </ScrollView>
-        <Animated.View style={[
-            styles.footer, 
-            { 
-                paddingBottom: insets.bottom || 10,
-                transform: [{ translateY: footerAnim }] 
-            }
-        ]}>
-            <TouchableOpacity style={styles.cartButton}>
-                <Ionicons name="cart-outline" size={24} color="#5E5CE6" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.buyButton}>
-                <Text style={styles.buyButtonText}>Buy Now</Text>
-            </TouchableOpacity>
-        </Animated.View>
+          <View style={styles.authorContainer}>
+              <Text style={styles.sectionTitle}>Author</Text>
+              <View style={styles.authorInfo}>
+                  <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} />
+                  <View>
+                      <Text style={styles.authorName}>{book.author}</Text>
+                      <Text style={styles.authorSubtitle}>Author</Text>
+                  </View>
+                  <TouchableOpacity style={styles.profileButton}>
+                      <Text style={styles.profileButtonText}>View Profile</Text>
+                  </TouchableOpacity>
+              </View>
+          </View>
+          
+          <View style={{height: 100}} /> 
+      </ScrollView>
+      <Animated.View style={[
+          styles.footer,
+          {
+              paddingBottom: insets.bottom || 10,
+              transform: [{ translateY: footerAnim }],
+              zIndex: showLoginAlert ? -1 : 1, // Đảm bảo footer không bị block khi alert hiện
+          }
+      ]}>
+          <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart} disabled={addingCart || showLoginAlert}>
+              <Ionicons name={cartSuccess ? 'checkmark-done' : 'cart-outline'} size={24} color={cartSuccess ? '#4CAF50' : '#5E5CE6'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow} disabled={showLoginAlert}>
+              <Text style={styles.buyButtonText}>Buy Now</Text>
+          </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };

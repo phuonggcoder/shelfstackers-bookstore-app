@@ -2,7 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
@@ -17,19 +25,18 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
-    // Validation
     if (!username || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Lỗi', 'Mật khẩu không khớp');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
       return;
     }
 
@@ -39,19 +46,19 @@ export default function Register() {
         username,
         email,
         password,
-        full_name: ''
+        full_name: '',
       });
 
       await signIn(response);
-      Alert.alert('Success', 'Registration successful!', [
+      Alert.alert('Thành công', 'Đăng ký thành công!', [
         {
           text: 'OK',
-          onPress: () => router.replace('/(tabs)')
-        }
+          onPress: () => router.replace('/(tabs)'),
+        },
       ]);
     } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during registration';
-      Alert.alert('Registration Failed', errorMessage);
+      const errorMessage = error.message || 'Đã xảy ra lỗi khi đăng ký';
+      Alert.alert('Đăng ký thất bại', errorMessage);
       console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
@@ -62,30 +69,31 @@ export default function Register() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require('../../assets/images/logo.png')}
+          source={require('../../assets/images/icon.png')}
           style={styles.logo}
           contentFit="contain"
         />
-        <Text style={styles.title}>Register your account</Text>
-        <Text style={styles.subtitle}>Enter your information below</Text>
+        <Text style={styles.title}>Đăng ký tài khoản</Text>
+        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
       </View>
 
       <View style={styles.form}>
-        <View style={styles.inputContainer}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Tên người dùng</Text>
           <TextInput
             style={styles.input}
-            placeholder="Username"
+            placeholder="Nhập tên người dùng"
             value={username}
             onChangeText={setUsername}
-            autoCapitalize="none"
             editable={!isLoading}
           />
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
-            placeholder="Email Address"
+            placeholder="Nhập email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -94,64 +102,69 @@ export default function Register() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Mật khẩu</Text>
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="Nhập mật khẩu"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             editable={!isLoading}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.eyeIcon}
             onPress={() => setShowPassword(!showPassword)}
           >
-            <Ionicons 
-              name={showPassword ? "eye-outline" : "eye-off-outline"} 
-              size={24} 
-              color="#666"
+            <Ionicons
+              name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+              size={24}
+              color="#999"
             />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Nhập lại mật khẩu</Text>
           <TextInput
             style={styles.input}
-            placeholder="Re-Enter Password"
+            placeholder="Nhập lại mật khẩu"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry={!showConfirmPassword}
             editable={!isLoading}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.eyeIcon}
             onPress={() => setShowConfirmPassword(!showConfirmPassword)}
           >
-            <Ionicons 
-              name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
-              size={24} 
-              color="#666"
+            <Ionicons
+              name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+              size={24}
+              color="#999"
             />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+        <TouchableOpacity
+          style={[
+            styles.registerButton,
+            isLoading && styles.registerButtonDisabled,
+          ]}
           onPress={handleRegister}
           disabled={isLoading}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.registerButtonText}>Register</Text>
+            <Text style={styles.registerButtonText}>Đăng ký</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>Already have an account? </Text>
+          <Text style={styles.loginText}>Đã có tài khoản?</Text>
           <TouchableOpacity onPress={() => router.push('/login')}>
-            <Text style={styles.loginLink}>Login</Text>
+            <Text style={styles.loginLink}>Đăng nhập</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -163,56 +176,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginTop: 40,
     marginBottom: 30,
   },
   logo: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    color: '#000',
+    marginBottom: 5,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    marginBottom: 20,
   },
   form: {
     marginTop: 20,
   },
-  inputContainer: {
-    marginBottom: 20,
-    position: 'relative',
+  inputGroup: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 5,
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
     fontSize: 16,
+    marginBottom: 15,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginBottom: 15,
   },
   eyeIcon: {
     position: 'absolute',
     right: 15,
-    top: 15,
+    top: '50%',
+    transform: [{ translateY: -12 }],
   },
   registerButton: {
-    backgroundColor: '#4A3780',
-    padding: 18,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#3255FB',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
   },
   registerButtonText: {
     color: '#fff',
-    textAlign: 'center',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -226,7 +256,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   loginLink: {
-    color: '#4A3780',
+    color: '#3255FB',
     fontSize: 14,
     fontWeight: '600',
   },
