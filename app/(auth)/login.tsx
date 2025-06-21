@@ -2,42 +2,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
 export default function Login() {
   const { signIn } = useAuth();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!email || !password) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await authService.login({
-        username,
-        password
-      });
-
+      const response = await authService.login({ username: email, password });
       await signIn(response);
-      Alert.alert('Success', 'Login successful!', [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(tabs)')
-        }
+      Alert.alert('Thành công', 'Đăng nhập thành công!', [
+        { text: 'OK', onPress: () => router.replace('/(tabs)') }
       ]);
     } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during login';
-      Alert.alert('Login Failed', errorMessage);
-      console.error('Login error:', error);
+      Alert.alert('Đăng nhập thất bại', error.message || 'Lỗi đăng nhập');
     } finally {
       setIsLoading(false);
     }
@@ -51,95 +50,90 @@ export default function Login() {
           style={styles.logo}
           contentFit="contain"
         />
-        <Text style={styles.title}>Let&apos;s get you Login!</Text>
-        <Text style={styles.subtitle}>Enter your information below</Text>
+        <Text style={styles.title}>Đăng nhập tài khoản</Text>
+        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
       </View>
 
-      <View style={styles.socialButtons}>
+      <View style={styles.socialContainer}>
         <TouchableOpacity style={styles.socialButton}>
-          <Image
-            source={require('../../assets/images/google.png')}
-            style={styles.socialIcon}
-          />
-          <Text style={styles.socialButtonText}>Google</Text>
+          <Image source={require('../../assets/images/google.png')} style={styles.icon} />
+          <Text style={styles.socialText}>Google</Text>
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.socialButton}>
-          <Image
-            source={require('../../assets/images/logo1.png')}
-            style={styles.socialIcon}
-          />
-          <Text style={styles.socialButtonText}>Apple</Text>
+          <Image source={require('../../assets/images/applelogo.png')} style={styles.icon} />
+          <Text style={styles.socialText}>Apple</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.dividerText}>Or Login with</Text>
+      <View style={styles.dividerContainer}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
+        <View style={styles.dividerLine} />
+      </View>
 
       <View style={styles.form}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter Username"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            editable={!isLoading}
-          />
-        </View>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          placeholder="Nhập email"
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          editable={!isLoading}
+        />
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            editable={!isLoading}
+        <Text style={styles.label}>Mật khẩu</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nhập mật khẩu"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          editable={!isLoading}
+        />
+        <TouchableOpacity
+          style={styles.eyeIcon}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Ionicons
+            name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+            size={24}
+            color="#999"
           />
-          <TouchableOpacity 
-            style={styles.eyeIcon}
-            onPress={() => setShowPassword(!showPassword)}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-outline" : "eye-off-outline"} 
-              size={24} 
-              color="#666"
-            />
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity 
-            style={styles.checkboxContainer}
-            onPress={() => setRememberMe(!rememberMe)}
-          >
+        <View style={styles.optionsRow}>
+          <TouchableOpacity style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && <Ionicons name="checkmark" size={16} color="#fff" />}
+              {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
             </View>
-            <Text style={styles.checkboxLabel}>Remember Me</Text>
+            <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
           </TouchableOpacity>
-
           <TouchableOpacity>
-            <Text style={styles.forgotPassword}>Forgot Password?</Text>
+            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+        <TouchableOpacity
+          style={[
+            styles.loginButton,
+            (!email || !password || isLoading) && styles.loginButtonDisabled
+          ]}
           onPress={handleLogin}
-          disabled={isLoading}
+          disabled={!email || !password || isLoading}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.loginButtonText}>Login</Text>
+            <Text style={styles.loginButtonText}>Đăng nhập</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Don&apos;t have an account? </Text>
+          <Text style={styles.registerText}>Chưa có tài khoản?</Text>
           <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.registerLink}>Register</Text>
+            <Text style={styles.registerLink}> Đăng ký ngay</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -151,29 +145,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginTop: 40,
     marginBottom: 30,
   },
   logo: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    color: '#000',
+    marginBottom: 5,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    marginBottom: 20,
   },
-  socialButtons: {
+  socialContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
@@ -188,46 +183,69 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     width: '48%',
   },
-  socialIcon: {
+  icon: {
     width: 24,
     height: 24,
     marginRight: 8,
   },
-  socialButtonText: {
+  socialText: {
     fontSize: 16,
     color: '#333',
   },
-  dividerText: {
-    textAlign: 'center',
-    color: '#666',
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: '#666',
+    fontSize: 14,
   },
   form: {
     marginTop: 20,
   },
-  inputContainer: {
-    marginBottom: 20,
-    position: 'relative',
+  label: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
     fontSize: 16,
+    marginBottom: 15,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginBottom: 15,
   },
   eyeIcon: {
     position: 'absolute',
     right: 15,
-    top: 15,
+    top: '50%',
+    transform: [{ translateY: -12 }],
   },
-  optionsContainer: {
+  optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  checkboxContainer: {
+  checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -244,26 +262,26 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: '#4A3780',
   },
-  checkboxLabel: {
+  rememberText: {
     fontSize: 14,
     color: '#333',
   },
-  forgotPassword: {
+  forgotText: {
     color: '#4A3780',
     fontSize: 14,
   },
   loginButton: {
-    backgroundColor: '#4A3780',
-    padding: 18,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#3255FB',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
   },
   loginButtonDisabled: {
     backgroundColor: '#ccc',
   },
   loginButtonText: {
     color: '#fff',
-    textAlign: 'center',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -277,7 +295,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   registerLink: {
-    color: '#4A3780',
+    color: '#3255FB',
     fontSize: 14,
     fontWeight: '600',
   },

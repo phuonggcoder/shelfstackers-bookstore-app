@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStoredAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadStoredAuth = async () => {
@@ -47,16 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(storedToken);
           setUser(parsedUser);
         } else {
-          // Token không hợp lệ, xóa dữ liệu đã lưu
-          await AsyncStorage.multiRemove(['token', 'user']);
-          setToken(null);
-          setUser(null);
+          // Token không hợp lệ, tự động signOut và chuyển về login
+          await signOut();
+          try {
+            const expoRouter = await import('expo-router');
+            expoRouter.router.replace('/(auth)/login');
+          } catch {}
         }
       }
     } catch (error) {
       console.error('Error loading auth:', error);
       // Xóa dữ liệu lỗi
-      await AsyncStorage.multiRemove(['token', 'user']);
+      await signOut();
+      try {
+        const expoRouter = await import('expo-router');
+        expoRouter.router.replace('/(auth)/login');
+      } catch {}
     } finally {
       setIsLoading(false);
     }

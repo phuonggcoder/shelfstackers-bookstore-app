@@ -2,33 +2,24 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import BookCard from '../../components/BookCard';
-import { useData } from '../../context/DataContext';
+import { useCategoryBooks } from '../../hooks/useCategoryBooks';
 
 const CategoryScreen = () => {
   const router = useRouter();
   const { id, name } = useLocalSearchParams();
-  const { books } = useData();
-
-  // Lọc sách theo categoryId, so sánh chắc chắn đúng kiểu
-  const filteredBooks = books.filter(book =>
-    Array.isArray(book.categories) &&
-    book.categories.some(cat => {
-      if (typeof cat === 'string') return cat === String(id);
-      if (typeof cat === 'object' && cat && cat._id) return String(cat._id) === String(id);
-      return false;
-    })
-  );
+  const { books, loading, error } = useCategoryBooks(String(id));
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{name || 'Danh mục'}</Text>
+      {error && <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>}
       <FlatList
-        data={filteredBooks}
+        data={books}
         keyExtractor={item => item._id}
         renderItem={({ item }) => <BookCard book={item} />}
         numColumns={2}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text>Không có sách nào trong danh mục này.</Text>}
+        ListEmptyComponent={loading ? <Text>Đang tải...</Text> : <Text>Không có sách nào trong danh mục này.</Text>}
       />
     </View>
   );
@@ -51,4 +42,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CategoryScreen; 
+export default CategoryScreen;

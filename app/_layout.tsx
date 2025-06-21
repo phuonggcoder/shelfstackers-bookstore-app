@@ -1,9 +1,36 @@
 import { Stack } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import SplashScreen from '../screens/SplashScreen';
 
 function RootLayoutNav() {
   const { isLoading } = useAuth();
+  const splashShown = useRef(false);
+  const [isSplashing, setIsSplashing] = useState(true);
+
+  useEffect(() => {
+    console.log('RootLayoutNav mounted');
+    if (!splashShown.current) {
+      splashShown.current = true;
+      setTimeout(() => {
+        setIsSplashing(false);
+        console.log('RootLayoutNav: splash done');
+      }, 1800);
+    } else {
+      setIsSplashing(false);
+      console.log('RootLayoutNav: splash skipped');
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('HomeScreen mounted');
+  }, []);
+
+  if (isSplashing) {
+    console.log('RootLayoutNav: show splash');
+    return <SplashScreen />;
+  }
 
   if (isLoading) {
     return (
@@ -17,16 +44,15 @@ function RootLayoutNav() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'fade', // Add fade animation for all stack transitions
+        animation: 'fade',
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen 
         name="(auth)" 
         options={{ 
-          headerShown: false,
           presentation: 'modal',
-          animation: 'fade', // Ensure fade animation for auth modal as well
+          animation: 'fade',
         }} 
       />
     </Stack>
