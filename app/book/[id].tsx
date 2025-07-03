@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { Animated, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomAlert from '../../components/BottomAlert';
@@ -91,7 +92,15 @@ const BookDetailsScreen = () => {
     );
   }
 
-  const images = book.cover_image && book.cover_image.length > 0 ? book.cover_image : ['https://i.imgur.com/gTzT0hA.jpeg']; // Default image
+  const images = book.cover_image && book.cover_image.length > 0 
+    ? book.cover_image.filter(img => img && img.trim() !== '') 
+    : ['https://i.imgur.com/gTzT0hA.jpeg']; // Default image
+
+  // Helper function to validate image URL
+  const getValidImageUrl = (url: string) => {
+    if (!url || url.trim() === '') return 'https://i.imgur.com/gTzT0hA.jpeg';
+    return url;
+  };
 
   const onMomentumScrollEnd = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
@@ -131,6 +140,19 @@ const BookDetailsScreen = () => {
     }
     if (!book) return;
     router.push({ pathname: '/order-review', params: { bookId: book._id } });
+  };
+
+  const tagsStyles = {
+    b: { fontWeight: 'bold' },
+    strong: { fontWeight: 'bold' },
+    i: { fontStyle: 'italic' },
+    em: { fontStyle: 'italic' },
+    p: { marginBottom: 10, lineHeight: 22, color: '#333' },
+    br: { height: 10 },
+    h1: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
+    h2: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+    ul: { marginBottom: 10, paddingLeft: 20 },
+    li: { marginBottom: 6 },
   };
 
   return (
@@ -206,13 +228,50 @@ const BookDetailsScreen = () => {
           onScroll={handleScroll}
           scrollEventThrottle={16}
       >
+          {/* Custom Header: Nổi trên cùng */}
+          <View style={{
+            position: 'absolute',
+            top: insets.top || 30,
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 10,
+            height: 56,
+            backgroundColor: '#fff',
+            opacity: 1,
+            borderBottomWidth: 1,
+            borderBottomColor: '#eee',
+          }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, backgroundColor: 'transparent', borderRadius: 20 }}>
+              <Ionicons name="arrow-back" size={24} color="black" />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity style={{ marginRight: 15, padding: 8, backgroundColor: 'transparent', borderRadius: 20 }} onPress={() => handleFavorite(id)}>
+                <Ionicons name="heart-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginRight: 15, padding: 8, backgroundColor: 'transparent', borderRadius: 20 }}>
+                <Ionicons name="share-outline" size={24} color="black" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAddToCart} style={{ padding: 8, backgroundColor: 'transparent', borderRadius: 20 }}>
+                <Ionicons name="cart-outline" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+          </View>
           {images.length > 1 ? (
               <View style={styles.sliderContainer}>
                   <FlatList
                       ref={flatListRef}
                       data={images}
                       renderItem={({ item }) => (
-                          <Image source={{ uri: item }} style={[styles.sliderImage, { width }]} />
+                          <Image 
+                              source={{ uri: getValidImageUrl(item) }} 
+                              style={[styles.sliderImage, { width }]} 
+                              contentFit="contain"
+                              transition={300}
+                          />
                       )}
                       horizontal
                       pagingEnabled
@@ -238,7 +297,12 @@ const BookDetailsScreen = () => {
               </View>
           ) : (
               <View style={styles.sliderContainer}>
-                  <Image source={{ uri: images[0] }} style={[styles.sliderImage, { width }]} />
+                  <Image 
+                      source={{ uri: getValidImageUrl(images[0]) }} 
+                      style={[styles.sliderImage, { width }]} 
+                      contentFit="contain"
+                      transition={300}
+                  />
               </View>
           )}
 
@@ -268,9 +332,16 @@ const BookDetailsScreen = () => {
           
           <View style={styles.descriptionContainer}>
               <Text style={styles.sectionTitle}>Descriptions</Text>
-              <RenderHTML contentWidth={width} source={{ html: truncatedHtml }} />
+              <RenderHTML
+                contentWidth={width}
+                source={{ html: truncatedHtml }}
+                tagsStyles={tagsStyles}
+              />
               <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
                   <Text style={styles.readMore}>{isExpanded ? 'Read Less' : 'Read More'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })}>
+                  <Text style={styles.readMore}>Xem thông tin chi tiết</Text>
               </TouchableOpacity>
           </View>
 

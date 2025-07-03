@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getBooksByCategory, getCart, removeFromCart, updateCartQuantity } from '../services/api';
 import { Book } from '../types';
-import { formatVND } from '../utils/format';
+import { formatVND, getFirstValidImage } from '../utils/format';
 
 type CartItem = {
   book: Book;
@@ -160,7 +160,7 @@ const CartScreen = () => {
               {isSelected && <Ionicons name="checkmark" size={18} color="#fff" />}
             </View>
           </Pressable>
-          <Image source={{ uri: item.book.cover_image?.[0] || '' }} style={styles.bookCoverSmall} contentFit="cover" />
+          <Image source={{ uri: getFirstValidImage(item.book.cover_image) || '' }} style={styles.bookCoverSmall} contentFit="cover" />
         </View>
         <View style={styles.cartItemInfo}>
           <Text style={styles.bookTitle}>{item.book.title}</Text>
@@ -226,7 +226,7 @@ const CartScreen = () => {
               keyExtractor={item => item._id}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.relatedBookCard} onPress={() => router.push({ pathname: '/book/[id]', params: { id: item._id } })}>
-                  <Image source={{ uri: item.cover_image?.[0] || '' }} style={styles.relatedBookImage} contentFit="cover" />
+                  <Image source={{ uri: getFirstValidImage(item.cover_image) || '' }} style={styles.relatedBookImage} contentFit="cover" />
                   <Text style={styles.relatedBookTitle} numberOfLines={2}>{item.title}</Text>
                   <Text style={styles.relatedBookPrice}>{formatVND(item.price)}</Text>
                 </TouchableOpacity>
@@ -259,7 +259,6 @@ const CartScreen = () => {
       </View>
     </SafeAreaView>
   );
-
   return loading ? <Text>Đang tải giỏ hàng...</Text> : (cartItems.length > 0 ? <CartContent /> : <EmptyCart onContinueShopping={() => router.push('/')} />);
 };
 

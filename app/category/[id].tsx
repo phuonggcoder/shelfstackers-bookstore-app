@@ -17,8 +17,9 @@ const CategoryScreen = () => {
         data={books}
         keyExtractor={item => item._id}
         renderItem={({ item }) => <BookCard book={item} />}
-        numColumns={2}
+        numColumns={3}
         contentContainerStyle={styles.list}
+        columnWrapperStyle={{ justifyContent: 'space-between' }}
         ListEmptyComponent={loading ? <Text>Đang tải...</Text> : <Text>Không có sách nào trong danh mục này.</Text>}
       />
     </View>
