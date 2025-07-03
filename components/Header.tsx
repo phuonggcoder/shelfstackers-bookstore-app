@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   title?: string;
@@ -11,6 +12,10 @@ interface HeaderProps {
 
 const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps) => {
   const router = useRouter();
+  const { user } = useAuth();
+  const fullName = user?.full_name;
+  const isLoggedIn = !!user;
+  const displayName = (isLoggedIn && fullName) ? fullName : 'bạn';
 
   return (
     <View style={styles.container}>
@@ -28,11 +33,16 @@ const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps
             <Text style={styles.headerTitle}>{title}</Text>
           ) : (
             <>
-              <Text style={styles.greeting}>Welcome to ShelfStackers 👋</Text>
-              <Text style={styles.title}>Find Your Next Book</Text>
+              <Text style={styles.greeting}>
+                {`Chào mừng ${displayName}\n Đến với ShelfStackers 👋`}
+                
+              </Text>
+              <Text style={styles.title}>Hôm nay bạn muốn đọc sách gì?</Text>
+
             </>
           )}
         </View>
+
       </View>
       {showIcons && (
         <View style={styles.iconContainer}>
@@ -80,9 +90,10 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   title: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#222',
+    marginTop: 2,
   },
   iconContainer: {
     flexDirection: 'row',

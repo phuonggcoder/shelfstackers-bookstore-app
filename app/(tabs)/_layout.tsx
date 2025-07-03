@@ -30,11 +30,11 @@ const TabsLayout = () => {
           headerShown: false,
         })}
       >
-        <Tabs.Screen name="index" options={{ title: 'Home' }} />
-        <Tabs.Screen name="search" options={{ title: 'Search' }} />
-        <Tabs.Screen name="categories" options={{ title: 'Categories' }} />
-        <Tabs.Screen name="favourite" options={{ title: 'Favorite' }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+        <Tabs.Screen name="index" options={{ title: 'Trang chủ' }} />
+        <Tabs.Screen name="search" options={{ title: 'Tìm kiếm' }} />
+        <Tabs.Screen name="categories" options={{ title: 'Danh mục' }} />
+        <Tabs.Screen name="favourite" options={{ title: 'Yêu thích' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Cá nhân' }} />
       </Tabs>
     </DataProvider>
   );

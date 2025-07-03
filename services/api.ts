@@ -181,27 +181,6 @@ const api = {
   },
 
   // ADDRESS
-  addAddress: async (token: string, address: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(address),
-    });
-    if (!response.ok) throw new Error('Failed to add address');
-    return response.json();
-  },
-
-  getAddresses: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error('Failed to fetch addresses');
-    return response.json();
-  },
-
   updateAddress: async (token: string, addressId: string, data: any) => {
     const response = await fetch(`${API_BASE_URL}/api/addresses/${addressId}`, {
       method: 'PUT',
@@ -244,6 +223,83 @@ const api = {
     const response = await fetch(`${API_BASE_URL}/api/addresses/autocomplete/street?q=${encodeURIComponent(q)}`);
     if (!response.ok) throw new Error('Failed to autocomplete street');
     return response.json();
+  },
+
+  // Address APIs
+  getProvinces: async (search?: string) => {
+    try {
+      const url = search 
+        ? `${API_BASE_URL}/autocomplete/province?q=${encodeURIComponent(search)}`
+        : `${API_BASE_URL}/autocomplete/province`;
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching provinces:', error);
+      throw error;
+    }
+  },
+
+  getDistricts: async (provinceCode: string, search?: string) => {
+    try {
+      const url = search 
+        ? `${API_BASE_URL}/autocomplete/district?province_code=${provinceCode}&q=${encodeURIComponent(search)}`
+        : `${API_BASE_URL}/autocomplete/district?province_code=${provinceCode}`;
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      throw error;
+    }
+  },
+
+  getWards: async (districtCode: string, search?: string) => {
+    try {
+      const url = search 
+        ? `${API_BASE_URL}/autocomplete/ward?district_code=${districtCode}&q=${encodeURIComponent(search)}`
+        : `${API_BASE_URL}/autocomplete/ward?district_code=${districtCode}`;
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching wards:', error);
+      throw error;
+    }
+  },
+
+  createAddress: async (token: string, addressData: {
+    receiver_name: string;
+    phone_number: string;
+    province: string;
+    district: string;
+    ward: string;
+    address_detail: string;
+    is_default: boolean;
+    type: 'office' | 'home';
+  }) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/addresses`, addressData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating address:', error);
+      throw error;
+    }
+  },
+
+  getAddresses: async (token: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/addresses`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+      throw error;
+    }
   },
 };
 

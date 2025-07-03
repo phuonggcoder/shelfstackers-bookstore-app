@@ -1,15 +1,17 @@
+import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
@@ -43,6 +45,9 @@ export default function Login() {
   };
 
   return (
+    <ScrollView style={styles.scrollbox}> 
+      
+   
     <View style={styles.container}>
       <View style={styles.header}>
         <Image
@@ -137,15 +142,28 @@ export default function Login() {
           </TouchableOpacity>
         </View>
       </View>
+     
     </View>
+     <AvoidKeyboardDummyView minHeight={0} maxHeight={300}>
+
+     </AvoidKeyboardDummyView>
+     </ScrollView>
   );
 }
 
+
 const styles = StyleSheet.create({
+
+  scrollbox:{
+    backgroundColor: '#fff',
+    flex:1,
+
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
     paddingHorizontal: 20,
+    marginTop:50,
     justifyContent: 'center',
   },
   header: {

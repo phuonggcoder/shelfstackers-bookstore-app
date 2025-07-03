@@ -76,12 +76,17 @@ const SettingsScreen = () => {
           <SettingItem 
             icon="receipt-outline" 
             label="Purchase History" 
-            onPress={() => {}} 
+            onPress={() => router.push('/order-history')} 
           />
           <SettingItem 
             icon="card-outline" 
             label="Payment Method" 
             onPress={() => router.push('/payment')} 
+          />
+          <SettingItem 
+            icon="location-outline" 
+            label="Địa chỉ đặt hàng" 
+            onPress={() => router.push('/address-list')} 
           />
         </View>
 
