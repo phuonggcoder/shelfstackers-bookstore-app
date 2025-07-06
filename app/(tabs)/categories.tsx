@@ -34,7 +34,7 @@ const CategoriesScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Categories</Text>
+        <Text style={styles.title}>Danh mục</Text>
         <TouchableOpacity 
           onPress={() => router.push('/allcategories')}
           style={styles.seeAll}

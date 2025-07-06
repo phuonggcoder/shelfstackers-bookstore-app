@@ -15,17 +15,17 @@ type Notification = {
 const mockNotifications: Notification[] = [
   {
     id: '1',
-    title: 'Order Confirmed',
-    message: 'Your order #12345 has been confirmed and is being processed',
-    time: '2 hours ago',
+    title: 'Đơn hàng đã xác nhận',
+    message: 'Đơn hàng #12345 của bạn đã được xác nhận và đang được xử lý',
+    time: '2 giờ trước',
     read: false,
     type: 'order',
   },
   {
     id: '2',
-    title: 'Special Offer',
-    message: 'Get 20% off on all fiction books this weekend!',
-    time: '1 day ago',
+    title: 'Ưu đãi đặc biệt',
+    message: 'Giảm 20% cho tất cả sách tiểu thuyết cuối tuần này!',
+    time: '1 ngày trước',
     read: true,
     type: 'promotion',
   },
@@ -67,7 +67,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
 const NotificationsScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Notifications</Text>
+      <Text style={styles.title}>Thông báo</Text>
       {mockNotifications.length > 0 ? (
         <FlatList
           data={mockNotifications}
@@ -78,7 +78,7 @@ const NotificationsScreen = () => {
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
-          <Text style={styles.emptyText}>No notifications yet</Text>
+          <Text style={styles.emptyText}>Chưa có thông báo nào</Text>
         </View>
       )}
     </View>

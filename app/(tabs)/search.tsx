@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Animated,
     Dimensions,
     FlatList,
     Image,
@@ -13,8 +15,10 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getBookImageUrl } from '../../utils/format';
 
 const API_BOOKS = 'https://server-shelf-stacker.onrender.com/api/books';
 const API_CATEGORIES = 'https://server-shelf-stacker.onrender.com/api/categories';
@@ -30,6 +34,13 @@ const SearchScreen = () => {
   const [activeTab, setActiveTab] = useState<'book' | 'category'>('book');
   const router = useRouter();
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const insets = useSafeAreaInsets();
+  const { autoFocus } = useLocalSearchParams();
+  const searchInputRef = useRef<TextInput>(null);
+  
+  // Animation values
+  const borderAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const loadRecentSearches = async () => {
@@ -38,6 +49,53 @@ const SearchScreen = () => {
     };
     loadRecentSearches();
   }, []);
+
+  // Auto focus khi navigate từ trang chủ
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Focus effect triggered:', { autoFocus, searchInputRef: !!searchInputRef.current });
+      if (autoFocus === 'true' && searchInputRef.current) {
+        // Tăng delay để đảm bảo component đã render hoàn toàn
+        setTimeout(() => {
+          console.log('Attempting to focus input...');
+          searchInputRef.current?.focus();
+          // Clear param sau khi focus thành công
+          router.setParams({ autoFocus: 'false' });
+        }, 500);
+      }
+    }, [autoFocus])
+  );
+
+  // Animation handlers
+  const handleFocus = () => {
+    Animated.parallel([
+      Animated.timing(borderAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1.02,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const handleBlur = () => {
+    Animated.parallel([
+      Animated.timing(borderAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
 
   // Search realtime khi searchText thay đổi (debounce 300ms)
   useEffect(() => {
@@ -127,25 +185,38 @@ const SearchScreen = () => {
   const ITEM_HEIGHT = 180;
   const PLACEHOLDER_IMAGE = 'https://i.imgur.com/gTzT0hA.jpeg';
 
-  const renderGridItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
-      onPress={() => handleResultPress(item)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.gridThumbWrap}>
-        <Image
-          source={{ uri: item.image_url || item.image || PLACEHOLDER_IMAGE }}
-          style={styles.gridThumb}
-          resizeMode="cover"
-        />
-      </View>
-      <Text style={styles.gridTitle} numberOfLines={2}>{item.title || item.name}</Text>
-      {activeTab === 'book' && item.author && (
-        <Text style={styles.gridAuthor} numberOfLines={1}>{item.author}</Text>
-      )}
-    </TouchableOpacity>
-  );
+  const renderGridItem = ({ item }: { item: any }) => {
+    // Use utility function for consistent image handling
+    const getImageUrl = () => {
+      if (activeTab === 'book') {
+        // For books: use the utility function
+        return getBookImageUrl(item);
+      } else {
+        // For categories: use image_url or image
+        return item.image_url || item.image || PLACEHOLDER_IMAGE;
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
+        onPress={() => handleResultPress(item)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.gridThumbWrap}>
+          <Image
+            source={{ uri: getImageUrl() }}
+            style={styles.gridThumb}
+            resizeMode="cover"
+          />
+        </View>
+        <Text style={styles.gridTitle} numberOfLines={2}>{item.title || item.name}</Text>
+        {activeTab === 'book' && item.author && (
+          <Text style={styles.gridAuthor} numberOfLines={1}>{item.author}</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   // UI grid list
   const renderGridList = (data: any[]) => (
@@ -166,9 +237,18 @@ const SearchScreen = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: insets.top }}>
         <View style={styles.topSearchContainer}>
-          <View style={styles.searchSection}>
+          <Animated.View style={[
+            styles.searchSection,
+            {
+              borderColor: borderAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['#E0E0E0', '#5E5CE6'],
+              }),
+              transform: [{ scale: scaleAnim }],
+            }
+          ]}>
             <Ionicons name="search" size={22} color="#888" style={styles.searchIcon} />
             <TextInput
               value={searchText}
@@ -176,8 +256,20 @@ const SearchScreen = () => {
               placeholder={activeTab === 'book' ? 'Tìm kiếm sách, tác giả...' : 'Tìm kiếm danh mục...'}
               style={styles.input}
               returnKeyType="search"
+              ref={searchInputRef}
+              onLayout={() => {
+                // Focus khi layout hoàn thành nếu có autoFocus
+                if (autoFocus === 'true') {
+                  setTimeout(() => {
+                    console.log('Focusing on layout complete');
+                    searchInputRef.current?.focus();
+                  }, 300);
+                }
+              }}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
             />
-          </View>
+          </Animated.View>
           <TouchableOpacity style={styles.filterButton}>
             <Ionicons name="filter" size={22} color="#fff" />
           </TouchableOpacity>

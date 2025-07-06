@@ -5,12 +5,14 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import AvoidKeyboardDummyView from '../../components/AvoidKeyboardDummyView';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
@@ -66,113 +68,120 @@ export default function Register() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require('../../assets/images/icon.png')}
-          style={styles.logo}
-          contentFit="contain"
-        />
-        <Text style={styles.title}>Đăng ký tài khoản</Text>
-        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tên người dùng</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập tên người dùng"
-            value={username}
-            onChangeText={setUsername}
-            editable={!isLoading}
+    <ScrollView style={styles.scrollbox}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+            contentFit="contain"
           />
+          <Text style={styles.title}>Đăng ký tài khoản</Text>
+          <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!isLoading}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập mật khẩu"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={styles.eyeIcon}
-            onPress={() => setShowPassword(!showPassword)}
-          >
-            <Ionicons
-              name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-              size={24}
-              color="#999"
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Tên người dùng</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập tên người dùng"
+              value={username}
+              onChangeText={setUsername}
+              editable={!isLoading}
             />
-          </TouchableOpacity>
-        </View>
+          </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nhập lại mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập lại mật khẩu"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry={!showConfirmPassword}
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={styles.eyeIcon}
-            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-          >
-            <Ionicons
-              name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-              size={24}
-              color="#999"
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!isLoading}
             />
-          </TouchableOpacity>
-        </View>
+          </View>
 
-        <TouchableOpacity
-          style={[
-            styles.registerButton,
-            isLoading && styles.registerButtonDisabled,
-          ]}
-          onPress={handleRegister}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.registerButtonText}>Đăng ký</Text>
-          )}
-        </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Mật khẩu</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập mật khẩu"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                size={24}
+                color="#999"
+              />
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>Đã có tài khoản?</Text>
-          <TouchableOpacity onPress={() => router.push('/login')}>
-            <Text style={styles.loginLink}>Đăng nhập</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nhập lại mật khẩu</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập lại mật khẩu"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                size={24}
+                color="#999"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.registerButton,
+              isLoading && styles.registerButtonDisabled,
+            ]}
+            onPress={handleRegister}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.registerButtonText}>Đăng ký</Text>
+            )}
           </TouchableOpacity>
+
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>Đã có tài khoản?</Text>
+            <TouchableOpacity onPress={() => router.push('/login')}>
+              <Text style={styles.loginLink}>Đăng nhập</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+      <AvoidKeyboardDummyView minHeight={0} maxHeight={300} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollbox: {
+    backgroundColor: '#fff',
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',

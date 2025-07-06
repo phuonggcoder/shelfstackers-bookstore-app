@@ -30,21 +30,21 @@ const PaymentScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Payment Method</Text>
+      <Text style={styles.title}>Phương thức thanh toán</Text>
       
       <View style={styles.paymentMethodsContainer}>
-        {renderPaymentMethodOption('card', 'Credit Card', 'card-outline')}
+        {renderPaymentMethodOption('card', 'Thẻ tín dụng', 'card-outline')}
         {renderPaymentMethodOption('momo', 'Momo', 'wallet-outline')}
-        {renderPaymentMethodOption('cod', 'Cash on Delivery', 'cash-outline')}
+        {renderPaymentMethodOption('cod', 'Thanh toán khi nhận hàng', 'cash-outline')}
       </View>
 
       {selectedMethod === 'card' && (
         <View style={styles.cardDetailsContainer}>
-          <Text style={styles.sectionTitle}>Card Details</Text>
+          <Text style={styles.sectionTitle}>Thông tin thẻ</Text>
           
           <TextInput
             style={styles.input}
-            placeholder="Card Number"
+            placeholder="Số thẻ"
             value={cardNumber}
             onChangeText={setCardNumber}
             keyboardType="numeric"
@@ -71,26 +71,26 @@ const PaymentScreen = () => {
       )}
 
       <View style={styles.summaryContainer}>
-        <Text style={styles.sectionTitle}>Order Summary</Text>
+        <Text style={styles.sectionTitle}>Tóm tắt đơn hàng</Text>
         
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Subtotal</Text>
+          <Text style={styles.summaryLabel}>Tạm tính</Text>
           <Text style={styles.summaryValue}>500,000 ₫</Text>
         </View>
         
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Shipping</Text>
+          <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
           <Text style={styles.summaryValue}>30,000 ₫</Text>
         </View>
         
         <View style={[styles.summaryRow, styles.totalRow]}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>Tổng cộng</Text>
           <Text style={styles.totalValue}>530,000 ₫</Text>
         </View>
       </View>
 
       <TouchableOpacity style={styles.payButton}>
-        <Text style={styles.payButtonText}>Pay Now</Text>
+        <Text style={styles.payButtonText}>Thanh toán ngay</Text>
       </TouchableOpacity>
     </ScrollView>
   );

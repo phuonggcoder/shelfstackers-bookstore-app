@@ -4,14 +4,14 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
@@ -141,6 +141,20 @@ export default function Login() {
             <Text style={styles.registerLink}> Đăng ký ngay</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.orContainer}>
+          <View style={styles.orLine} />
+          <Text style={styles.orText}>hoặc</Text>
+          <View style={styles.orLine} />
+        </View>
+
+        <TouchableOpacity 
+          style={styles.skipLoginContainer}
+          onPress={() => router.replace('/(tabs)')}
+        >
+          <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
+          <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
+        </TouchableOpacity>
       </View>
      
     </View>
@@ -316,5 +330,33 @@ const styles = StyleSheet.create({
     color: '#3255FB',
     fontSize: 14,
     fontWeight: '600',
+  },
+  skipLoginContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  skipLoginText: {
+    color: '#3255FB',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  orText: {
+    marginHorizontal: 15,
+    color: '#666',
+    fontSize: 14,
   },
 });

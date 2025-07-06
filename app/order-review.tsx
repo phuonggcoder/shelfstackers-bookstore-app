@@ -1,14 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AddressSelector from '../components/AddressSelector';
+import PaymentMethodSelector from '../components/PaymentMethodSelector';
 import { useAuth } from '../context/AuthContext';
 import { getAddresses } from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
-import { formatVND } from '../utils/format';
+import { createOrder } from '../services/orderService';
+import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
+import { getAvailableVouchers, validateVoucher } from '../services/voucherService';
+import { formatVND, getBookImageUrl } from '../utils/format';
 
 export default function OrderReviewScreen() {
   const { token } = useAuth();
@@ -19,9 +24,10 @@ export default function OrderReviewScreen() {
   const [address, setAddress] = useState<any>(null);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [payment] = useState<any>({ method: 'Master Card', card: '4897 4700 2589 9658' });
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(PAYMENT_METHODS.COD);
   const [shipping] = useState<'free' | 'fast'>('free');
-  const [discount] = useState(15000); // giả lập
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<any|null>(null);
   const router = useRouter();
 
   // Load addresses
@@ -29,75 +35,141 @@ export default function OrderReviewScreen() {
     const loadAddresses = async () => {
       if (!token) return;
       try {
-        const addressData = await getAddresses(token);
-        setAddresses(addressData.addresses || []);
-        // Set default address
-        const defaultAddress = addressData.addresses?.find((addr: any) => addr.is_default);
-        if (defaultAddress) {
-          setAddress(defaultAddress);
+        const addresses = await getAddresses(token);
+        setAddresses(addresses);
+        console.log('OrderReview addresses:', addresses);
+        
+        // Check if there's a selected address from address list
+        const selectedAddressStr = await AsyncStorage.getItem('selected_address');
+        if (selectedAddressStr) {
+          const selectedAddress = JSON.parse(selectedAddressStr);
+          setAddress(selectedAddress);
+          // Clear the stored address
+          await AsyncStorage.removeItem('selected_address');
+        } else {
+          // Set default address if no selected address
+          const defaultAddress = addresses.find((addr: any) => addr.is_default);
+          if (defaultAddress) {
+            setAddress(defaultAddress);
+          }
         }
       } catch (error) {
         console.error('Error loading addresses:', error);
+        setAddresses([]);
       }
     };
     loadAddresses();
   }, [token]);
 
-  // Multi-item: fetch cart and filter by ids
+  // Load book or cart data
   useEffect(() => {
-    const fetchCartItems = async () => {
-      if (!ids || !token) return;
+    const loadData = async () => {
       setLoading(true);
       try {
-        const cart = await getCart(token);
-        const idArr = String(ids).split(',');
-        const selected = (cart.items || []).filter((item: any) => idArr.includes(item.book_id?._id || item.book_id));
-        // Map to unified format for rendering
-        setCartItems(selected.map((item: any) => ({
-          book: item.book_id,
-          quantity: item.quantity,
-        })));
-      } catch {
-        setCartItems([]);
+        if (ids) {
+          // Multi-item checkout from cart - only load selected items
+          if (!token) {
+            console.error('No token available for cart fetch');
+            return;
+          }
+          const cartData = await getCart(token);
+          const allCartItems = cartData.items || [];
+          
+          // Parse selected item IDs
+          const selectedIds = Array.isArray(ids) ? ids : ids.split(',').filter(id => id.trim() !== '');
+          console.log('OrderReview selected IDs:', selectedIds);
+          
+          // Filter cart items to only include selected ones
+          const selectedItems = allCartItems.filter((item: any) => {
+            if (!item.book_id) {
+              console.log('Skipping item with null book_id:', item);
+              return false;
+            }
+            const bookId = item.book_id._id || item.book_id;
+            const isSelected = selectedIds.includes(bookId);
+            console.log('Checking item:', { bookId, isSelected, item });
+            return isSelected;
+          }).map((item: any) => ({
+            ...item,
+            book: item.book_id, // Map book_id to book for consistency
+          }));
+          
+          console.log('OrderReview selected items:', selectedItems);
+          setCartItems(selectedItems);
+        } else if (bookId && typeof bookId === 'string') {
+          // Single book checkout
+          if (bookId.trim() !== '') {
+            const bookData = await getBookById(bookId);
+            setBook(bookData);
+          }
+        } else if (Array.isArray(bookId) && bookId.length > 0) {
+          // Handle array case
+          const firstBookId = bookId[0];
+          if (firstBookId && typeof firstBookId === 'string') {
+            const bookData = await getBookById(firstBookId);
+            setBook(bookData);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
       } finally {
         setLoading(false);
       }
     };
-    if (ids) fetchCartItems();
-  }, [ids, token]);
+    loadData();
+  }, [bookId, ids, token]);
 
-  // Single book (buy now) logic giữ nguyên
+  // Load vouchers
   useEffect(() => {
-    if (!bookId || ids) return; // skip if multi-item
-    setLoading(true);
-    getBookById(Array.isArray(bookId) ? bookId[0] : bookId)
-      .then(data => {
-        if (data && typeof data === 'object') {
-          if ('book' in data && typeof data.book === 'object') {
-            setBook(data.book);
-          } else {
-            setBook(data);
-          }
+    const loadVouchers = async () => {
+      if (!token) return;
+      try {
+        const vouchersData = await getAvailableVouchers(token);
+        setVouchers(vouchersData.vouchers || vouchersData || []);
+      } catch (error: any) {
+        console.error('Error loading vouchers:', error);
+        // Handle admin-only error gracefully
+        if (error.msg?.includes('Admins only')) {
+          console.log('Voucher API requires admin access, showing empty list');
+          setVouchers([]);
         } else {
-          setBook(null);
+          // Fallback: set empty array để tránh lỗi
+          setVouchers([]);
         }
-      })
-      .catch((err) => {
-        setBook(null);
-      })
-      .finally(() => setLoading(false));
-  }, [bookId, ids]);
+      }
+    };
+    loadVouchers();
+  }, [token]);
 
-  // Tính tổng tiền cho nhiều sách
-  const subtotal = ids
-    ? cartItems.reduce((sum, item) => sum + (item.book?.price || 0) * item.quantity, 0)
-    : (book && typeof book.price === 'number' ? book.price : 0);
-  const shippingFee = shipping === 'free' ? 0 : 20000;
+  // Calculate totals
+  const subtotal = ids 
+    ? cartItems.reduce((sum, item) => {
+        if (!item || !item.book) {
+          console.log('Skipping item with null book for subtotal calculation:', item);
+          return sum;
+        }
+        const price = item.book.price || 0;
+        const quantity = item.quantity || 1;
+        console.log('Adding to subtotal:', { title: item.book.title, price, quantity, total: price * quantity });
+        return sum + (price * quantity);
+      }, 0)
+    : (book?.price || 0);
+  
+  const shippingFee = shipping === 'free' ? 0 : 30000;
+  const discount = selectedVoucher ? (selectedVoucher.voucher_type==='percent' ? subtotal*selectedVoucher.discount_value/100 : selectedVoucher.discount_value) : 15000; // fallback 15000 demo
   const total = subtotal - discount + shippingFee;
 
   const handleEdit = async () => {
     if (!token) return;
     if (ids) {
+      // Store selected cart items for when user returns to cart
+      try {
+        const idsString = Array.isArray(ids) ? ids.join(',') : ids;
+        const selectedItems = idsString.split(',').filter((id: string) => id.trim() !== '');
+        await AsyncStorage.setItem('selected_cart_items', JSON.stringify(selectedItems));
+      } catch (error) {
+        console.error('Error storing selected items:', error);
+      }
       router.replace('/cart');
       return;
     }
@@ -111,13 +183,8 @@ export default function OrderReviewScreen() {
   };
 
   const handleAddressSelect = () => {
-    if (addresses.length === 0) {
-      // No addresses, go to add new address
-      router.push('/add-address');
-    } else {
-      // Show address selection modal
-      setShowAddressModal(true);
-    }
+    // Navigate to address list screen
+    router.push('/address-list?from=order-review');
   };
 
   const handleAddNewAddress = () => {
@@ -126,13 +193,142 @@ export default function OrderReviewScreen() {
   };
 
   const handleConfirm = async () => {
-    if (!address) return Alert.alert('Vui lòng chọn địa chỉ giao hàng!');
+    if (!token) {
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      return;
+    }
+
+    if (!address) {
+      Alert.alert('Lỗi', 'Vui lòng chọn địa chỉ giao hàng.');
+      return;
+    }
+
+    if (!selectedPaymentMethod) {
+      Alert.alert('Lỗi', 'Vui lòng chọn phương thức thanh toán.');
+      return;
+    }
+
+    // Check if we have items to order (either cart items or single book)
+    if ((!cartItems || cartItems.length === 0) && !book) {
+      Alert.alert('Lỗi', 'Không có sản phẩm để đặt hàng. Vui lòng thêm sản phẩm vào giỏ hàng.');
+      return;
+    }
+
+    // For cart items, check if they have valid data
+    if (ids && cartItems) {
+      const invalidItems = cartItems.filter(item => !item.book || !item.book._id);
+      if (invalidItems.length > 0) {
+        Alert.alert('Lỗi', 'Một số sản phẩm trong giỏ hàng không hợp lệ. Vui lòng thử lại.');
+        return;
+      }
+    }
+
     try {
-      // TODO: Gọi API tạo order với nhiều sách nếu ids, hoặc 1 sách nếu bookId
-      Alert.alert('Đặt hàng thành công!', 'Đơn hàng của bạn đã được lưu vào lịch sử.');
-      router.replace('/');
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể đặt hàng.');
+      console.log('Creating order with:', {
+        address_id: address._id,
+        payment_method: selectedPaymentMethod,
+        voucher_code: selectedVoucher?.voucher_id,
+        subtotal: subtotal,
+        cart_items_count: cartItems.length
+      });
+
+      // Validate voucher if selected
+      if (selectedVoucher) {
+        try {
+          console.log('Validating voucher:', selectedVoucher.voucher_id, 'with subtotal:', subtotal);
+          const voucherValidation = await validateVoucher(token, selectedVoucher.voucher_id, subtotal);
+          console.log('Voucher validation result:', voucherValidation);
+          
+          if (!voucherValidation.valid) {
+            Alert.alert('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.');
+            return;
+          }
+        } catch (error: any) {
+          console.error('Voucher validation error:', error);
+          
+          // Handle specific voucher errors
+          let voucherErrorMsg = 'Không thể validate voucher. Vui lòng thử lại.';
+          if (error.message?.includes('toString')) {
+            voucherErrorMsg = 'Lỗi hệ thống voucher. Vui lòng thử lại sau.';
+          } else if (error.message?.includes('Order value must be at least')) {
+            voucherErrorMsg = 'Giá trị đơn hàng không đủ để áp dụng voucher. Vui lòng thêm sản phẩm hoặc chọn voucher khác.';
+          }
+          
+          Alert.alert('Lỗi voucher', voucherErrorMsg);
+          return;
+        }
+      }
+
+      // Create order using the correct API endpoint
+      const orderData = {
+        address_id: address._id,
+        payment_method: selectedPaymentMethod,
+        ...(selectedVoucher && { voucher_code: selectedVoucher.voucher_id })
+      };
+
+      // Add book_id for single book purchase (buy now)
+      if (!ids && book) {
+        orderData.book_id = book._id;
+        orderData.quantity = 1;
+      }
+
+      console.log('Order data being sent:', orderData);
+      const order = await createOrder(token, orderData);
+      console.log('Order created successfully:', order);
+
+      Alert.alert(
+        'Đặt hàng thành công!', 
+        'Đơn hàng của bạn đã được tạo thành công.',
+        [
+          {
+            text: 'Xem đơn hàng',
+            onPress: () => router.push('/order-history')
+          },
+          {
+            text: 'Về trang chủ',
+            onPress: () => router.replace('/')
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error('Order creation error:', error);
+      
+      // Handle specific backend errors with improved messages
+      let errorMessage = 'Không thể đặt hàng. Vui lòng thử lại.';
+      
+      if (error.message) {
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes('not enough stock')) {
+          errorMessage = 'Sản phẩm không đủ số lượng trong kho. Vui lòng chọn sản phẩm khác hoặc giảm số lượng.';
+        } else if (errorMsg.includes('cannot read properties of null') && errorMsg.includes('stock')) {
+          errorMessage = 'Lỗi hệ thống: Thông tin sản phẩm không hợp lệ. Vui lòng thử lại sau.';
+        } else if (errorMsg.includes('duplicate key error')) {
+          errorMessage = 'Lỗi hệ thống: Trùng lặp đơn hàng. Vui lòng thử lại sau.';
+        } else if (errorMsg.includes('order value must be at least')) {
+          errorMessage = 'Giá trị đơn hàng không đủ để áp dụng voucher. Vui lòng thêm sản phẩm hoặc chọn voucher khác.';
+        } else if (errorMsg.includes('payment method is required')) {
+          errorMessage = 'Vui lòng chọn phương thức thanh toán hợp lệ.';
+        } else if (errorMsg.includes('cart is empty')) {
+          errorMessage = 'Giỏ hàng trống. Vui lòng thêm sản phẩm vào giỏ hàng.';
+        } else if (errorMsg.includes('address not found')) {
+          errorMessage = 'Địa chỉ không hợp lệ. Vui lòng chọn địa chỉ khác.';
+        } else if (errorMsg.includes('voucher not found')) {
+          errorMessage = 'Voucher không tồn tại hoặc đã bị xóa.';
+        } else if (errorMsg.includes('voucher is not active')) {
+          errorMessage = 'Voucher không còn hoạt động.';
+        } else if (errorMsg.includes('voucher has expired')) {
+          errorMessage = 'Voucher đã hết hạn.';
+        } else if (errorMsg.includes('usage limit exceeded')) {
+          errorMessage = 'Voucher đã hết lượt sử dụng.';
+        } else if (errorMsg.includes('already used this voucher')) {
+          errorMessage = 'Bạn đã sử dụng voucher này tối đa số lần cho phép.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert('Lỗi', errorMessage);
     }
   };
 
@@ -169,31 +365,33 @@ export default function OrderReviewScreen() {
       </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Multi-item render */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>Sản phẩm</Text>
+        </View>
+        
         {ids ? (
-          <View>
-            {cartItems.map((item, idx) => (
-              <View key={item.book._id || idx} style={styles.itemRow}>
-                <Image 
-                  source={{ uri: getValidImageUrl(item.book.cover_image?.[0] || '') }} 
-                  style={styles.bookImage} 
-                  contentFit="cover"
-                  transition={200}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bookTitle}>{item.book.title || 'Không có tên'}</Text>
-                  <Text style={styles.bookAuthor}>Tác giả: {item.book.author || ''}</Text>
-                  <Text style={styles.bookPrice}>{formatVND(item.book.price || 0)}</Text>
-                  <Text style={styles.qty}>Số lượng: {item.quantity}</Text>
-                </View>
+          // Multiple items from cart
+          cartItems.filter(item => item && item.book).map((item, index) => (
+            <View key={index} style={styles.itemRow}>
+              <Image 
+                source={{ uri: getBookImageUrl(item.book) }} 
+                style={styles.bookImage} 
+                contentFit="cover"
+                transition={200}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bookTitle}>{item.book?.title || 'Không có tên'}</Text>
+                <Text style={styles.bookAuthor}>Tác giả: {item.book?.author || ''}</Text>
+                <Text style={styles.bookPrice}>{formatVND(item.book?.price || 0)}</Text>
+                <Text style={styles.qty}>Số lượng: {item.quantity || 1}</Text>
               </View>
-            ))}
-          </View>
+            </View>
+          ))
         ) : (
           // Single book (buy now)
           <View style={styles.itemRow}>
             <Image 
-              source={{ uri: getValidImageUrl(book.cover_image?.[0] || '') }} 
+              source={{ uri: getBookImageUrl(book) }} 
               style={styles.bookImage} 
               contentFit="cover"
               transition={200}
@@ -229,15 +427,12 @@ export default function OrderReviewScreen() {
           </TouchableOpacity>
         )}
         
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Phương thức thanh toán</Text>
-          <TouchableOpacity><Text style={styles.edit}>Chỉnh sửa</Text></TouchableOpacity>
-        </View>
-        <View style={styles.paymentRow}>
-          <Image source={require('../assets/images/mastercard_temp.png')} style={styles.paymentIcon} />
-          <Text style={styles.paymentText}>{payment.method}</Text>
-          <Text style={styles.paymentCard}>{payment.card}</Text>
-        </View>
+        {/* Payment Method Selector */}
+        <PaymentMethodSelector
+          selectedMethod={selectedPaymentMethod}
+          onSelectMethod={setSelectedPaymentMethod}
+        />
+        
         <View style={styles.sectionRow}>
           <Text style={styles.sectionLabel}>Tóm tắt đơn hàng</Text>
         </View>
@@ -245,6 +440,43 @@ export default function OrderReviewScreen() {
         <View style={styles.summaryRow}><Text>Giảm giá</Text><Text style={{ color: '#4CAF50' }}>- {formatVND(discount)}</Text></View>
         <View style={styles.summaryRow}><Text>Phí vận chuyển</Text><Text style={{ color: '#3255FB' }}>{shippingFee === 0 ? 'Miễn phí' : formatVND(shippingFee)}</Text></View>
         <View style={styles.summaryRow}><Text style={styles.grandTotal}>Tổng cộng</Text><Text style={styles.grandTotal}>{formatVND(total)}</Text></View>
+        
+        {/* Voucher Section */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>Chọn voucher</Text>
+        </View>
+        <View style={styles.voucherContainer}>
+          {vouchers && vouchers.length > 0 ? vouchers.map(v => {
+            const now = new Date();
+            const expired = new Date(v.end_date) <= now;
+            return (
+              <TouchableOpacity
+                key={v._id}
+                style={[
+                  styles.voucherItem,
+                  selectedVoucher?._id === v._id && styles.voucherItemSelected,
+                  expired && styles.voucherItemExpired
+                ]}
+                disabled={expired}
+                onPress={() => setSelectedVoucher(v)}
+              >
+                <Text style={[styles.voucherTitle, expired && styles.voucherTitleExpired]}>Voucher</Text>
+                <Text style={styles.voucherCode}>{v.title || v.voucher_id}</Text>
+                <Text style={styles.voucherDescription}>
+                  {v.description || `${v.discount_value}${v.voucher_type === 'percent' ? '%' : 'đ'} off`}
+                </Text>
+                <Text style={styles.voucherExpiry}>
+                  HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}
+                </Text>
+                {selectedVoucher?._id === v._id && (
+                  <Ionicons name="checkmark-circle" size={18} color="#3255FB" style={styles.voucherCheck} />
+                )}
+              </TouchableOpacity>
+            );
+          }) : (
+            <Text style={styles.noVouchersText}>Không có voucher khả dụng</Text>
+          )}
+        </View>
       </ScrollView>
       
       <TouchableOpacity style={styles.payButton} onPress={handleConfirm}>
@@ -299,4 +531,23 @@ const styles = StyleSheet.create({
   addAddressButton: { flexDirection: 'row', alignItems: 'center', padding: 10 },
   addAddressText: { color: '#3255FB', fontWeight: 'bold', marginLeft: 10 },
   scrollView: { padding: 10 },
+  voucherContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  voucherItem: { 
+    borderWidth: 2, 
+    borderColor: '#ddd', 
+    borderRadius: 10, 
+    padding: 12, 
+    backgroundColor: '#fff',
+    minWidth: 180,
+    position: 'relative'
+  },
+  voucherItemSelected: { borderColor: '#3255FB' },
+  voucherItemExpired: { backgroundColor: '#eee' },
+  voucherTitle: { fontWeight: 'bold', color: '#3255FB' },
+  voucherTitleExpired: { color: '#aaa' },
+  voucherCode: { fontSize: 13, fontWeight: '600', marginVertical: 2 },
+  voucherDescription: { fontSize: 12, color: '#333' },
+  voucherExpiry: { fontSize: 11, color: '#888', marginTop: 2 },
+  voucherCheck: { position: 'absolute', top: 8, right: 8 },
+  noVouchersText: { color: '#888', fontStyle: 'italic', textAlign: 'center', padding: 20 }
 });

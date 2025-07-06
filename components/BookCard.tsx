@@ -4,7 +4,7 @@ import { Link } from 'expo-router';
 import React, { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Book } from '../types';
-import { formatVND } from '../utils/format';
+import { formatVND, getBookImageUrl } from '../utils/format';
 
 interface Props {
   book: Book;
@@ -17,7 +17,7 @@ const BookCard = ({ book }: Props) => {
       <TouchableOpacity style={styles.container}>
         <View>
             <Image 
-                source={{ uri: book.cover_image && book.cover_image.length > 0 ? book.cover_image[0] : undefined }} 
+                source={{ uri: getBookImageUrl(book) }} 
                 style={styles.image}
                 contentFit="cover"
                 transition={300}

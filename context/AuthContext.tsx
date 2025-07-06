@@ -10,6 +10,10 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (userData: AuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
+  checkTokenExpiration: () => Promise<boolean>;
+  showTokenExpiredAlert: () => void;
+  tokenExpiredAlertVisible: boolean;
+  hideTokenExpiredAlert: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,19 +22,74 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   signIn: async () => {},
   signOut: async () => {},
+  checkTokenExpiration: async () => false,
+  showTokenExpiredAlert: () => {},
+  tokenExpiredAlertVisible: false,
+  hideTokenExpiredAlert: () => {},
 });
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  // Always return a valid context object, never undefined
+  return context || {
+    user: null,
+    token: null,
+    isLoading: true,
+    signIn: async () => {},
+    signOut: async () => {},
+    checkTokenExpiration: async () => false,
+    showTokenExpiredAlert: () => {},
+    tokenExpiredAlertVisible: false,
+    hideTokenExpiredAlert: () => {},
+  };
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tokenExpiredAlertVisible, setTokenExpiredAlertVisible] = useState(false);
 
   useEffect(() => {
     loadStoredAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Check token expiration periodically (only if user is actively using the app)
+  useEffect(() => {
+    if (token) {
+      const checkInterval = setInterval(async () => {
+        const isValid = await checkTokenExpiration();
+        if (!isValid) {
+          console.log('Token expired, showing alert');
+          await signOut();
+          setTokenExpiredAlertVisible(true);
+        }
+      }, 300000); // Check every 5 minutes instead of every minute
+
+      return () => clearInterval(checkInterval);
+    }
+  }, [token]);
+
+  const checkTokenExpiration = async (): Promise<boolean> => {
+    if (!token) return false;
+    
+    try {
+      const isValid = await authService.validateToken(token);
+      if (!isValid) {
+        console.log('Token validation failed, showing alert');
+        await signOut();
+        setTokenExpiredAlertVisible(true);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Token validation error:', error);
+      await signOut();
+      setTokenExpiredAlertVisible(true);
+      return false;
+    }
+  };
 
   const loadStoredAuth = async () => {
     try {
@@ -42,28 +101,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken && storedUser) {
         const parsedUser = JSON.parse(storedUser);
 
-        // Validate token with server
-        const isValid = await authService.validateToken(storedToken);
-        if (isValid) {
-          setToken(storedToken);
-          setUser(parsedUser);
-        } else {
-          // Token không hợp lệ, tự động signOut và chuyển về login
-          await signOut();
+        // Set token and user first, then validate in background
+        setToken(storedToken);
+        setUser(parsedUser);
+        
+        // Validate token in background without blocking UI
+        setTimeout(async () => {
           try {
-            const expoRouter = await import('expo-router');
-            expoRouter.router.replace('/(auth)/login');
-          } catch {}
-        }
+            const isValid = await authService.validateToken(storedToken);
+            if (!isValid) {
+              console.log('Token validation failed, showing alert');
+              await signOut();
+              setTokenExpiredAlertVisible(true);
+            }
+          } catch (error) {
+            console.error('Token validation error:', error);
+            await signOut();
+            setTokenExpiredAlertVisible(true);
+          }
+        }, 1000); // Delay validation by 1 second
       }
     } catch (error) {
       console.error('Error loading auth:', error);
-      // Xóa dữ liệu lỗi
+      // Clear invalid data but don't redirect
       await signOut();
-      try {
-        const expoRouter = await import('expo-router');
-        expoRouter.router.replace('/(auth)/login');
-      } catch {}
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +136,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid authentication data');
       }
 
+      // Log chi tiết khi user login thành công
+      console.log('=== USER LOGIN SUCCESS ===');
+      console.log('Login time:', new Date().toISOString());
+      console.log('User data:', {
+        id: userData.user._id,
+        email: userData.user.email,
+        username: userData.user.username,
+        full_name: userData.user.full_name,
+        roles: userData.user.roles
+      });
+      console.log('Token present:', !!userData.token);
+      console.log('Token length:', userData.token?.length);
+      console.log('========================');
+
       // Lưu token và user vào AsyncStorage
       await Promise.all([
         AsyncStorage.setItem('token', userData.token),
@@ -84,12 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(userData.token);
       setUser(userData.user);
 
-      Alert.alert('Success', 'Login successful!');
+      Alert.alert('Thành công', 'Đăng nhập thành công!');
     } catch (error) {
       console.error('Error saving auth:', error);
       Alert.alert(
-        'Authentication Error',
-        'Could not complete the authentication process. Please try again.'
+        'Lỗi xác thực',
+        'Không thể hoàn thành quá trình xác thực. Vui lòng thử lại.'
       );
       throw error; // Throw lại error để component có thể xử lý
     }
@@ -102,12 +177,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
     } catch (error) {
       console.error('Error signing out:', error);
-      Alert.alert('Error', 'Could not sign out properly');
+      Alert.alert('Lỗi', 'Không thể đăng xuất đúng cách');
     }
   };
 
+  const showTokenExpiredAlert = () => {
+    setTokenExpiredAlertVisible(true);
+  };
+
+  const hideTokenExpiredAlert = () => {
+    setTokenExpiredAlertVisible(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      token, 
+      isLoading, 
+      signIn, 
+      signOut, 
+      checkTokenExpiration, 
+      showTokenExpiredAlert,
+      tokenExpiredAlertVisible,
+      hideTokenExpiredAlert
+    }}>
       {children}
     </AuthContext.Provider>
   );

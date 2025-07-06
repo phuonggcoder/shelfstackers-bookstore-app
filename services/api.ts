@@ -18,7 +18,8 @@ export const getBooks = async (): Promise<Book[]> => {
   if (!response.ok) {
     throw new Error('Failed to fetch books');
   }
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.books || [];
 };
 
 export const getBookById = async (id: string): Promise<Book> => {
@@ -34,55 +35,108 @@ export const getBooksByCategory = async (categoryId: string): Promise<Book[]> =>
   if (!response.ok) {
     throw new Error('Failed to fetch books by category');
   }
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.books || [];
 };
 
 // CART
 export const getCart = async (token: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/cart/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) throw new Error('Failed to fetch cart');
-  return response.json();
+  console.log('getCart called with token:', token ? 'present' : 'missing');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/cart/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log('getCart response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('getCart error response:', errorText);
+      throw new Error(`Failed to fetch cart: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('getCart success result:', result);
+    return result;
+  } catch (error) {
+    console.error('getCart catch error:', error);
+    throw error;
+  }
 };
 
 export const addToCart = async (token: string, book_id: string, quantity: number) => {
-  const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ book_id, quantity }),
-  });
-  if (!response.ok) throw new Error('Failed to add to cart');
-  return response.json();
+  console.log('addToCart called with:', { book_id, quantity, token: token ? 'present' : 'missing' });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ book_id, quantity }),
+    });
+    console.log('addToCart response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('addToCart error response:', errorText);
+      throw new Error(`Failed to add to cart: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('addToCart success result:', result);
+    return result;
+  } catch (error) {
+    console.error('addToCart catch error:', error);
+    throw error;
+  }
 };
 
 export const updateCartQuantity = async (token: string, book_id: string, quantity: number) => {
-  const response = await fetch(`${API_BASE_URL}/api/cart/update`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ book_id, quantity }),
-  });
-  if (!response.ok) throw new Error('Failed to update cart');
-  return response.json();
+  console.log('updateCartQuantity called with:', { book_id, quantity, token: token ? 'present' : 'missing' });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/cart/update`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ book_id, quantity }),
+    });
+    console.log('updateCartQuantity response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('updateCartQuantity error response:', errorText);
+      throw new Error(`Failed to update cart: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('updateCartQuantity success result:', result);
+    return result;
+  } catch (error) {
+    console.error('updateCartQuantity catch error:', error);
+    throw error;
+  }
 };
 
 export const removeFromCart = async (token: string, book_id: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/cart/remove`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ book_id }),
-  });
-  if (!response.ok) throw new Error('Failed to remove from cart');
-  return response.json();
+  console.log('removeFromCart called with:', { book_id, token: token ? 'present' : 'missing' });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/cart/remove`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ book_id }),
+    });
+    console.log('removeFromCart response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('removeFromCart error response:', errorText);
+      throw new Error(`Failed to remove from cart: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('removeFromCart success result:', result);
+    return result;
+  } catch (error) {
+    console.error('removeFromCart catch error:', error);
+    throw error;
+  }
 };
 
 export const clearCart = async (token: string) => {
@@ -91,6 +145,34 @@ export const clearCart = async (token: string) => {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error('Failed to clear cart');
+  return response.json();
+};
+
+export const addToWishlist = async (token: string, bookId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/wishlist/add`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ bookId }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error('addToWishlist error:', response.status, text);
+    throw new Error('Failed to add to wishlist: ' + text);
+  }
+  return response.json();
+};
+
+export const removeFromWishlist = async (token: string, bookId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/wishlist/remove/${bookId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) throw new Error('Failed to remove from wishlist');
   return response.json();
 };
 
@@ -116,17 +198,30 @@ const api = {
   },
 
   // ORDER
-  createOrder: async (token: string, address_id: string, voucher_id?: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/orders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ address_id, voucher_id }),
-    });
-    if (!response.ok) throw new Error('Failed to create order');
-    return response.json();
+  createOrder: async (token: string, orderData: { address_id: string; payment_method: string; voucher_id?: string }) => {
+    console.log('createOrder called with:', orderData);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(orderData),
+      });
+      console.log('createOrder response status:', response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('createOrder error response:', errorText);
+        throw new Error(`Failed to create order: ${response.status} - ${errorText}`);
+      }
+      const result = await response.json();
+      console.log('createOrder success result:', result);
+      return result;
+    } catch (error) {
+      console.error('createOrder catch error:', error);
+      throw error;
+    }
   },
 
   getMyOrders: async (token: string) => {
@@ -180,127 +275,9 @@ const api = {
     return response.json();
   },
 
-  // ADDRESS
-  updateAddress: async (token: string, addressId: string, data: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/${addressId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to update address');
-    return response.json();
-  },
 
-  deleteAddress: async (token: string, addressId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/${addressId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error('Failed to delete address');
-    return response.json();
-  },
 
-  // ADDRESS AUTOCOMPLETE
-  autocompleteProvince: async (q: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/autocomplete/province?q=${encodeURIComponent(q)}`);
-    if (!response.ok) throw new Error('Failed to autocomplete province');
-    return response.json();
-  },
-  autocompleteDistrict: async (province_code: string, q: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/autocomplete/district?province_code=${province_code}&q=${encodeURIComponent(q)}`);
-    if (!response.ok) throw new Error('Failed to autocomplete district');
-    return response.json();
-  },
-  autocompleteWard: async (district_code: string, q: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/autocomplete/ward?district_code=${district_code}&q=${encodeURIComponent(q)}`);
-    if (!response.ok) throw new Error('Failed to autocomplete ward');
-    return response.json();
-  },
-  autocompleteStreet: async (q: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/addresses/autocomplete/street?q=${encodeURIComponent(q)}`);
-    if (!response.ok) throw new Error('Failed to autocomplete street');
-    return response.json();
-  },
 
-  // Address APIs
-  getProvinces: async (search?: string) => {
-    try {
-      const url = search 
-        ? `${API_BASE_URL}/autocomplete/province?q=${encodeURIComponent(search)}`
-        : `${API_BASE_URL}/autocomplete/province`;
-      const response = await axios.get(url);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching provinces:', error);
-      throw error;
-    }
-  },
-
-  getDistricts: async (provinceCode: string, search?: string) => {
-    try {
-      const url = search 
-        ? `${API_BASE_URL}/autocomplete/district?province_code=${provinceCode}&q=${encodeURIComponent(search)}`
-        : `${API_BASE_URL}/autocomplete/district?province_code=${provinceCode}`;
-      const response = await axios.get(url);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching districts:', error);
-      throw error;
-    }
-  },
-
-  getWards: async (districtCode: string, search?: string) => {
-    try {
-      const url = search 
-        ? `${API_BASE_URL}/autocomplete/ward?district_code=${districtCode}&q=${encodeURIComponent(search)}`
-        : `${API_BASE_URL}/autocomplete/ward?district_code=${districtCode}`;
-      const response = await axios.get(url);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching wards:', error);
-      throw error;
-    }
-  },
-
-  createAddress: async (token: string, addressData: {
-    receiver_name: string;
-    phone_number: string;
-    province: string;
-    district: string;
-    ward: string;
-    address_detail: string;
-    is_default: boolean;
-    type: 'office' | 'home';
-  }) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/addresses`, addressData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error creating address:', error);
-      throw error;
-    }
-  },
-
-  getAddresses: async (token: string) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/addresses`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching addresses:', error);
-      throw error;
-    }
-  },
 };
 
 export default api;

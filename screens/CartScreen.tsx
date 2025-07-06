@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getBooksByCategory, getCart, removeFromCart, updateCartQuantity } from '../services/api';
 import { Book } from '../types';
-import { formatVND, getFirstValidImage } from '../utils/format';
+import { formatVND, getBookImageUrl } from '../utils/format';
 
 type CartItem = {
   book: Book;
@@ -17,29 +18,54 @@ type CartItem = {
 // Mock data - replace with real cart data later
 const mockCartItems: CartItem[] = [];
 
-const EmptyCart = ({ onContinueShopping }: { onContinueShopping: () => void }) => (
-  <View style={styles.emptyContainer}>
-    <Image 
-      source={require('../assets/images/cart.png')}
-      style={styles.emptyCartImage}
-      contentFit="contain"
-    />
-    <Text style={styles.emptyTitle}>Giỏ hàng của bạn còn trống</Text>
-    <Text style={styles.emptyText}>
-      Khám phá các danh mục của chúng tôi và tìm những ưu đãi tốt nhất!
-    </Text>
-    <TouchableOpacity 
-      style={styles.startShoppingButton}
-      onPress={onContinueShopping}
-    >
-      <Text style={styles.startShoppingText}>Bắt đầu mua sắm</Text>
-    </TouchableOpacity>
-  </View>
+const EmptyCart = ({ onContinueShopping, router, isLoggedIn }: { onContinueShopping: () => void; router: any; isLoggedIn: boolean }) => (
+  <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'bottom']}>
+    <View style={[styles.headerBar, { paddingTop: 24 }]}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+        <Ionicons name="arrow-back" size={26} color="#222" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Giỏ hàng</Text>
+    </View>
+    <View style={styles.emptyContainer}>
+      <Image 
+        source={require('../assets/images/cart.png')}
+        style={styles.emptyCartImage}
+        contentFit="contain"
+      />
+      {isLoggedIn ? (
+        <>
+          <Text style={styles.emptyTitle}>Giỏ hàng của bạn còn trống</Text>
+          <Text style={styles.emptyText}>
+            Khám phá các danh mục của chúng tôi và tìm những ưu đãi tốt nhất!
+          </Text>
+          <TouchableOpacity 
+            style={styles.startShoppingButton}
+            onPress={onContinueShopping}
+          >
+            <Text style={styles.startShoppingText}>Bắt đầu mua sắm</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <Text style={styles.emptyTitle}>Vui lòng đăng nhập</Text>
+          <Text style={styles.emptyText}>
+            Đăng nhập để xem giỏ hàng và mua sắm
+          </Text>
+          <TouchableOpacity 
+            style={styles.startShoppingButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={styles.startShoppingText}>Đăng nhập</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  </SafeAreaView>
 );
 
 const CartScreen = () => {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, isLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -49,36 +75,70 @@ const CartScreen = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
+  // Load selected items from AsyncStorage when coming from order review
+  useEffect(() => {
+    const loadSelectedItems = async () => {
+      try {
+        const selectedItemsStr = await AsyncStorage.getItem('selected_cart_items');
+        if (selectedItemsStr) {
+          const selectedItems = JSON.parse(selectedItemsStr);
+          setSelectedIds(selectedItems);
+          // Clear the stored selected items
+          await AsyncStorage.removeItem('selected_cart_items');
+        }
+      } catch (error) {
+        console.error('Error loading selected items:', error);
+      }
+    };
+    loadSelectedItems();
+  }, []);
+
   // Fetch cart
   const fetchCart = useCallback(async () => {
     try {
       setLoading(true);
-      if (!token) return;
+      if (!token || isLoading) {
+        console.log('fetchCart skipped - token or isLoading:', { token: !!token, isLoading });
+        return;
+      }
+      console.log('fetchCart called with token');
       const data = await getCart(token);
+      console.log('fetchCart result:', data);
       const items = (data.items || []).map((item: any) => ({
-        book: item.book_id,
+        book: {
+          ...item.book_id,
+          price: item.price || item.book_id?.price || 0, // Ensure price is available
+          stock: item.book_id?.stock || 0, // Ensure stock is available
+        },
         quantity: item.quantity,
       }));
+      console.log('fetchCart processed items:', items);
       setCartItems(items);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching cart:', error);
       setCartItems([]);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, isLoading]);
 
   // Fetch related books by first book's first category
   useEffect(() => {
     const fetchRelated = async () => {
-      if (cartItems.length === 0 || !cartItems[0].book?.categories?.length) {
+      if (cartItems.length === 0) {
         setRelatedBooks([]);
         setRelatedCategory(null);
         return;
       }
-      const categoryId = cartItems[0].book.categories[0]._id || cartItems[0].book.categories[0];
-      setRelatedCategory(categoryId);
+      const categoryId = cartItems[0].book.categories[0]?._id || cartItems[0].book.categories[0];
+      if (!categoryId) {
+        setRelatedBooks([]);
+        setRelatedCategory(null);
+        return;
+      }
+      setRelatedCategory(String(categoryId));
       try {
-        let books = await getBooksByCategory(categoryId);
+        let books = await getBooksByCategory(String(categoryId));
         // Loại bỏ các sách đã có trong cart
         const cartBookIds = cartItems.map(i => i.book._id);
         books = books.filter(b => !cartBookIds.includes(b._id));
@@ -91,22 +151,72 @@ const CartScreen = () => {
   }, [cartItems]);
 
   React.useEffect(() => {
-    fetchCart();
-  }, [fetchCart]);
+    if (!isLoading) {
+      fetchCart();
+    }
+  }, [fetchCart, isLoading]);
 
   const updateQuantity = async (bookId: string, increment: boolean) => {
-    if (!token) return;
+    if (!token) {
+      console.error('No token available for updateQuantity');
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      return;
+    }
+    
     const item = cartItems.find(i => i.book._id === bookId);
-    if (!item) return;
+    if (!item) {
+      console.error('Item not found for updateQuantity:', bookId);
+      Alert.alert('Lỗi', 'Không tìm thấy sản phẩm trong giỏ hàng.');
+      return;
+    }
+    
     const newQuantity = increment ? item.quantity + 1 : Math.max(1, item.quantity - 1);
-    await updateCartQuantity(token, bookId, newQuantity);
-    setCartItems(prev => prev.map(i => i.book._id === bookId ? { ...i, quantity: newQuantity } : i));
+    console.log('Updating quantity for item:', { bookId, oldQuantity: item.quantity, newQuantity, token: token ? 'present' : 'missing' });
+    
+    try {
+      // Optimistic update - update UI first
+      setCartItems(prev => prev.map(i => i.book._id === bookId ? { ...i, quantity: newQuantity } : i));
+      
+      const result = await updateCartQuantity(token, bookId, newQuantity);
+      console.log('Update quantity API result:', result);
+      
+      // Refresh cart data to ensure sync with server
+      await fetchCart();
+      
+    } catch (error: any) {
+      console.error('Error updating quantity:', error);
+      
+      // Revert optimistic update on error
+      setCartItems(prev => prev.map(i => i.book._id === bookId ? { ...i, quantity: item.quantity } : i));
+      
+      // Show user-friendly error message
+      const errorMessage = error.message || 'Không thể cập nhật số lượng. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    }
   };
 
   const removeItem = async (bookId: string) => {
-    if (!token) return;
-    await removeFromCart(token, bookId);
-    setCartItems(prev => prev.filter(item => item.book._id !== bookId));
+    if (!token) {
+      console.error('No token available for removeItem');
+      return;
+    }
+    console.log('Attempting to remove item:', bookId);
+    try {
+      const result = await removeFromCart(token, bookId);
+      console.log('Remove from cart result:', result);
+      
+      // Remove from selected items if it was selected
+      setSelectedIds(prev => prev.filter(id => id !== bookId));
+      
+      // Refresh cart data from server to ensure UI is in sync
+      await fetchCart();
+      
+      console.log('Item removed successfully from UI');
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      // Show user-friendly error message
+      Alert.alert('Lỗi', 'Không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại.');
+    }
   };
 
   // Chọn/bỏ chọn sách để thanh toán
@@ -131,7 +241,10 @@ const CartScreen = () => {
 
   // Tính tổng chỉ các sách được chọn
   const calculateSubtotal = () => {
-    return cartItems.reduce((sum, item) => selectedIds.includes(item.book._id) ? sum + (item.book.price * item.quantity) : sum, 0);
+    return cartItems.reduce((sum, item) => {
+      if (!item || !item.book || !item.book._id) return sum;
+      return selectedIds.includes(item.book._id) ? sum + (item.book.price * item.quantity) : sum;
+    }, 0);
   };
 
   const calculateDiscount = () => {
@@ -160,7 +273,7 @@ const CartScreen = () => {
               {isSelected && <Ionicons name="checkmark" size={18} color="#fff" />}
             </View>
           </Pressable>
-          <Image source={{ uri: getFirstValidImage(item.book.cover_image) || '' }} style={styles.bookCoverSmall} contentFit="cover" />
+          <Image source={{ uri: getBookImageUrl(item.book) }} style={styles.bookCoverSmall} contentFit="cover" />
         </View>
         <View style={styles.cartItemInfo}>
           <Text style={styles.bookTitle}>{item.book.title}</Text>
@@ -182,6 +295,46 @@ const CartScreen = () => {
       </View>
     );
   };
+
+  // Show loading if auth is still loading
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={[styles.headerBar, { paddingTop: 24 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+            <Ionicons name="arrow-back" size={26} color="#222" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Đang tải...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show login prompt if no token
+  if (!token) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={[styles.headerBar, { paddingTop: 24 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+            <Ionicons name="arrow-back" size={26} color="#222" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Vui lòng đăng nhập để xem giỏ hàng</Text>
+          <TouchableOpacity 
+            style={{ marginTop: 20, padding: 15, backgroundColor: '#3255FB', borderRadius: 8 }}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Đăng nhập</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const CartContent = () => (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'bottom']}> 
@@ -226,16 +379,15 @@ const CartScreen = () => {
               keyExtractor={item => item._id}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.relatedBookCard} onPress={() => router.push({ pathname: '/book/[id]', params: { id: item._id } })}>
-                  <Image source={{ uri: getFirstValidImage(item.cover_image) || '' }} style={styles.relatedBookImage} contentFit="cover" />
+                  <Image source={{ uri: getBookImageUrl(item) }} style={styles.relatedBookImage} contentFit="cover" />
                   <Text style={styles.relatedBookTitle} numberOfLines={2}>{item.title}</Text>
                   <Text style={styles.relatedBookPrice}>{formatVND(item.price)}</Text>
                 </TouchableOpacity>
               )}
-              contentContainerStyle={{ gap: 16 }}
+              contentContainerStyle={styles.relatedBooksList}
             />
           </View>
         )}
-        {/* Xóa mã giảm giá ở đây, chuyển xuống bar thanh toán */}
       </ScrollView>
       <View style={[styles.checkoutBarRow, { paddingBottom: 36 }]}> 
         <Pressable style={styles.selectAllWrap} onPress={handleSelectAll} hitSlop={10}>
@@ -259,7 +411,21 @@ const CartScreen = () => {
       </View>
     </SafeAreaView>
   );
-  return loading ? <Text>Đang tải giỏ hàng...</Text> : (cartItems.length > 0 ? <CartContent /> : <EmptyCart onContinueShopping={() => router.push('/')} />);
+  return loading ? (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={[styles.headerBar, { paddingTop: 24 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+          <Ionicons name="arrow-back" size={26} color="#222" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Giỏ hàng</Text>
+      </View>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Đang tải giỏ hàng...</Text>
+      </View>
+    </SafeAreaView>
+  ) : (
+    cartItems.length > 0 ? <CartContent /> : <EmptyCart onContinueShopping={() => router.push('/')} router={router} isLoggedIn={!!token} />
+  );
 };
 
 const styles = StyleSheet.create({
@@ -717,6 +883,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FF',
     borderRadius: 12,
     padding: 14,
+  },
+  relatedBooksList: {
+    gap: 16,
   },
 });
 

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +29,8 @@ const BookDetailInfoScreen = () => {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+
+  const contentWidth = useMemo(() => width, [width]);
 
   useEffect(() => {
     if (id) {
@@ -92,7 +94,7 @@ const BookDetailInfoScreen = () => {
                 if (field.key === 'description') {
                   return (
                     <RenderHTML
-                      contentWidth={width}
+                      contentWidth={contentWidth}
                       source={{ html: value }}
                     />
                   );

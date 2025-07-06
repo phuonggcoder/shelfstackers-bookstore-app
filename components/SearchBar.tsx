@@ -1,17 +1,33 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const SearchBar = () => {
+  const router = useRouter();
+
+  const handleSearchPress = () => {
+    // Navigate đến trang search và truyền param để tự động focus
+    // Thêm timestamp để tránh cache
+    const timestamp = Date.now();
+    router.push(`/(tabs)/search?autoFocus=true&t=${timestamp}`);
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.searchSection}>
+      <TouchableOpacity 
+        style={styles.searchSection}
+        onPress={handleSearchPress}
+        activeOpacity={0.8}
+      >
         <Ionicons name="search" size={22} color="#888" style={styles.searchIcon} />
         <TextInput
           placeholder="Tìm kiếm sách, tác giả..."
           style={styles.input}
+          editable={false} // Disable input để chỉ cho phép click
+          pointerEvents="none" // Disable pointer events cho input
         />
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.filterButton}>
         <Ionicons name="filter" size={22} color="#fff" />
       </TouchableOpacity>

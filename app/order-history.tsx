@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { formatVND } from '../utils/format';
 
 const API_URL = 'https://server-shelf-stacker.onrender.com/api/orders/my';
 
@@ -37,17 +38,33 @@ const OrderHistoryScreen = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
+        console.log('Fetching orders with token:', token ? 'present' : 'missing');
         const res = await axios.get(API_URL, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setOrders(res.data.orders || []);
-      } catch (err) {
+        console.log('Orders API response:', res.data);
+        
+        // Đảm bảo orders luôn là array
+        const ordersData = res.data.orders || res.data || [];
+        const ordersArray = Array.isArray(ordersData) ? ordersData : [];
+        console.log('Processed orders:', ordersArray);
+        setOrders(ordersArray);
+      } catch (err: any) {
+        console.error('Error fetching orders:', err);
+        console.error('Error details:', err.response?.data || err.message);
         setOrders([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchOrders();
+    
+    if (token) {
+      fetchOrders();
+    } else {
+      console.log('No token available, setting empty orders');
+      setOrders([]);
+      setLoading(false);
+    }
   }, [token]);
 
   const handleCancel = async (orderId: string) => {
@@ -61,63 +78,63 @@ const OrderHistoryScreen = () => {
     } catch (e) {}
   };
 
-  const filteredOrders = orders.filter((order) => {
+  const filteredOrders = (orders || []).filter((order) => {
     if (tab === 'upcoming') return order.status !== 'Delivered' && order.status !== 'Cancelled';
     return order.status === 'Delivered' || order.status === 'Cancelled';
   });
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>My Order</Text>
+      <Text style={styles.title}>Đơn hàng của tôi</Text>
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
           onPress={() => setTab('upcoming')}
         >
-          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
+          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>Đang xử lý</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'past' && styles.tabActive]}
           onPress={() => setTab('past')}
         >
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Past</Text>
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Đã hoàn thành</Text>
         </TouchableOpacity>
       </View>
       {loading ? (
         <ActivityIndicator size="large" color="#4A3780" style={{ marginTop: 40 }} />
       ) : filteredOrders.length === 0 ? (
-        <Text style={styles.emptyText}>No orders found.</Text>
+        <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
       ) : (
         <ScrollView style={{ flex: 1 }}>
           {filteredOrders.map((order) => (
             <View key={order._id} style={styles.orderCard}>
-              <Text style={styles.orderId}>Order ID: #{order.order_code || order._id.slice(-8).toUpperCase()}</Text>
-              {order.items.map((item) => (
-                <View key={item.book._id} style={styles.bookRow}>
-                  <Image source={{ uri: item.book.image_url || 'https://via.placeholder.com/60' }} style={styles.bookImage} />
+              <Text style={styles.orderId}>Mã đơn hàng: #{order.order_code || order._id.slice(-8).toUpperCase()}</Text>
+              {(order.items || []).map((item, index) => (
+                <View key={item?.book?._id || index} style={styles.bookRow}>
+                  <Image source={{ uri: item?.book?.image_url || 'https://via.placeholder.com/60' }} style={styles.bookImage} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.bookAuthor}>By {item.book.author}</Text>
-                    <Text style={styles.bookTitle}>{item.book.title}</Text>
-                    <Text style={styles.bookPrice}>${item.book.price}</Text>
-                    <Text style={styles.bookQty}>Qty: {item.quantity}</Text>
+                    <Text style={styles.bookAuthor}>Tác giả: {item?.book?.author || 'Không xác định'}</Text>
+                    <Text style={styles.bookTitle}>{item?.book?.title || 'Sách không xác định'}</Text>
+                    <Text style={styles.bookPrice}>{formatVND(item?.book?.price || 0)}</Text>
+                    <Text style={styles.bookQty}>Số lượng: {item?.quantity || 1}</Text>
                   </View>
                 </View>
               ))}
               <Text style={styles.deliveryText}>
-                Expected Delivery by {order.expected_delivery ? new Date(order.expected_delivery).toDateString() : 'N/A'}
+                Dự kiến giao hàng: {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('vi-VN') : 'Chưa xác định'}
               </Text>
               <View style={styles.buttonRow}>
                 {order.status !== 'Cancelled' && order.status !== 'Delivered' ? (
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(order._id)}>
-                    <Text style={styles.cancelText}>Cancel</Text>
+                    <Text style={styles.cancelText}>Hủy đơn</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={[styles.cancelBtn, { backgroundColor: '#eee' }]}> 
-                    <Text style={[styles.cancelText, { color: '#aaa' }]}>Cancel</Text>
+                    <Text style={[styles.cancelText, { color: '#aaa' }]}>Hủy đơn</Text>
                   </View>
                 )}
-                <TouchableOpacity style={styles.viewBtn} onPress={() => router.push(`/order-review?orderId=${order._id}`)}>
-                  <Text style={styles.viewText}>View Order</Text>
+                <TouchableOpacity style={styles.viewBtn} onPress={() => router.push(`/order-detail?orderId=${order._id}`)}>
+                  <Text style={styles.viewText}>Xem chi tiết</Text>
                 </TouchableOpacity>
               </View>
             </View>

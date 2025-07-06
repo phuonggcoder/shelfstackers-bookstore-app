@@ -27,4 +27,5 @@ export interface Book {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  thumbnail: string;
 } 

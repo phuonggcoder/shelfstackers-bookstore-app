@@ -1,11 +1,14 @@
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { MenuProvider } from 'react-native-popup-menu';
+import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { CartProvider } from '../context/CartContext';
 import SplashScreen from '../screens/SplashScreen';
 
 function RootLayoutNav() {
-  const { isLoading } = useAuth();
+  const { isLoading, tokenExpiredAlertVisible, hideTokenExpiredAlert } = useAuth();
   const splashShown = useRef(false);
   const [isSplashing, setIsSplashing] = useState(true);
 
@@ -41,28 +44,38 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'fade',
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen 
-        name="(auth)" 
-        options={{ 
-          presentation: 'modal',
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
           animation: 'fade',
-        }} 
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen 
+          name="(auth)" 
+          options={{ 
+            presentation: 'modal',
+            animation: 'fade',
+          }} 
+        />
+      </Stack>
+      <TokenExpiredAlert 
+        visible={tokenExpiredAlertVisible}
+        onClose={hideTokenExpiredAlert}
       />
-    </Stack>
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <CartProvider>
+      <AuthProvider>
+        <MenuProvider>
+          <RootLayoutNav />
+        </MenuProvider>
+      </AuthProvider>
+    </CartProvider>
   );
 }

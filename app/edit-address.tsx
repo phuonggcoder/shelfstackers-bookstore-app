@@ -1,10 +1,9 @@
-import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = 'https://server-shelf-stacker.onrender.com/api/addresses';
+import { LocationItem, deleteAddress, getAddresses, getDistricts, getProvinces, getWards, updateAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { token } = useAuth();
@@ -12,68 +11,96 @@ const EditAddressScreen = () => {
   const [loading, setLoading] = useState(true);
   const [receiver_name, setReceiverName] = useState('');
   const [phone_number, setPhoneNumber] = useState('');
-  const [province, setProvince] = useState('');
-  const [district, setDistrict] = useState('');
-  const [ward, setWard] = useState('');
-  const [street, setStreet] = useState('');
+  const [province, setProvince] = useState<LocationItem | null>(null);
+  const [district, setDistrict] = useState<LocationItem | null>(null);
+  const [ward, setWard] = useState<LocationItem | null>(null);
   const [address_detail, setAddressDetail] = useState('');
   const [is_default, setIsDefault] = useState(false);
   const [type, setType] = useState<'office' | 'home'>('office');
   const router = useRouter();
 
   useEffect(() => {
-    fetchAddress();
+    if (id) {
+      fetchAddress();
+    }
   }, [id]);
 
   const fetchAddress = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const addr = res.data.address;
+      const addresses = await getAddresses(token);
+      const addr = addresses.find((a: any) => a._id === id);
+      
+      if (!addr) {
+        console.error('Address not found');
+        return;
+      }
+
+      // Fetch id for province
+      let provinceObj = null, districtObj = null, wardObj = null;
+      if (addr.province) {
+        const provinces = await getProvinces(addr.province);
+        provinceObj = provinces.find(p => p.name === addr.province) || { id: '', name: addr.province };
+      }
+      if (addr.district && provinceObj?.id) {
+        const districts = await getDistricts(provinceObj.id, addr.district);
+        districtObj = districts.find(d => d.name === addr.district) || { id: '', name: addr.district };
+      }
+      if (addr.ward && districtObj?.id) {
+        const wards = await getWards(districtObj.id, addr.ward);
+        wardObj = wards.find(w => w.name === addr.ward) || { id: '', name: addr.ward };
+      }
+
       setReceiverName(addr.receiver_name);
       setPhoneNumber(addr.phone_number);
-      setProvince(addr.province);
-      setDistrict(addr.district);
-      setWard(addr.ward);
-      setStreet(addr.street);
+      setProvince(provinceObj);
+      setDistrict(districtObj);
+      setWard(wardObj);
       setAddressDetail(addr.address_detail);
       setIsDefault(addr.is_default);
       setType(addr.type || 'office');
-    } catch {}
+    } catch (e) {
+      console.error('Error fetching address:', e);
+    }
     setLoading(false);
   };
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      await axios.put(`${API_URL}/${id}`, {
+      if (!id) {
+        console.error('Address ID is missing');
+        return;
+      }
+      await updateAddress(token, id as string, {
         receiver_name,
         phone_number,
-        province,
-        district,
-        ward,
-        street,
+        province: province?.name || '',
+        district: district?.name || '',
+        ward: ward?.name || '',
         address_detail,
         is_default,
         type,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
       });
       router.replace('/address-list');
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error updating address:', e);
+    }
     setLoading(false);
   };
 
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (!id) {
+        console.error('Address ID is missing');
+        return;
+      }
+      await deleteAddress(token, id as string);
       router.replace('/address-list');
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error deleting address:', e);
+    }
     setLoading(false);
   };
 
@@ -81,19 +108,44 @@ const EditAddressScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Chọn địa chỉ</Text>
+      <Text style={styles.title}>Chỉnh sửa địa chỉ</Text>
       <View style={styles.formBox}>
         <Text style={styles.label}>Họ và tên</Text>
         <TextInput style={styles.input} value={receiver_name} onChangeText={setReceiverName} placeholder="Họ và tên" />
         <Text style={styles.label}>Số điện thoại</Text>
         <TextInput style={styles.input} value={phone_number} onChangeText={setPhoneNumber} placeholder="Số điện thoại" keyboardType="phone-pad" />
-        <Text style={styles.label}>Tỉnh/Thành phố, Quận/Huyện, Phường/Xã</Text>
-        <TextInput style={styles.input} value={province} onChangeText={setProvince} placeholder="Tỉnh/Thành phố" />
-        <TextInput style={styles.input} value={district} onChangeText={setDistrict} placeholder="Quận/Huyện" />
-        <TextInput style={styles.input} value={ward} onChangeText={setWard} placeholder="Phường/Xã" />
-        <Text style={styles.label}>Tên đường, Tòa nhà, Số nhà</Text>
-        <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Tên đường, Tòa nhà, Số nhà" />
-        <TextInput style={styles.input} value={address_detail} onChangeText={setAddressDetail} placeholder="Chi tiết địa chỉ" />
+        
+        <AutocompleteInput
+          label="Tỉnh/Thành phố"
+          placeholder="Chọn Tỉnh/Thành phố"
+          value={province}
+          onSelect={setProvince}
+          level="province"
+        />
+        
+        <AutocompleteInput
+          label="Quận/Huyện"
+          placeholder="Chọn Quận/Huyện"
+          value={district}
+          onSelect={setDistrict}
+          level="district"
+          provinceId={province?.id}
+          disabled={!province}
+        />
+        
+        <AutocompleteInput
+          label="Phường/Xã"
+          placeholder="Chọn Phường/Xã"
+          value={ward}
+          onSelect={setWard}
+          level="ward"
+          districtId={district?.id}
+          disabled={!district}
+        />
+        
+        <Text style={styles.label}>Chi tiết địa chỉ</Text>
+        <TextInput style={styles.input} value={address_detail} onChangeText={setAddressDetail} placeholder="Chi tiết địa chỉ" multiline />
+        
         <View style={styles.switchRow}>
           <Text style={styles.label}>Đặt làm địa chỉ mặc định</Text>
           <Switch value={is_default} onValueChange={setIsDefault} />

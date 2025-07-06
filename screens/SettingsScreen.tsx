@@ -72,29 +72,29 @@ const SettingsScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Info</Text>
+          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
           <SettingItem
             icon="person-outline"
-            label="Edit Profile"
+            label="Chỉnh sửa hồ sơ"
             onPress={() => {}}
           />
           <SettingItem
             icon="card-outline"
-            label="Payment Methods"
+            label="Phương thức thanh toán"
             onPress={() => router.push('/payment')}
           />
           <SettingItem
             icon="location-outline"
-            label="Shipping Address"
+            label="Địa chỉ giao hàng"
             onPress={() => {}}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
+          <Text style={styles.sectionTitle}>Bảo mật</Text>
           <SettingItem
             icon="lock-closed-outline"
-            label="Change Password"
+            label="Đổi mật khẩu"
             onPress={() => {}}
           />
           <SettingItem
@@ -109,10 +109,10 @@ const SettingsScreen = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General</Text>
+          <Text style={styles.sectionTitle}>Cài đặt chung</Text>
           <SettingItem
             icon="notifications-outline"
-            label="Push Notifications"
+            label="Thông báo đẩy"
             toggle={{
               value: notifications,
               onToggle: setNotifications,
@@ -121,7 +121,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="moon-outline"
-            label="Dark Mode"
+            label="Chế độ tối"
             toggle={{
               value: darkMode,
               onToggle: setDarkMode,
@@ -130,7 +130,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="volume-high-outline"
-            label="Sound Effects"
+            label="Hiệu ứng âm thanh"
             toggle={{
               value: soundEffects,
               onToggle: setSoundEffects,
@@ -139,37 +139,37 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="language-outline"
-            label="Language"
-            value="English (US)"
+            label="Ngôn ngữ"
+            value="Tiếng Việt"
             onPress={() => {}}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Help & Support</Text>
+          <Text style={styles.sectionTitle}>Trợ giúp & Hỗ trợ</Text>
           <SettingItem
             icon="help-circle-outline"
-            label="FAQ"
+            label="Câu hỏi thường gặp"
             onPress={() => {}}
           />
           <SettingItem
             icon="chatbox-outline"
-            label="Contact Support"
+            label="Liên hệ hỗ trợ"
             onPress={() => {}}
           />
           <SettingItem
             icon="document-text-outline"
-            label="Terms of Service"
+            label="Điều khoản sử dụng"
             onPress={() => {}}
           />
           <SettingItem
             icon="shield-outline"
-            label="Privacy Policy"
+            label="Chính sách bảo mật"
             onPress={() => {}}
           />
           <SettingItem
             icon="log-out-outline"
-            label="Sign Out"
+            label="Đăng xuất"
             onPress={() => {}}
             danger
           />

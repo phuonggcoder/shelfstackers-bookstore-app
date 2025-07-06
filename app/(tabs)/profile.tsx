@@ -8,18 +8,18 @@ import { useAuth } from '../../context/AuthContext';
 const WelcomeScreen = () => (
   <View style={styles.welcomeContainer}>
     <Ionicons name="person-circle-outline" size={100} color="#4A3780" />
-    <Text style={styles.welcomeTitle}>Welcome to ShelfStackers</Text>
+          <Text style={styles.welcomeTitle}>Chào mừng đến với ShelfStackers</Text>
     <Text style={styles.welcomeText}>
-      Sign in to manage your orders, wishlist, and more
+      Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
     </Text>
     <Link href="/login" asChild>
       <TouchableOpacity style={styles.signInButton}>
-        <Text style={styles.signInButtonText}>Sign In</Text>
+        <Text style={styles.signInButtonText}>Đăng nhập</Text>
       </TouchableOpacity>
     </Link>
     <Link href="/register" asChild>
       <TouchableOpacity style={styles.registerButton}>
-        <Text style={styles.registerButtonText}>Create Account</Text>
+        <Text style={styles.registerButtonText}>Tạo tài khoản</Text>
       </TouchableOpacity>
     </Link>
   </View>
@@ -57,69 +57,69 @@ const SettingsScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal infor</Text>
-          <SettingItem 
-            icon="person-outline" 
-            label="Profile" 
-            onPress={() => {}} 
-          />
-          <SettingItem 
-            icon="ticket-outline" 
-            label="Voucher" 
-            onPress={() => {}} 
-          />
-          <SettingItem 
-            icon="heart-outline" 
-            label="Wishlist Book" 
-            onPress={() => router.push('/favourite')} 
-          />
-          <SettingItem 
-            icon="receipt-outline" 
-            label="Purchase History" 
-            onPress={() => router.push('/order-history')} 
-          />
-          <SettingItem 
-            icon="card-outline" 
-            label="Payment Method" 
-            onPress={() => router.push('/payment')} 
-          />
-          <SettingItem 
-            icon="location-outline" 
-            label="Địa chỉ đặt hàng" 
-            onPress={() => router.push('/address-list')} 
-          />
+          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>router.push('/vouchers')}>
+            <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Mã giảm giá</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/favourite')}>
+            <Ionicons name="heart-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Sách yêu thích</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/order-history')}>
+            <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Lịch sử mua hàng</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/payment')}>
+            <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Phương thức thanh toán</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/address-list')}>
+            <Ionicons name="location-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Địa chỉ đặt hàng</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
-          <SettingItem 
-            icon="key-outline" 
-            label="Change Password" 
-            onPress={() => {}} 
-          />
-          <SettingItem 
-            icon="help-circle-outline" 
-            label="Forgot Password" 
-            onPress={() => {}} 
-          />
-          <SettingItem 
-            icon="shield-outline" 
-            label="Security" 
-            onPress={() => {}} 
-          />
+          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="help-circle-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Quên mật khẩu</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Bảo mật</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General</Text>
-          <SettingItem 
-            icon="language-outline" 
-            label="Language" 
-            onPress={() => {}} 
-          />
+          <Text style={styles.sectionTitle}>Cài đặt chung</Text>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log out</Text>
+          <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

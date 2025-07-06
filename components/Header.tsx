@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import CartIconWithBadge from './CartIconWithBadge';
 
 interface HeaderProps {
   title?: string;
@@ -16,6 +18,7 @@ const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps
   const fullName = user?.full_name;
   const isLoggedIn = !!user;
   const displayName = (isLoggedIn && fullName) ? fullName : 'bạn';
+  const { cartCount, cartJustAdded } = useCart();
 
   return (
     <View style={styles.container}>
@@ -56,7 +59,7 @@ const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps
             style={styles.iconButton}
             onPress={() => router.push('/cart')}
           >
-            <Ionicons name="cart-outline" size={24} color="#333" />
+            <CartIconWithBadge count={cartCount} animated={cartJustAdded} />
           </TouchableOpacity>
         </View>
       )}

@@ -14,6 +14,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
 import { createAddress, LocationItem } from '../services/addressService';
 
@@ -94,10 +95,16 @@ const AddAddress = () => {
         'selected_ward',
       ]);
 
+      // Set flag to show success alert in address list
+      await AsyncStorage.setItem('address_added', 'true');
+      
       Alert.alert('Thành công', 'Địa chỉ đã được thêm thành công', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: () => {
+            // Go back to address list instead of order review
+            router.back();
+          },
         },
       ]);
     } catch (error) {
@@ -156,40 +163,33 @@ const AddAddress = () => {
         <Text style={styles.sectionTitle}>Địa chỉ</Text>
 
         <View style={styles.inputGroup}>
-          <TouchableOpacity
-            style={styles.selectInput}
-            onPress={() => router.push('/select-location?level=province')}
-          >
-            <Text style={[styles.selectText, province && styles.selectedText]}>
-              {province?.name || 'Chọn Tỉnh/Thành phố'}
-            </Text>
-          </TouchableOpacity>
+          <AutocompleteInput
+            label="Tỉnh/Thành phố"
+            placeholder="Chọn Tỉnh/Thành phố"
+            value={province}
+            onSelect={setProvince}
+            level="province"
+          />
           
-          <TouchableOpacity
-            style={[styles.selectInput, !province && styles.disabledInput]}
-            onPress={() =>
-              province &&
-              router.push(`/select-location?level=district&provinceCode=${province.code}`)
-            }
+          <AutocompleteInput
+            label="Quận/Huyện"
+            placeholder="Chọn Quận/Huyện"
+            value={district}
+            onSelect={setDistrict}
+            level="district"
+            provinceId={province?.id}
             disabled={!province}
-          >
-            <Text style={[styles.selectText, district && styles.selectedText]}>
-              {district?.name || 'Chọn Quận/Huyện'}
-            </Text>
-          </TouchableOpacity>
+          />
           
-          <TouchableOpacity
-            style={[styles.selectInput, !district && styles.disabledInput]}
-            onPress={() =>
-              district &&
-              router.push(`/select-location?level=ward&districtCode=${district.code}`)
-            }
+          <AutocompleteInput
+            label="Phường/Xã"
+            placeholder="Chọn Phường/Xã"
+            value={ward}
+            onSelect={setWard}
+            level="ward"
+            districtId={district?.id}
             disabled={!district}
-          >
-            <Text style={[styles.selectText, ward && styles.selectedText]}>
-              {ward?.name || 'Chọn Phường/Xã'}
-            </Text>
-          </TouchableOpacity>
+          />
           
           <TextInput
             placeholder="Tên đường, Tòa nhà, Số nhà..."
@@ -307,24 +307,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
     marginBottom: 12,
-  },
-  selectInput: { 
-    paddingVertical: 12, 
-    paddingHorizontal: 16,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    marginBottom: 12,
-  },
-  disabledInput: {
-    opacity: 0.5,
-  },
-  selectText: { 
-    color: '#999', 
-    fontSize: 16 
-  },
-  selectedText: {
-    color: '#000',
-    fontWeight: '500',
   },
   addressPreview: {
     backgroundColor: '#f0f8ff',
