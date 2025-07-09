@@ -30,6 +30,8 @@ export default function OrderReviewScreen() {
   const [selectedVoucher, setSelectedVoucher] = useState<any|null>(null);
   const router = useRouter();
 
+
+
   // Load addresses
   useEffect(() => {
     const loadAddresses = async () => {
@@ -273,23 +275,31 @@ export default function OrderReviewScreen() {
       }
 
       console.log('Order data being sent:', orderData);
-      const order = await createOrder(token, orderData);
-      console.log('Order created successfully:', order);
+      const response = await createOrder(token, orderData);
+      console.log('Order created successfully:', response);
 
-      Alert.alert(
-        'Đặt hàng thành công!', 
-        'Đơn hàng của bạn đã được tạo thành công.',
-        [
-          {
-            text: 'Xem đơn hàng',
-            onPress: () => router.push('/order-history')
-          },
-          {
-            text: 'Về trang chủ',
-            onPress: () => router.replace('/')
-          }
-        ]
-      );
+      // Handle new API response structure
+      let orderId;
+      let zaloPayData;
+      
+      if (response.success && response.order) {
+        // New response structure
+        orderId = response.order._id;
+        zaloPayData = response.zaloPay;
+      } else {
+        // Fallback for old response structure
+        orderId = response.order?._id || response._id;
+        zaloPayData = response.zaloPay;
+      }
+
+      // Điều hướng sang trang ZaloPay nếu có order_url
+      if (zaloPayData && zaloPayData.order_url) {
+        router.replace({ pathname: '/zalo-pay', params: { orderId } });
+        return;
+      }
+      // Nếu không có, fallback sang order-success
+      router.replace({ pathname: '/order-success', params: { orderId } });
+      return;
     } catch (error: any) {
       console.error('Order creation error:', error);
       
@@ -333,10 +343,7 @@ export default function OrderReviewScreen() {
   };
 
   // Helper function to validate image URL
-  const getValidImageUrl = (url: string) => {
-    if (!url || url.trim() === '') return 'https://i.imgur.com/gTzT0hA.jpeg';
-    return url;
-  };
+
 
   const formatAddressText = (addr: any) => {
     if (!addr) return '';
@@ -499,6 +506,31 @@ export default function OrderReviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    width: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrCloseBtn: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#f2f2f2',
+  },
   safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { flex: 1, backgroundColor: '#fff', padding: 20 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingHorizontal: 10 },

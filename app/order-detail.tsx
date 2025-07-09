@@ -2,13 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getOrderDetail } from '../services/orderService';
 import { formatVND, getBookImageUrl } from '../utils/format';
 
 export default function OrderDetailScreen() {
+  // State cho hoàn tiền
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundStatus, setRefundStatus] = useState<string|null>(null);
   const { token } = useAuth();
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
@@ -107,6 +110,61 @@ export default function OrderDetailScreen() {
     );
   }
 
+  // Hàm gọi API hoàn tiền
+  const handleRefund = async () => {
+    if (!order?.payment?._id) {
+      Alert.alert('Không tìm thấy thông tin thanh toán!');
+      return;
+    }
+    setIsRefunding(true);
+    try {
+      // Chỉ admin mới được hoàn tiền, cần token admin
+      const res = await fetch(`https://server-shelf-stacker.onrender.com/api/payments/${order.payment._id}/refund`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description: 'Hoàn tiền đơn hàng #' + order.order_id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRefundStatus('Thành công');
+        Alert.alert('Hoàn tiền thành công!');
+      } else {
+        setRefundStatus('Thất bại');
+        Alert.alert('Hoàn tiền thất bại!', data.message || 'Có lỗi xảy ra');
+      }
+    } catch (e) {
+      setRefundStatus('Thất bại');
+      Alert.alert('Hoàn tiền thất bại!', e.message || 'Có lỗi xảy ra');
+    }
+    setIsRefunding(false);
+  };
+
+  // Hàm kiểm tra trạng thái hoàn tiền
+  const handleQueryRefund = async () => {
+    if (!order?.payment?.m_refund_id) {
+      Alert.alert('Không tìm thấy mã hoàn tiền!');
+      return;
+    }
+    try {
+      const res = await fetch(`https://server-shelf-stacker.onrender.com/api/payments/query_refund`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ m_refund_id: order.payment.m_refund_id })
+      });
+      const data = await res.json();
+      setRefundStatus(data.status || JSON.stringify(data));
+      Alert.alert('Trạng thái hoàn tiền', data.status || JSON.stringify(data));
+    } catch (e) {
+      Alert.alert('Lỗi', e.message || 'Không kiểm tra được trạng thái hoàn tiền');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -118,6 +176,29 @@ export default function OrderDetailScreen() {
       </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Nút hoàn tiền cho admin (chỉ hiển thị nếu là ZaloPay và trạng thái chưa hoàn tiền) */}
+        {order?.payment?.payment_method === 'ZALOPAY' && order?.payment?.payment_status !== 'REFUNDED' && (
+          <View style={{ marginBottom: 16 }}>
+            <TouchableOpacity
+              style={{ backgroundColor: '#F44336', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 8, opacity: isRefunding ? 0.6 : 1 }}
+              onPress={handleRefund}
+              disabled={isRefunding}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>{isRefunding ? 'Đang hoàn tiền...' : 'Hoàn tiền ZaloPay'}</Text>
+            </TouchableOpacity>
+            {order?.payment?.m_refund_id && (
+              <TouchableOpacity
+                style={{ backgroundColor: '#3255FB', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                onPress={handleQueryRefund}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Kiểm tra trạng thái hoàn tiền</Text>
+              </TouchableOpacity>
+            )}
+            {refundStatus && (
+              <Text style={{ marginTop: 8, color: '#222', textAlign: 'center' }}>Trạng thái hoàn tiền: {refundStatus}</Text>
+            )}
+          </View>
+        )}
         {/* Order Status */}
         <View style={styles.statusContainer}>
           <View style={styles.statusRow}>
