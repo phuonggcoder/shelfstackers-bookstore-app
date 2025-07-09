@@ -22,17 +22,58 @@ interface OrderItem {
 
 interface Order {
   _id: string;
+  order_id?: string;
   order_code?: string;
-  items: OrderItem[];
+  order_date?: string;
+  order_status?: string;
   status: string;
+  items: OrderItem[];
+  order_items?: OrderItem[];
+  payment?: {
+    payment_method?: string;
+    payment_status?: string;
+  };
+  discount_amount?: number;
+  ship_amount?: number;
+  final_amount?: number;
+  total_amount?: number;
+  address_id?: {
+    receiver_name?: string;
+    phone_number?: string;
+    address_detail?: string;
+    ward?: string;
+    district?: string;
+    province?: string;
+  };
   expected_delivery?: string;
 }
+
+// Mapping trạng thái đơn hàng sang tiếng Việt
+const ORDER_STATUS_VI: Record<string, string> = {
+  pending: 'Chờ xác nhận',
+  processing: 'Chờ lấy hàng',
+  shipped: 'Chờ giao hàng',
+  delivered: 'Đã giao',
+  returned: 'Trả hàng',
+  cancelled: 'Đã huỷ',
+  completed: 'Hoàn thành',
+};
+
+const ORDER_TABS = [
+  { key: 'pending', label: 'Chờ xác nhận' },
+  { key: 'processing', label: 'Chờ lấy hàng' },
+  { key: 'shipped', label: 'Chờ giao hàng' },
+  { key: 'delivered', label: 'Đã giao' },
+  { key: 'returned', label: 'Trả hàng' },
+  { key: 'cancelled', label: 'Đã huỷ' },
+  { key: 'completed', label: 'Hoàn thành' },
+];
 
 const OrderHistoryScreen = () => {
   const { user, token } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState('pending');
   const router = useRouter();
 
   useEffect(() => {
@@ -79,26 +120,34 @@ const OrderHistoryScreen = () => {
   };
 
   const filteredOrders = (orders || []).filter((order) => {
-    if (tab === 'upcoming') return order.status !== 'Delivered' && order.status !== 'Cancelled';
-    return order.status === 'Delivered' || order.status === 'Cancelled';
+    const status = (order.order_status || order.status || '').toLowerCase();
+    return status === tab;
   });
+
+  // Hàm format địa chỉ
+  const formatAddressText = (addr: any) => {
+    if (!addr) return '';
+    const parts = [];
+    if (addr.address_detail) parts.push(addr.address_detail);
+    if (addr.ward) parts.push(addr.ward);
+    if (addr.district) parts.push(addr.district);
+    if (addr.province) parts.push(addr.province);
+    return parts.join(', ');
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Đơn hàng của tôi</Text>
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
-          onPress={() => setTab('upcoming')}
-        >
-          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>Đang xử lý</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'past' && styles.tabActive]}
-          onPress={() => setTab('past')}
-        >
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Đã hoàn thành</Text>
-        </TouchableOpacity>
+        {ORDER_TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tab, tab === t.key && styles.tabActive]}
+            onPress={() => setTab(t.key)}
+          >
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
       {loading ? (
         <ActivityIndicator size="large" color="#4A3780" style={{ marginTop: 40 }} />
@@ -106,39 +155,38 @@ const OrderHistoryScreen = () => {
         <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
       ) : (
         <ScrollView style={{ flex: 1 }}>
-          {filteredOrders.map((order) => (
-            <View key={order._id} style={styles.orderCard}>
-              <Text style={styles.orderId}>Mã đơn hàng: #{order.order_code || order._id.slice(-8).toUpperCase()}</Text>
-              {(order.items || []).map((item, index) => (
-                <View key={item?.book?._id || index} style={styles.bookRow}>
-                  <Image source={{ uri: item?.book?.image_url || 'https://via.placeholder.com/60' }} style={styles.bookImage} />
+          {filteredOrders.map((order) => {
+            const firstItem = (order.items || order.order_items || [])[0];
+            const statusVi = ORDER_STATUS_VI[(order.order_status || order.status || '').toLowerCase()] || (order.order_status || order.status || 'Không xác định');
+            return (
+              <View key={order._id} style={styles.orderCard}>
+                {/* Trạng thái góc phải trên */}
+                <Text style={{position:'absolute',top:10,right:16,color:'#F55',fontWeight:'bold',fontSize:16}}>{statusVi}</Text>
+                {/* Ảnh và thông tin sản phẩm đầu tiên */}
+                <View style={{flexDirection:'row',alignItems:'center'}}>
+                  <Image source={{ uri: firstItem?.book?.image_url || 'https://via.placeholder.com/60' }} style={styles.bookImage} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.bookAuthor}>Tác giả: {item?.book?.author || 'Không xác định'}</Text>
-                    <Text style={styles.bookTitle}>{item?.book?.title || 'Sách không xác định'}</Text>
-                    <Text style={styles.bookPrice}>{formatVND(item?.book?.price || 0)}</Text>
-                    <Text style={styles.bookQty}>Số lượng: {item?.quantity || 1}</Text>
+                    <Text numberOfLines={1} style={styles.bookTitle}>{firstItem?.book?.title || 'Sách không xác định'}</Text>
+                    <Text style={{color:'#888'}}>{(firstItem?.book && (firstItem.book as any).color) ? (firstItem.book as any).color : ''}</Text>
+                    <Text style={styles.bookQty}>x{firstItem?.quantity || 1}</Text>
                   </View>
                 </View>
-              ))}
-              <Text style={styles.deliveryText}>
-                Dự kiến giao hàng: {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('vi-VN') : 'Chưa xác định'}
-              </Text>
-              <View style={styles.buttonRow}>
-                {order.status !== 'Cancelled' && order.status !== 'Delivered' ? (
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(order._id)}>
-                    <Text style={styles.cancelText}>Hủy đơn</Text>
+                {/* Giá gốc và giá giảm */}
+                <View style={{flexDirection:'row',alignItems:'center',marginTop:4}}>
+                  <Text style={{textDecorationLine:'line-through',color:'#888',marginRight:8}}>{firstItem?.book?.price ? formatVND(firstItem.book.price) : ''}</Text>
+                  <Text style={{fontWeight:'bold',fontSize:16}}>{(firstItem?.book && (firstItem.book as any).discount_price) ? formatVND((firstItem.book as any).discount_price) : (firstItem?.book?.price ? formatVND(firstItem.book.price) : '')}</Text>
+                </View>
+                {/* Tổng số tiền và tổng số sản phẩm */}
+                <Text style={{marginTop:8,fontWeight:'bold'}}>Tổng số tiền ({(order.items || order.order_items || []).reduce((sum, i) => sum + (i.quantity || 1), 0)} sản phẩm): {formatVND(order.final_amount || order.total_amount || 0)}</Text>
+                {/* Nút chi tiết đơn hàng ở góc phải dưới */}
+                <View style={{flexDirection:'row',justifyContent:'flex-end',marginTop:10}}>
+                  <TouchableOpacity style={{backgroundColor:'#4A3780',paddingVertical:8,paddingHorizontal:18,borderRadius:20}} onPress={() => router.push(`/order-detail?orderId=${order._id}`)}>
+                    <Text style={{color:'#fff',fontWeight:'bold'}}>Chi tiết đơn hàng</Text>
                   </TouchableOpacity>
-                ) : (
-                  <View style={[styles.cancelBtn, { backgroundColor: '#eee' }]}> 
-                    <Text style={[styles.cancelText, { color: '#aaa' }]}>Hủy đơn</Text>
-                  </View>
-                )}
-                <TouchableOpacity style={styles.viewBtn} onPress={() => router.push(`/order-detail?orderId=${order._id}`)}>
-                  <Text style={styles.viewText}>Xem chi tiết</Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
     </View>
