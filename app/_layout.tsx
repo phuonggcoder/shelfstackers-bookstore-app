@@ -5,9 +5,14 @@ import { MenuProvider } from 'react-native-popup-menu';
 import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
+import { useFCMListener } from '../hooks/useFCMListener';
+import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 
 function RootLayoutNav() {
+  console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
+  usePushNotification();
+  useFCMListener();
   const { isLoading, tokenExpiredAlertVisible, hideTokenExpiredAlert } = useAuth();
   const splashShown = useRef(false);
   const [isSplashing, setIsSplashing] = useState(true);

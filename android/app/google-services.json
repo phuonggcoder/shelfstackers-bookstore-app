@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "346115100070",
+    "project_id": "shelfstacker-project",
+    "storage_bucket": "shelfstacker-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:346115100070:android:d65091845f39ad28c5d367",
+        "android_client_info": {
+          "package_name": "com.lathsenpai.shelfstackersbookstoreappfix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjalULt7NMGpNDvWzXgs3kxmkRKPExXw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
