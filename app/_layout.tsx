@@ -2,17 +2,18 @@ import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
+import { Provider } from 'react-redux';
 import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
-import { useFCMListener } from '../hooks/useFCMListener';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
+import { store } from '../store/store';
 
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
   usePushNotification();
-  useFCMListener();
+  // useFCMListener(); // Sẽ được gọi khi có navigation
   const { isLoading, tokenExpiredAlertVisible, hideTokenExpiredAlert } = useAuth();
   const splashShown = useRef(false);
   const [isSplashing, setIsSplashing] = useState(true);
@@ -75,12 +76,14 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <CartProvider>
-      <AuthProvider>
-        <MenuProvider>
-          <RootLayoutNav />
-        </MenuProvider>
-      </AuthProvider>
-    </CartProvider>
+    <Provider store={store}>
+      <CartProvider>
+        <AuthProvider>
+          <MenuProvider>
+            <RootLayoutNav />
+          </MenuProvider>
+        </AuthProvider>
+      </CartProvider>
+    </Provider>
   );
 }
