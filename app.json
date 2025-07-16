@@ -32,14 +32,7 @@
           "launchMode": "most-recent"
         }
       ],
-      "./withNotifeeAndroidFix",
-      [
-        {
-          "android": {
-            "googleServicesFile": "./google-services.json"
-          }
-        }
-      ]
+      "./withNotifeeAndroidFix"
     ],
     "experiments": {
       "typedRoutes": true

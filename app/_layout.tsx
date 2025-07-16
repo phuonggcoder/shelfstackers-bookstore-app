@@ -9,11 +9,12 @@ import { CartProvider } from '../context/CartContext';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
+import { useFCMListener } from '@/hooks/useFCMListener';
 
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
   usePushNotification();
-  // useFCMListener(); // Sẽ được gọi khi có navigation
+  useFCMListener(); // Sẽ được gọi khi có navigation
   const { isLoading, tokenExpiredAlertVisible, hideTokenExpiredAlert } = useAuth();
   const splashShown = useRef(false);
   const [isSplashing, setIsSplashing] = useState(true);

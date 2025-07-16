@@ -3,9 +3,7 @@ import fcmReducer from './slices/fcm.slice';
 
 export const store = configureStore({
   reducer: {
-    global: {
-      fcmReducer
-    }
+    fcm: fcmReducer,
   },
 });
 
