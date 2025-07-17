@@ -12,7 +12,20 @@
           "package_name": "com.lathsenpai.shelfstackersbookstoreappfix"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "346115100070-2lj3psa8lbsvdeleo460jps8kjumemgt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lathsenpai.shelfstackersbookstoreappfix",
+            "certificate_hash": "e8c5475a7a42db2328c778122b13baff7d8207a4"
+          }
+        },
+        {
+          "client_id": "346115100070-imk95purovk56kccc6hk19vmbrcjtj2m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAjalULt7NMGpNDvWzXgs3kxmkRKPExXw4"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "346115100070-imk95purovk56kccc6hk19vmbrcjtj2m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -1,5 +1,7 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -15,6 +17,14 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+
+
+GoogleSignin.configure({
+  webClientId: '346115100070-imk95purovk56kccc6hk19vmbrcjtj2m.apps.googleusercontent.com', // Lấy từ Google Console, loại Web (nếu backend xác thực)
+  offlineAccess: false, // true nếu cần refreshToken
+  
+
+});
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -44,6 +54,42 @@ export default function Login() {
     }
   };
 
+  // Hàm đăng nhập Google
+  const handleGoogleLogin = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      // Lấy idToken đúng type, fallback nếu cần
+      const idToken = (userInfo as any).idToken || (userInfo as any).user?.idToken;
+      if (!idToken) {
+        Alert.alert('Không lấy được idToken từ Google');
+        return;
+      }
+      // Gửi idToken lên backend
+      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Lưu JWT vào AsyncStorage hoặc context
+        await AsyncStorage.setItem('jwt', data.token);
+        await signIn(data); // data phải trả về { user, token }
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!');
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        Alert.alert('Đã hủy đăng nhập');
+      } else {
+        Alert.alert('Lỗi', error.message);
+      }
+    }
+  };
+
   return (
     <ScrollView style={styles.scrollbox}> 
       
@@ -60,7 +106,7 @@ export default function Login() {
       </View>
 
       <View style={styles.socialContainer}>
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
           <Image source={require('../../assets/images/google.png')} style={styles.icon} />
           <Text style={styles.socialText}>Google</Text>
         </TouchableOpacity>
