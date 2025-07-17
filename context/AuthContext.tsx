@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { authService } from '../services/authService';
 import { AuthResponse, User } from '../types/auth';
+import { syncFcmToken, removeFcmToken, listenFcmTokenRefresh } from '../services/fcmService';
+import * as Device from 'expo-device';
 
 interface AuthContextType {
   user: User | null;
@@ -54,6 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadStoredAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Đồng bộ FCM token khi app khởi động nếu đã đăng nhập
+  useEffect(() => {
+    if (user && user._id) {
+      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+      syncFcmToken(user._id, deviceId);
+      listenFcmTokenRefresh(user._id, deviceId);
+    }
+  }, [user]);
 
   // Check token expiration periodically (only if user is actively using the app)
   useEffect(() => {
@@ -158,6 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(userData.token);
       setUser(userData.user);
+      // Đồng bộ FCM token khi login
+      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+      syncFcmToken(userData.user._id, deviceId);
+      listenFcmTokenRefresh(userData.user._id, deviceId);
 
       Alert.alert('Thành công', 'Đăng nhập thành công!');
     } catch (error) {
@@ -172,6 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (user && user._id) {
+        await removeFcmToken(user._id);
+      }
       await AsyncStorage.multiRemove(['token', 'user']);
       setToken(null);
       setUser(null);
