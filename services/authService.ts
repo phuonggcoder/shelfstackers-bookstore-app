@@ -77,5 +77,25 @@ export const authService = {
       console.error('Token validation error:', error);
       return false;
     }
+  },
+
+  updateUser: async (userId: string, updateData: any, token: string): Promise<AuthResponse> => {
+    try {
+      const response = await axios.put(`${API_URL}/update/${userId}`, updateData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+      return mapUserResponse(response.data);
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error(error.message || 'Update user failed');
+    }
   }
 };

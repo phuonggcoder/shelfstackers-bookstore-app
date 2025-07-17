@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { authService } from '../services/authService';
+import { listenFcmTokenRefresh, removeFcmToken, syncFcmToken } from '../services/fcmService';
 import { AuthResponse, User } from '../types/auth';
-import { syncFcmToken, removeFcmToken, listenFcmTokenRefresh } from '../services/fcmService';
-import * as Device from 'expo-device';
 
 interface AuthContextType {
   user: User | null;
@@ -16,10 +16,12 @@ interface AuthContextType {
   showTokenExpiredAlert: () => void;
   tokenExpiredAlertVisible: boolean;
   hideTokenExpiredAlert: () => void;
+  register: (data: any) => Promise<void>;
+  updateUser: (updateData: any) => Promise<void>; // Thêm hàm cập nhật user
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
+user: null,
   token: null,
   isLoading: true,
   signIn: async () => {},
@@ -28,6 +30,8 @@ const AuthContext = createContext<AuthContextType>({
   showTokenExpiredAlert: () => {},
   tokenExpiredAlertVisible: false,
   hideTokenExpiredAlert: () => {},
+  register: async () => {},
+  updateUser: async () => {}, // Thêm mặc định
 });
 
 export const useAuth = () => {
@@ -43,6 +47,8 @@ export const useAuth = () => {
     showTokenExpiredAlert: () => {},
     tokenExpiredAlertVisible: false,
     hideTokenExpiredAlert: () => {},
+    register: async () => {},
+    updateUser: async () => {}, // Thêm mặc định
   };
 };
 
@@ -116,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         
+        // Đồng bộ FCM token khi load lại user
+        const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+        syncFcmToken(parsedUser._id, deviceId);
+        listenFcmTokenRefresh(parsedUser._id, deviceId);
+
         // Validate token in background without blocking UI
         setTimeout(async () => {
           try {
@@ -207,6 +218,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokenExpiredAlertVisible(false);
   };
 
+  const register = async (data: any) => {
+    setIsLoading(true);
+    try {
+      const res = await authService.register(data);
+      await signIn(res); // Đăng nhập luôn sau khi đăng ký thành công
+    } catch (error) {
+      Alert.alert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateUser = async (updateData: any) => {
+    if (!user || !token) return;
+    setIsLoading(true);
+    try {
+      // Giả sử backend có API PUT /auth/update/:id
+      const response = await authService.updateUser(user._id, updateData, token);
+      await AsyncStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user);
+      Alert.alert('Thành công', 'Cập nhật thông tin thành công!');
+    } catch (error) {
+      Alert.alert('Lỗi', 'Cập nhật thông tin thất bại');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -217,7 +258,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       checkTokenExpiration, 
       showTokenExpiredAlert,
       tokenExpiredAlertVisible,
-      hideTokenExpiredAlert
+      hideTokenExpiredAlert,
+      register,
+      updateUser // Thêm vào Provider
     }}>
       {children}
     </AuthContext.Provider>
