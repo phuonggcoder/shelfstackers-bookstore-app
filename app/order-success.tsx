@@ -132,7 +132,7 @@ export default function OrderSuccessScreen() {
           </>}
           {expireTime && <>
             <Text style={styles.infoLabel}>Giao dịch kết thúc lúc</Text>
-            <Text style={[styles.infoValue, isExpired && {color:'#E53935'}]}>{expireTime} {isExpired ? '(Đã hết hạn)' : ''}</Text>
+            <Text style={[styles.infoValue, isExpired && {color:'#4A90E2'}]}>{expireTime} {isExpired ? '(Đã hết hạn)' : ''}</Text>
           </>}
         </View>
         {/* Nút chuyển sang web/app thanh toán (order_url) */}

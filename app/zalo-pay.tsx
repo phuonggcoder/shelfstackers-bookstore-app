@@ -1,11 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getOrderDetail } from '../services/orderService';
@@ -18,7 +15,7 @@ export default function ZaloPayScreen() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const qrRef = useRef<any>(null);
+
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -53,19 +50,7 @@ export default function ZaloPayScreen() {
   const expireTime = expireAt ? new Date(expireAt).toLocaleString('vi-VN') : null;
   const paymentMethod = payment.payment_method || order.payment_method || '';
 
-  // Download QR code as image
-  const handleDownloadQR = async () => {
-    if (!paymentUrl || !qrRef.current) return;
-    try {
-      qrRef.current.toDataURL(async (data: string) => {
-        const fileUri = FileSystem.cacheDirectory + `qr_${order.order_id || order._id}.png`;
-        await FileSystem.writeAsStringAsync(fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
-        await Sharing.shareAsync(fileUri, { mimeType: 'image/png' });
-      });
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải ảnh QR.');
-    }
-  };
+
 
   // Copy order_url
   const handleCopyOrderUrl = async () => {
@@ -100,7 +85,7 @@ export default function ZaloPayScreen() {
     <SafeAreaView style={styles.safeArea}>
       {paymentMethod !== 'ZALOPAY' ? (
         <View style={[styles.verticalContainer, {justifyContent: 'center', flex: 1}]}> 
-          <Text style={{ color: '#E53935', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+          <Text style={{ color: '#4A90E2', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
             Đơn hàng này không sử dụng phương thức thanh toán ZaloPay.
           </Text>
           <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace({ pathname: '/order-success', params: { orderId: order.order_id || order._id } })}>
@@ -112,13 +97,31 @@ export default function ZaloPayScreen() {
           <Text style={styles.title}>Thanh toán qua ZaloPay</Text>
           {paymentUrl ? (
             <View style={styles.qrBoxTop}>
-              <Text style={styles.qrTitle}>Quét QR để thanh toán</Text>
+              <Text style={styles.qrTitle}>Link thanh toán ZaloPay</Text>
               <View style={{ alignItems: 'center', position: 'relative' }}>
-                <QRCode value={paymentUrl} size={220} getRef={c => (qrRef.current = c)} />
+                <View style={{ 
+                  width: 220, 
+                  height: 120, 
+                  backgroundColor: '#f8f9fa', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  borderRadius: 12,
+                  borderWidth: 2,
+                  borderColor: '#e9ecef',
+                  borderStyle: 'dashed'
+                }}>
+                  <Ionicons name="link-outline" size={48} color="#3255FB" />
+                  <Text style={{ 
+                    color: '#666', 
+                    fontSize: 12, 
+                    textAlign: 'center', 
+                    marginTop: 8,
+                    paddingHorizontal: 10
+                  }}>
+                    Nhấn nút bên dưới để mở app ZaloPay
+                  </Text>
+                </View>
                 <View style={styles.qrActionRow}>
-                  <TouchableOpacity onPress={handleDownloadQR} style={styles.qrIconBtn}>
-                    <Ionicons name="download-outline" size={28} color="#3255FB" />
-                  </TouchableOpacity>
                   <TouchableOpacity onPress={handleCopyOrderUrl} style={styles.qrIconBtn}>
                     <Ionicons name="copy-outline" size={28} color="#3255FB" />
                   </TouchableOpacity>

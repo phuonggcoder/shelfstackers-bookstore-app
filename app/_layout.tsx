@@ -1,3 +1,7 @@
+// Silence Firebase deprecation warnings
+(globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
+
+import { useFCMListener } from '@/hooks/useFCMListener';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -9,8 +13,6 @@ import { CartProvider } from '../context/CartContext';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
-import { useFCMListener } from '@/hooks/useFCMListener';
-
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
   usePushNotification();

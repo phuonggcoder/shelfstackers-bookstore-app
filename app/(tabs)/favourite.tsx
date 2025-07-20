@@ -1,259 +1,595 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Menu, MenuOption, MenuOptions, MenuTrigger } from 'react-native-popup-menu';
+import { ActivityIndicator, Alert, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { getWishlist, removeFromWishlist } from '../../services/api';
+import { Book } from '../../types';
 import { getBookImageUrl } from '../../utils/format';
 
-const API_BASE_URL = 'https://server-shelf-stacker.onrender.com';
+const { width } = Dimensions.get('window');
+
+const CACHE_KEYS = {
+  FAVORITES: 'cached_favorites',
+  LAST_UPDATE: 'last_cache_update_favorites',
+};
+
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes (shorter for favorites)
 
 const FavouriteScreen = () => {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [books, setBooks] = useState<any[]>([]);
-  const { token } = useAuth();
   const router = useRouter();
+  const { token } = useAuth();
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
+
+  // Auto-load favorites when tab is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 Favourite tab focused, loading favorites...');
+      if (token) {
+        // Always refresh when returning to the page
+        loadFavorites(true); // Force refresh
+      } else {
+        console.log('❌ No token available for favorites');
+        setFavorites([]);
+        // Clear cache when no token
+        AsyncStorage.multiRemove([CACHE_KEYS.FAVORITES, CACHE_KEYS.LAST_UPDATE]);
+      }
+    }, [token])
+  );
+
+  // Also load when token changes
   useEffect(() => {
-    if (token) fetchWishlist();
-    else setLoading(false);
+    if (token) {
+      console.log('🔑 Token changed, loading favorites...');
+      loadFavorites(true);
+    } else {
+      console.log('🚪 No token, clearing favorites...');
+      setFavorites([]);
+      // Clear cache when logged out
+      AsyncStorage.multiRemove([CACHE_KEYS.FAVORITES, CACHE_KEYS.LAST_UPDATE]);
+    }
   }, [token]);
 
-  const fetchWishlist = async () => {
-    if (!refreshing) setLoading(true);
+  const isCacheValid = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/wishlist`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const booksArr = Array.isArray(data) ? data : (data.books || data.data?.books || []);
-      setBooks(booksArr);
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải danh sách yêu thích');
+      const lastUpdate = await AsyncStorage.getItem(CACHE_KEYS.LAST_UPDATE);
+      if (!lastUpdate) return false;
+      
+      const now = Date.now();
+      const lastUpdateTime = parseInt(lastUpdate);
+      return (now - lastUpdateTime) < CACHE_DURATION;
+    } catch (error) {
+      console.error('Error checking cache validity:', error);
+      return false;
     }
-    setLoading(false);
-    setRefreshing(false);
   };
 
-  const onRefresh = () => {
+  const loadCachedData = async () => {
+    try {
+      const cachedFavorites = await AsyncStorage.getItem(CACHE_KEYS.FAVORITES);
+      if (cachedFavorites) {
+        setFavorites(JSON.parse(cachedFavorites));
+        console.log('📦 Loaded favorites from cache');
+      }
+    } catch (error) {
+      console.error('Error loading cached data:', error);
+    }
+  };
+
+  const saveToCache = async (favoritesData: Book[]) => {
+    try {
+      const now = Date.now();
+      await Promise.all([
+        AsyncStorage.setItem(CACHE_KEYS.FAVORITES, JSON.stringify(favoritesData)),
+        AsyncStorage.setItem(CACHE_KEYS.LAST_UPDATE, now.toString()),
+      ]);
+      console.log('💾 Saved favorites to cache');
+    } catch (error) {
+      console.error('Error saving to cache:', error);
+    }
+  };
+
+  const loadFavorites = async (forceRefresh = false) => {
+    if (!token) {
+      console.log('❌ No token, cannot load favorites');
+      setFavorites([]);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      console.log('🔄 Loading favorites...', { forceRefresh });
+      
+      // Check if cache is valid (unless force refresh)
+      const cacheValid = !forceRefresh && await isCacheValid();
+      
+      if (cacheValid) {
+        // Load from cache
+        await loadCachedData();
+        console.log('✅ Favorites loaded from cache');
+      } else {
+        // Use real API call
+        console.log('🌐 Fetching favorites from API...');
+        const response = await getWishlist(token);
+        console.log('📚 API returned favorites:', response);
+        console.log('📚 Number of favorites:', response.length);
+        setFavorites(response);
+        
+        // Save to cache
+        await saveToCache(response);
+        console.log('✅ Favorites loaded from API and cached');
+      }
+    } catch (error) {
+      console.error('❌ Error loading favorites:', error);
+      // Try to load from cache as fallback
+      await loadCachedData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    if (!token) {
+      console.log('❌ No token, clearing favorites on refresh...');
+      setFavorites([]);
+      setRefreshing(false);
+      return;
+    }
+    console.log('🔄 Manual refresh triggered...');
     setRefreshing(true);
-    fetchWishlist();
-  };
-
-  const handleRemove = async (bookId: string) => {
     try {
-      await fetch(`${API_BASE_URL}/api/wishlist/remove/${bookId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setBooks(books.filter(b => b._id !== bookId));
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể xóa sách khỏi yêu thích');
+      // Force refresh from API
+      console.log('🌐 Force refreshing favorites from API...');
+      const response = await getWishlist(token);
+      setFavorites(response);
+      
+      // Update cache
+      await saveToCache(response);
+      console.log('✅ Favorites refreshed from API and cached');
+    } catch (error) {
+      console.error('❌ Error refreshing favorites:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  const handlePay = (book: any) => {
-    router.push({ pathname: '/order-review', params: { ids: book._id } });
+  const handleRemoveFavorite = async (bookId: string) => {
+    if (!token) {
+      console.log('❌ No token, cannot remove from favorites');
+      setFavorites([]);
+      return;
+    }
+    
+    try {
+      console.log('🗑️ Removing book from favorites:', bookId);
+      const result = await removeFromWishlist(token, bookId);
+      console.log('🗑️ API remove result:', result);
+      
+      // Update state with filtered favorites
+      setFavorites(prev => {
+        const newFavorites = prev.filter(item => {
+          const itemBook = item.book || item;
+          return itemBook._id !== bookId;
+        });
+        
+        // Save to cache with new favorites
+        saveToCache(newFavorites);
+        console.log('✅ Book removed from favorites, new count:', newFavorites.length);
+        
+        return newFavorites;
+      });
+      
+    } catch (error) {
+      console.error('❌ Error removing from favorites:', error);
+    }
   };
 
-  const handleShare = (book: any) => {
-    Alert.alert('Chia sẻ', `Chia sẻ sách: ${book.title}`);
+  const handleMenuPress = (book: any, itemRef: any) => {
+    console.log('🎯 Menu pressed for book:', book._id, book.title);
+    
+    // Use Alert instead of inline menu
+    Alert.alert(
+      book.title,
+      'Chọn hành động:',
+      [
+        {
+          text: 'Xóa khỏi yêu thích',
+          style: 'destructive',
+          onPress: () => {
+            console.log('🗑️ Remove from Alert for bookId:', book._id);
+            handleRemoveFavorite(book._id);
+          }
+        },
+        {
+          text: 'Thanh toán',
+          onPress: () => {
+            console.log('💳 Pay from Alert for bookId:', book._id);
+            handlePayPress(book);
+          }
+        },
+        {
+          text: 'Chia sẻ',
+          onPress: () => {
+            console.log('📤 Share from Alert for bookId:', book._id);
+            handleSharePress(book);
+          }
+        },
+        {
+          text: 'Hủy',
+          style: 'cancel'
+        }
+      ]
+    );
   };
 
-  // Màn hình yêu cầu đăng nhập
-  if (!token) {
+  const handlePayPress = (book: any) => {
+    const bookId = book._id || book.book?._id;
+    router.push({
+      pathname: '/book/[id]',
+      params: { id: bookId }
+    });
+  };
+
+  const handleSharePress = (book: any) => {
+    Alert.alert('Chia sẻ', `Chia sẻ sách "${book.title}"`);
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(price);
+  };
+
+
+
+  const handleBookPress = (book: any) => {
+    const bookId = book._id || book.book?._id;
+    router.push({
+      pathname: '/book/[id]',
+      params: { id: bookId }
+    });
+  };
+
+  const renderBookItem = ({ item }: { item: any }) => {
+    // Handle different data structures
+    const book = item.book || item;
+    const bookId = book._id || item._id;
+    
+    console.log('📚 Rendering book item:', {
+      bookId,
+      bookTitle: book.title
+    });
+    
     return (
-      <View style={styles.emptyWrap}>
-        <Ionicons name="heart-outline" size={60} color="#5E5CE6" style={{ marginBottom: 16 }} />
-        <Text style={styles.emptyTitle}>Bạn cần đăng nhập để xem danh sách yêu thích</Text>
-        <Text style={styles.emptyDesc}>Hãy đăng nhập hoặc đăng ký để lưu và quản lý sách yêu thích của bạn.</Text>
-        <View style={{ flexDirection: 'row', gap: 16, marginTop: 24 }}>
-          <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.loginBtnText}>Đăng nhập</Text>
+      <View style={styles.bookCardContainer}>
+        <TouchableOpacity
+          style={styles.bookCard}
+          onPress={() => handleBookPress(book)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.bookImageContainer}>
+            <Image
+              source={{ uri: getBookImageUrl(book) }}
+              style={styles.bookImage}
+              contentFit="cover"
+              transition={300}
+            />
+          </View>
+          
+          <View style={styles.bookInfo}>
+            <Text style={styles.bookAuthor}>By {book.author || 'Unknown'}</Text>
+            <Text style={styles.bookTitle} numberOfLines={2}>
+              {book.title || 'Unknown Title'}
+            </Text>
+            <Text style={styles.currentPrice}>
+              {formatPrice(book.price || 0)}
+            </Text>
+            
+            {/* Heart icon to show favorite status */}
+            <View style={styles.heartContainer}>
+              <Ionicons 
+                name="heart" 
+                size={20} 
+                color="#ff4757" 
+              />
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => handleMenuPress(book, null)}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color="#666" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.registerBtn} onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.registerBtnText}>Đăng ký</Text>
-          </TouchableOpacity>
-        </View>
+          
+
+          
+
+        </TouchableOpacity>
+        
+
       </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Danh sách yêu thích</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Đang tải sách yêu thích...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  const renderItem = ({ item }: { item: any }) => {
-    // Nếu API trả về dạng { book: {...} } thì lấy item.book, còn không thì lấy item
-    const book = item.book || item;
-    return (
-      <TouchableOpacity style={styles.itemRow} activeOpacity={0.85} onPress={() => router.push({ pathname: '/book/[id]', params: { id: book._id } })}>
-        <Image source={{ uri: getBookImageUrl(book) }} style={styles.bookImage} />
-        <View style={styles.infoWrap}>
-          <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>{book.author}</Text>
-          <Text style={styles.price}>{book.price ? `${book.price.toLocaleString()}₫` : ''}</Text>
-        </View>
-        <Menu>
-          <MenuTrigger>
-            <Ionicons name="ellipsis-vertical" size={22} color="#222" style={{ padding: 8 }} />
-          </MenuTrigger>
-          <MenuOptions>
-            <MenuOption onSelect={() => handleRemove(book._id)}>
-              <View style={styles.menuOption}><Ionicons name="trash-outline" size={18} color="#E53935" /><Text style={styles.menuText}>Xóa khỏi danh sách yêu thích</Text></View>
-            </MenuOption>
-            <MenuOption onSelect={() => handlePay(book)}>
-              <View style={styles.menuOption}><Ionicons name="card-outline" size={18} color="#5E5CE6" /><Text style={styles.menuText}>Pay</Text></View>
-            </MenuOption>
-            <MenuOption onSelect={() => handleShare(book)}>
-              <View style={styles.menuOption}><Ionicons name="share-social-outline" size={18} color="#5E5CE6" /><Text style={styles.menuText}>Share</Text></View>
-            </MenuOption>
-          </MenuOptions>
-        </Menu>
-      </TouchableOpacity>
-    );
-  };
+  console.log('🎨 Rendering favourites screen:', { 
+    favoritesCount: favorites.length, 
+    loading, 
+    refreshing,
+    favorites: favorites.slice(0, 2) // Log first 2 items
+  });
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-          <Ionicons name="arrow-back" size={24} color="#222" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Danh sách yêu thích</Text>
+        {loading && (
+          <View style={styles.headerLoading}>
+            <ActivityIndicator size="small" color="#667eea" />
+          </View>
+        )}
+        {favorites.length > 0 && !loading && (
+          <Text style={styles.favoriteCount}>{favorites.length} sách</Text>
+        )}
       </View>
-      {loading ? (
-        <ActivityIndicator size="large" color="#5E5CE6" style={{ marginTop: 40 }} />
-      ) : books.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Ionicons name="heart-outline" size={60} color="#5E5CE6" style={{ marginBottom: 16 }} />
+
+      {favorites.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="heart-outline" size={64} color="#bdc3c7" />
           <Text style={styles.emptyTitle}>Chưa có sách yêu thích</Text>
-          <Text style={styles.emptyDesc}>Hãy thêm sách vào danh sách yêu thích để dễ dàng tìm lại sau.</Text>
+          <Text style={styles.emptyText}>
+            Hãy thêm sách vào danh sách yêu thích để dễ dàng tìm lại sau.
+          </Text>
+          <TouchableOpacity 
+            style={styles.browseButton}
+            onPress={() => router.push('/(tabs)')}
+          >
+            <Text style={styles.browseButtonText}>Duyệt sách</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={books}
-          renderItem={renderItem}
-          keyExtractor={item => item._id}
-          contentContainerStyle={{ padding: 16 }}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
+          data={favorites}
+          renderItem={renderBookItem}
+          keyExtractor={(item: any) => (item.book?._id || item._id).toString()}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#667eea']}
+              tintColor="#667eea"
+            />
+          }
         />
       )}
-    </View>
+
+
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
+    padding: 16,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#fff',
+    borderBottomColor: '#e9ecef',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'center',
-    marginRight: 32,
+    color: '#2c3e50',
   },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#eee',
-    padding: 10,
-    gap: 12,
-  },
-  bookImage: {
-    width: 60,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#E8E8FF',
-  },
-  infoWrap: {
-    flex: 1,
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#222',
-    marginBottom: 2,
-  },
-  author: {
-    color: '#666',
+  favoriteCount: {
     fontSize: 14,
-    marginBottom: 2,
+    color: '#667eea',
+    fontWeight: '600',
   },
-  price: {
-    fontSize: 15,
-    color: '#222',
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  menuText: {
-    fontSize: 15,
-    marginLeft: 8,
-  },
-  emptyWrap: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
+    color: '#2c3e50',
+    marginTop: 16,
     marginBottom: 8,
   },
-  loginBtn: {
-    backgroundColor: '#5E5CE6',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-  },
-  loginBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  emptyText: {
     fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  registerBtn: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#5E5CE6',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
+  browseButton: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  registerBtnText: {
-    color: '#5E5CE6',
-    fontWeight: 'bold',
+  browseButtonText: {
+    color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 150,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  bookCard: {
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+  },
+  bookImageContainer: {
+    width: 80,
+    height: 120,
+    marginRight: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  bookImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bookInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  bookAuthor: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginBottom: 4,
+  },
+  bookTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  currentPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
+  heartContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 4,
+  },
+  menuButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  headerLoading: {
+    marginLeft: 10,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 50,
+  },
+  menuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 4,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  menuText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  bookCardContainer: {
+    marginBottom: 12,
+  },
+  inlineMenuContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    zIndex: 1000,
+  },
+  inlineMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 6,
+    marginVertical: 2,
+    minHeight: 44,
+  },
+  inlineMenuText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#333',
   },
 });
 

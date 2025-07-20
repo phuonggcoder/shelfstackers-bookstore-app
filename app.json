@@ -8,17 +8,14 @@
     "scheme": "shelfstackersbookstoreappfix",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.lathsenpai.shelfstackersbookstoreappfix"
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.lathsenpai.shelfstackersbookstoreappfix"
+      "package": "com.lathsenpai.shelfstackersbookstoreappfix",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "bundler": "metro",

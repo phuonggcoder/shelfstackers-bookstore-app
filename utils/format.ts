@@ -6,11 +6,16 @@ export const formatVND = (amount: number): string => {
 };
 
 // Utility function to get book image URL with fallback for thumbnail/cover display
-// For external screens (index, cart, favorite, search, order-review): cover_image > thumbnail > default
+// For external screens (index, cart, favorite, search, order-review): thumbnail > cover_image > default
 export const getBookImageUrl = (book: any): string => {
   if (!book) return 'https://i.imgur.com/gTzT0hA.jpeg';
   
-  // Priority: cover_image > thumbnail > default image (for external screens)
+  // Priority: thumbnail > cover_image > default image (for external screens)
+  if (book.thumbnail && book.thumbnail.trim() !== '') {
+    return book.thumbnail;
+  }
+  
+  // Fallback to cover_image if no thumbnail
   if (book.cover_image && Array.isArray(book.cover_image) && book.cover_image.length > 0) {
     for (let i = 0; i < book.cover_image.length; i++) {
       const img = book.cover_image[i];
@@ -18,11 +23,6 @@ export const getBookImageUrl = (book: any): string => {
         return img;
       }
     }
-  }
-  
-  // Fallback to thumbnail if no cover_image
-  if (book.thumbnail && book.thumbnail.trim() !== '') {
-    return book.thumbnail;
   }
   
   return 'https://i.imgur.com/gTzT0hA.jpeg';

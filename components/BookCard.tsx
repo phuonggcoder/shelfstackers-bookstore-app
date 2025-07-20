@@ -1,17 +1,60 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import React, { memo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useEffect, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import { addToWishlist, removeFromWishlist } from '../services/api';
 import { Book } from '../types';
 import { formatVND, getBookImageUrl } from '../utils/format';
 
 interface Props {
   book: Book;
+  isFavorited?: boolean;
+  onFavoriteChange?: (bookId: string, isFavorited: boolean) => void;
 }
 
-const BookCard = ({ book }: Props) => {
+const BookCard = ({ book, isFavorited = false, onFavoriteChange }: Props) => {
+  const { token } = useAuth();
+  const [favorited, setFavorited] = useState(isFavorited);
+  const [loading, setLoading] = useState(false);
+  
   const firstCategory = book.categories && book.categories.length > 0 ? book.categories[0] : null;
+
+  useEffect(() => {
+    setFavorited(isFavorited);
+  }, [isFavorited]);
+
+  const handleFavoritePress = async () => {
+    if (!token) {
+      Alert.alert('Thông báo', 'Vui lòng đăng nhập để thêm sách yêu thích');
+      return;
+    }
+
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      
+      if (favorited) {
+        // Remove from favorites
+        await removeFromWishlist(token, book._id);
+        setFavorited(false);
+        onFavoriteChange?.(book._id, false);
+      } else {
+        // Add to favorites
+        await addToWishlist(token, book._id);
+        setFavorited(true);
+        onFavoriteChange?.(book._id, true);
+      }
+    } catch (error) {
+      console.error('Favorite error:', error);
+      Alert.alert('Lỗi', 'Không thể thay đổi trạng thái yêu thích');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Link href={`/book/${book._id}` as any} asChild>
       <TouchableOpacity style={styles.container}>
@@ -22,8 +65,21 @@ const BookCard = ({ book }: Props) => {
                 contentFit="cover"
                 transition={300}
             />
-            <TouchableOpacity style={styles.favIcon}>
-                <Feather name="heart" size={18} color="#fff" />
+            <TouchableOpacity 
+              style={[styles.favIcon, favorited && styles.favIconActive]}
+              onPress={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleFavoritePress();
+              }}
+              disabled={loading}
+            >
+                <Feather 
+                  name={favorited ? "heart" : "heart"} 
+                  size={18} 
+                  color={favorited ? "#ff4757" : "#fff"} 
+                  fill={favorited ? "#ff4757" : "none"}
+                />
             </TouchableOpacity>
         </View>
         <View style={styles.content}>
@@ -65,6 +121,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.3)',
         padding: 5,
         borderRadius: 15,
+    },
+    favIconActive: {
+        backgroundColor: 'rgba(255, 71, 87, 0.3)',
     },
     content: {
         marginTop: 8,

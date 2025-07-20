@@ -1,19 +1,60 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BookCarousel from "../../components/BookCarousel";
+import CampaignCarousel from "../../components/CampaignCarousel";
 import CategoryFilters from "../../components/CategoryFilters";
 import Header from "../../components/Header";
 import SearchBar from "../../components/SearchBar";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
+import api from "../../services/api";
+import { Campaign } from "../../types";
 
 const Index = () => {
-  const { books, categories, isLoading } = useData();
+  const { books, categories, isLoading, refreshData } = useData();
   const { user } = useAuth();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(!user);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Auto-load data when tab is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCampaigns();
+    }, [])
+  );
+
+  const loadCampaigns = async () => {
+    try {
+      setCampaignsLoading(true);
+      const data = await api.getCampaigns();
+      setCampaigns(data);
+    } catch (error) {
+      console.error('Error loading campaigns:', error);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh all data
+      await Promise.all([
+        refreshData(),
+        loadCampaigns()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const getBooksForCategory = (categoryId: string) => {
     return books.filter(book => book.categories.some(cat => cat._id === categoryId));
@@ -59,10 +100,31 @@ const Index = () => {
           </View>
         </View>
       </Modal>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3255FB']}
+            tintColor="#3255FB"
+          />
+        }
+      >
         <Header />
         <SearchBar />
         <CategoryFilters />
+        
+        {/* Campaigns Section */}
+        {!campaignsLoading && campaigns.length > 0 && (
+          <CampaignCarousel 
+            title="Danh Mục" 
+            campaigns={campaigns} 
+          />
+        )}
+        
+        {/* Categories Section */}
         {categories.map(category => {
           const categoryBooks = getBooksForCategory(category._id);
           if (categoryBooks.length === 0) return null;
@@ -88,6 +150,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
+    paddingBottom: 160, // Increase padding even more for better spacing
   },
   centered: {
     flex: 1,

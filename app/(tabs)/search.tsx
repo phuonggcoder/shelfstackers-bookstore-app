@@ -1,440 +1,577 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import axios from 'axios';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    FlatList,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getBookImageUrl } from '../../utils/format';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getBooks, getCategories } from '../../services/api';
+import { Book, Category } from '../../types';
 
-const API_BOOKS = 'https://server-shelf-stacker.onrender.com/api/books';
-const API_CATEGORIES = 'https://server-shelf-stacker.onrender.com/api/categories';
+const { width } = Dimensions.get('window');
 
-const removeAccents = (str: string) =>
-  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const CACHE_KEYS = {
+  BOOKS: 'cached_books',
+  CATEGORIES: 'cached_categories',
+  LAST_UPDATE: 'last_cache_update',
+};
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const SearchScreen = () => {
-  const [searchText, setSearchText] = useState('');
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [resultLoading, setResultLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'book' | 'category'>('book');
   const router = useRouter();
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
-  const insets = useSafeAreaInsets();
-  const { autoFocus } = useLocalSearchParams();
-  const searchInputRef = useRef<TextInput>(null);
-  
-  // Animation values
-  const borderAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [activeTab, setActiveTab] = useState<'books' | 'categories'>('books');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [books, setBooks] = useState<Book[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
 
-  useEffect(() => {
-    const loadRecentSearches = async () => {
-      const stored = await AsyncStorage.getItem('recentSearches');
-      if (stored) setRecentSearches(JSON.parse(stored));
-    };
-    loadRecentSearches();
-  }, []);
-
-  // Auto focus khi navigate từ trang chủ
+  // Auto-load data when tab is focused
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Focus effect triggered:', { autoFocus, searchInputRef: !!searchInputRef.current });
-      if (autoFocus === 'true' && searchInputRef.current) {
-        // Tăng delay để đảm bảo component đã render hoàn toàn
-        setTimeout(() => {
-          console.log('Attempting to focus input...');
-          searchInputRef.current?.focus();
-          // Clear param sau khi focus thành công
-          router.setParams({ autoFocus: 'false' });
-        }, 500);
-      }
-    }, [autoFocus])
+      loadData();
+    }, [])
   );
 
-  // Animation handlers
-  const handleFocus = () => {
-    Animated.parallel([
-      Animated.timing(borderAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1.02,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  const handleBlur = () => {
-    Animated.parallel([
-      Animated.timing(borderAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  // Search realtime khi searchText thay đổi (debounce 300ms)
   useEffect(() => {
-    if (debounceTimeout.current) clearTimeout(debounceTimeout.current as any);
-    if (!searchText.trim()) {
-      setSearchResults([]);
+    filterData();
+  }, [searchQuery, books, categories]);
+
+  const isCacheValid = async () => {
+    try {
+      const lastUpdate = await AsyncStorage.getItem(CACHE_KEYS.LAST_UPDATE);
+      if (!lastUpdate) return false;
+      
+      const now = Date.now();
+      const lastUpdateTime = parseInt(lastUpdate);
+      return (now - lastUpdateTime) < CACHE_DURATION;
+    } catch (error) {
+      console.error('Error checking cache validity:', error);
+      return false;
+    }
+  };
+
+  const loadCachedData = async () => {
+    try {
+      const [cachedBooks, cachedCategories] = await Promise.all([
+        AsyncStorage.getItem(CACHE_KEYS.BOOKS),
+        AsyncStorage.getItem(CACHE_KEYS.CATEGORIES),
+      ]);
+
+      if (cachedBooks) {
+        setBooks(JSON.parse(cachedBooks));
+      }
+      if (cachedCategories) {
+        setCategories(JSON.parse(cachedCategories));
+      }
+    } catch (error) {
+      console.error('Error loading cached data:', error);
+    }
+  };
+
+  const saveToCache = async (booksData: Book[], categoriesData: Category[]) => {
+    try {
+      const now = Date.now();
+      await Promise.all([
+        AsyncStorage.setItem(CACHE_KEYS.BOOKS, JSON.stringify(booksData)),
+        AsyncStorage.setItem(CACHE_KEYS.CATEGORIES, JSON.stringify(categoriesData)),
+        AsyncStorage.setItem(CACHE_KEYS.LAST_UPDATE, now.toString()),
+      ]);
+    } catch (error) {
+      console.error('Error saving to cache:', error);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Check if cache is valid
+      const cacheValid = await isCacheValid();
+      
+      if (cacheValid) {
+        // Load from cache
+        await loadCachedData();
+        console.log('Data loaded from cache');
+      } else {
+        // Load from API and update cache
+        const [booksData, categoriesData] = await Promise.all([
+          getBooks(),
+          getCategories()
+        ]);
+        
+        setBooks(booksData);
+        setCategories(categoriesData);
+        
+        // Save to cache
+        await saveToCache(booksData, categoriesData);
+        console.log('Data loaded from API and cached');
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // Try to load from cache as fallback
+      await loadCachedData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Force refresh from API
+      const [booksData, categoriesData] = await Promise.all([
+        getBooks(),
+        getCategories()
+      ]);
+      
+      setBooks(booksData);
+      setCategories(categoriesData);
+      
+      // Update cache
+      await saveToCache(booksData, categoriesData);
+      console.log('Data refreshed from API and cached');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const filterData = () => {
+    if (!searchQuery.trim()) {
+      setFilteredBooks(books);
+      setFilteredCategories(categories);
       return;
     }
-    debounceTimeout.current = setTimeout(() => {
-      doSearch(searchText.trim());
-    }, 300) as any;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, activeTab]);
 
-  // Tìm kiếm khi nhập
-  const doSearch = async (keyword: string) => {
-    setResultLoading(true);
-    setSearchResults([]);
-    try {
-      if (activeTab === 'book') {
-        const res = await axios.get(`${API_BOOKS}/search?keyword=${encodeURIComponent(keyword)}`);
-        setSearchResults(res.data.books || []);
-      } else {
-        const res = await axios.get(`${API_CATEGORIES}/search?name=${encodeURIComponent(keyword)}`);
-        setSearchResults(res.data.categories || []);
-      }
-    } catch {
-      setSearchResults([]);
+    const query = searchQuery.toLowerCase();
+    
+    // Filter books
+    const filteredBooksData = books.filter(book => 
+      book.title.toLowerCase().includes(query) ||
+      book.author.toLowerCase().includes(query) ||
+      book.description?.toLowerCase().includes(query)
+    );
+    setFilteredBooks(filteredBooksData);
+
+    // Filter categories
+    const filteredCategoriesData = categories.filter(category => 
+      category.name.toLowerCase().includes(query) ||
+      category.description?.toLowerCase().includes(query)
+    );
+    setFilteredCategories(filteredCategoriesData);
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(price);
+  };
+
+  const getBookImage = (book: Book) => {
+    if (book.thumbnail) return book.thumbnail;
+    if (book.cover_image && book.cover_image.length > 0) {
+      return book.cover_image[0];
     }
-    setResultLoading(false);
+    return 'https://i.imgur.com/gTzT0hA.jpeg';
   };
 
-  // Lưu lịch sử và tìm kiếm
-  const saveSearch = async (keyword: string) => {
-    const cleanKeyword = keyword.trim();
-    if (!cleanKeyword) return;
-    const stored = await AsyncStorage.getItem('recentSearches');
-    const current: string[] = stored ? JSON.parse(stored) : [];
-    const newHistory = [cleanKeyword, ...current.filter(item => item !== cleanKeyword)];
-    const final = newHistory.slice(0, 10);
-    setRecentSearches(final);
-    await AsyncStorage.setItem('recentSearches', JSON.stringify(final));
-    setSearchText(cleanKeyword);
+  const getCategoryImage = (category: Category) => {
+    if (category.image) return category.image;
+    return 'https://i.imgur.com/gTzT0hA.jpeg';
   };
 
-  const clearSearchHistory = async () => {
-    await AsyncStorage.removeItem('recentSearches');
-    setRecentSearches([]);
+  const handleBookPress = (book: Book) => {
+    router.push({
+      pathname: '/book/[id]',
+      params: { id: book._id }
+    });
   };
 
-  const deleteOneKeyword = async (keyword: string) => {
-    const newList = recentSearches.filter(item => item !== keyword);
-    setRecentSearches(newList);
-    await AsyncStorage.setItem('recentSearches', JSON.stringify(newList));
+  const handleCategoryPress = (category: Category) => {
+    router.push({
+      pathname: '/category-detail/[id]',
+      params: { id: category._id, name: category.name }
+    });
   };
 
-  // Khi click vào kết quả
-  const handleResultPress = (item: any) => {
-    if (activeTab === 'book') {
-      router.push({ pathname: '/book/[id]', params: { id: item._id || item.id } });
-    } else {
-      router.push({ pathname: '/category/[id]', params: { id: item._id || item.id, name: item.name || item.title } });
-    }
-    saveSearch(searchText);
-  };
-
-  // UI tab
-  const renderTabBar = () => (
-    <View style={styles.tabBar}>
-      <TouchableOpacity
-        style={[styles.tabItem, activeTab === 'book' && styles.tabActive]}
-        onPress={() => setActiveTab('book')}
-      >
-        <Text style={[styles.tabText, activeTab === 'book' && styles.tabTextActive]}>Sách</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tabItem, activeTab === 'category' && styles.tabActive]}
-        onPress={() => setActiveTab('category')}
-      >
-        <Text style={[styles.tabText, activeTab === 'category' && styles.tabTextActive]}>Danh mục</Text>
-      </TouchableOpacity>
-    </View>
+  const renderBookItem = ({ item }: { item: Book }) => (
+    <TouchableOpacity
+      style={styles.bookCard}
+      onPress={() => handleBookPress(item)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.bookImageContainer}>
+        <Image
+          source={{ uri: getBookImage(item) }}
+          style={styles.bookImage}
+          contentFit="cover"
+          transition={300}
+        />
+        <TouchableOpacity style={styles.heartButton}>
+          <Ionicons name="heart-outline" size={18} color="#4A90E2" />
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.bookInfo}>
+        <Text style={styles.bookTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.bookAuthor} numberOfLines={1}>
+          {item.author}
+        </Text>
+        <View style={styles.priceContainer}>
+          <Text style={styles.currentPrice}>
+            {formatPrice(item.price)}
+          </Text>
+          {item.price > 0 && (
+            <Text style={styles.originalPrice}>
+              {formatPrice(item.price * 1.2)}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 
-  // UI grid item
-  const ITEM_WIDTH = Math.floor((Dimensions.get('window').width - 40 - 24) / 3); // 40 padding, 24 gap
-  const ITEM_HEIGHT = 180;
-  const PLACEHOLDER_IMAGE = 'https://i.imgur.com/gTzT0hA.jpeg';
-
-  const renderGridItem = ({ item }: { item: any }) => {
-    // Use utility function for consistent image handling
-    const getImageUrl = () => {
-      if (activeTab === 'book') {
-        // For books: use the utility function
-        return getBookImageUrl(item);
-      } else {
-        // For categories: use image_url or image
-        return item.image_url || item.image || PLACEHOLDER_IMAGE;
-      }
-    };
-
-    return (
-      <TouchableOpacity
-        style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
-        onPress={() => handleResultPress(item)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.gridThumbWrap}>
-          <Image
-            source={{ uri: getImageUrl() }}
-            style={styles.gridThumb}
-            resizeMode="cover"
-          />
-        </View>
-        <Text style={styles.gridTitle} numberOfLines={2}>{item.title || item.name}</Text>
-        {activeTab === 'book' && item.author && (
-          <Text style={styles.gridAuthor} numberOfLines={1}>{item.author}</Text>
+  const renderCategoryItem = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      style={styles.categoryCard}
+      onPress={() => handleCategoryPress(item)}
+      activeOpacity={0.8}
+    >
+      <Image
+        source={{ uri: getCategoryImage(item) }}
+        style={styles.categoryImage}
+        contentFit="cover"
+        transition={300}
+      />
+      <View style={styles.categoryInfo}>
+        <Text style={styles.categoryName} numberOfLines={2}>
+          {item.name}
+        </Text>
+        {item.description && (
+          <Text style={styles.categoryDescription} numberOfLines={2}>
+            {item.description.replace(/<[^>]*>/g, '')}
+          </Text>
         )}
-      </TouchableOpacity>
-    );
-  };
-
-  // UI grid list
-  const renderGridList = (data: any[]) => (
-    <FlatList
-      data={data}
-      renderItem={renderGridItem}
-      keyExtractor={item => item._id || item.id}
-      numColumns={3}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.gridList}
-      ListEmptyComponent={resultLoading ? (
-        <ActivityIndicator size="small" color="#5E5CE6" style={{ marginVertical: 10 }} />
-      ) : searchText.trim() ? (
-        <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>Không tìm thấy kết quả cho từ khóa "{searchText}"</Text>
-      ) : null}
-    />
+      </View>
+    </TouchableOpacity>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: insets.top }}>
-        <View style={styles.topSearchContainer}>
-          <Animated.View style={[
-            styles.searchSection,
-            {
-              borderColor: borderAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['#E0E0E0', '#5E5CE6'],
-              }),
-              transform: [{ scale: scaleAnim }],
-            }
-          ]}>
-            <Ionicons name="search" size={22} color="#888" style={styles.searchIcon} />
-            <TextInput
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholder={activeTab === 'book' ? 'Tìm kiếm sách, tác giả...' : 'Tìm kiếm danh mục...'}
-              style={styles.input}
-              returnKeyType="search"
-              ref={searchInputRef}
-              onLayout={() => {
-                // Focus khi layout hoàn thành nếu có autoFocus
-                if (autoFocus === 'true') {
-                  setTimeout(() => {
-                    console.log('Focusing on layout complete');
-                    searchInputRef.current?.focus();
-                  }, 300);
-                }
-              }}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-          </Animated.View>
-          <TouchableOpacity style={styles.filterButton}>
-            <Ionicons name="filter" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        {renderTabBar()}
-      </View>
-      {/* Nếu searchText rỗng, hiện lịch sử tìm kiếm */}
-      {!searchText.trim() && recentSearches.length > 0 ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <View style={styles.All}>
-            <Text style={styles.sectionTitle}>Lịch sử tìm kiếm</Text>
-            <TouchableOpacity onPress={clearSearchHistory}>
-              <Text style={styles.seeAll}>Xóa</Text>
+    <SafeAreaView style={styles.container}>
+      {/* Search Header */}
+      <View style={styles.searchHeader}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#7f8c8d" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm sách, tác giả, danh mục..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#7f8c8d"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#7f8c8d" />
             </TouchableOpacity>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {recentSearches.map((item, index) => (
-              <View
-                key={index}
-                style={{
-                  flexDirection: 'row',
-                  backgroundColor: '#eee',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                  marginRight: 8,
-                  marginBottom: 8,
-                  alignItems: 'center',
-                }}
-              >
-                <TouchableOpacity onPress={() => setSearchText(item)}>
-                  <Text>{item}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteOneKeyword(item)}>
-                  <Ionicons name="close" size={16} color="#666" style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+          )}
+        </View>
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={() => setShowFilter(!showFilter)}
+        >
+          <Ionicons name="options-outline" size={20} color="#667eea" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'books' && styles.tabActive]}
+          onPress={() => setActiveTab('books')}
+        >
+          <Text style={[styles.tabText, activeTab === 'books' && styles.tabTextActive]}>
+            Sách ({filteredBooks.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'categories' && styles.tabActive]}
+          onPress={() => setActiveTab('categories')}
+        >
+          <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>
+            Danh mục ({filteredCategories.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+        </View>
       ) : (
-        // Nếu có searchText, chỉ hiện 1 FlatList kết quả
-        renderGridList(searchResults)
+        <>
+          {activeTab === 'books' ? (
+            filteredBooks.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="search-outline" size={64} color="#bdc3c7" />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'Không tìm thấy sách phù hợp' : 'Chưa có sách nào'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm sách bạn muốn'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredBooks}
+                renderItem={renderBookItem}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                columnWrapperStyle={styles.row}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+                key="books-list"
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+              />
+            )
+          ) : (
+            filteredCategories.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="grid-outline" size={64} color="#bdc3c7" />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có danh mục nào'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm danh mục bạn muốn'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredCategories}
+                renderItem={renderCategoryItem}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+                key="categories-list"
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+              />
+            )
+          )}
+        </>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
-  topSearchContainer: {
+  searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
   },
-  searchSection: {
+  searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F8',
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    height: 50,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 12,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
-  input: {
+  searchInput: {
     flex: 1,
-    height: '100%',
     fontSize: 16,
+    color: '#2c3e50',
+    paddingVertical: 8,
   },
   filterButton: {
-    marginLeft: 10,
-    backgroundColor: '#5E5CE6',
-    padding: 14,
-    borderRadius: 15,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F8',
-    borderRadius: 10,
-    marginTop: 10,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 2,
-    borderBottomColor: '#5E5CE6',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#888',
-    fontWeight: 'bold',
-  },
-  tabTextActive: {
-    color: '#5E5CE6',
-  },
-  All: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginVertical: 10,
-  },
-  sectionTitle: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 20,
-  },
-  seeAll: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  gridList: {
-    paddingHorizontal: 8,
-    paddingBottom: 20,
-  },
-  gridItem: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 10,
-    padding: 8,
-    marginBottom: 12,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  gridThumbWrap: {
-    width: 80,
-    height: 112,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#eee',
-    marginBottom: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  gridThumb: {
-    width: 80,
-    height: 112,
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: '#eee',
+    marginHorizontal: 4,
   },
-  gridTitle: {
+  tabActive: {
+    backgroundColor: '#667eea',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  tabTextActive: {
+    color: 'white',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 15,
-    color: '#222',
+    color: '#2c3e50',
+    marginTop: 16,
+    marginBottom: 8,
     textAlign: 'center',
-    marginBottom: 2,
   },
-  gridAuthor: {
-    fontSize: 13,
-    color: '#888',
+  emptyText: {
+    fontSize: 14,
+    color: '#7f8c8d',
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 150, // Increase padding even more for floating tab bar
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  bookCard: {
+    width: (width - 48) / 2,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  bookImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 180,
+  },
+  bookImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heartButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bookInfo: {
+    padding: 12,
+  },
+  bookTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  bookAuthor: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginBottom: 8,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  currentPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
+  originalPrice: {
+    fontSize: 11,
+    color: '#7f8c8d',
+    textDecorationLine: 'line-through',
+  },
+  categoryCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  categoryImage: {
+    width: '100%',
+    height: 120,
+  },
+  categoryInfo: {
+    padding: 16,
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  categoryDescription: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    lineHeight: 18,
   },
 });
 

@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
 class StorageHelper {
   private readonly FCM_TOKEN_KEY = 'fcm_token';
@@ -27,7 +26,7 @@ class StorageHelper {
       let deviceId = await AsyncStorage.getItem(this.DEVICE_ID_KEY);
       
       if (!deviceId) {
-        deviceId = `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        deviceId = `android_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await AsyncStorage.setItem(this.DEVICE_ID_KEY, deviceId);
       }
       

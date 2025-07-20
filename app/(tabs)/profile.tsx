@@ -44,7 +44,7 @@ const SettingsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
         <Image
           source={{ uri: 'https://i.pravatar.cc/150' }}
@@ -119,8 +119,12 @@ const SettingsScreen = () => {
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
+        
+        {/* Spacer to ensure button is not hidden */}
+        <View style={{ height: 20 }} />
       </View>
     </ScrollView>
   );
@@ -254,15 +258,29 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   logoutButton: {
-    backgroundColor: '#4A3780',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: '#ff4757',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 30,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#ff3742',
   },
   logoutText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });

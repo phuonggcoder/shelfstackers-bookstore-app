@@ -1,221 +1,502 @@
-import axios from 'axios';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { formatVND } from '../utils/format';
 
-const API_URL = 'https://server-shelf-stacker.onrender.com/api/orders/my';
-
-// Define types for order and item
 interface OrderItem {
-  book: {
-    _id: string;
-    title: string;
-    author: string;
-    price: number;
-    image_url?: string;
-  };
-  quantity: number;
-}
-
-interface Order {
   _id: string;
-  order_id?: string;
-  order_code?: string;
-  order_date?: string;
-  order_status?: string;
+  orderCode: string;
   status: string;
-  items: OrderItem[];
-  order_items?: OrderItem[];
-  payment?: {
-    payment_method?: string;
-    payment_status?: string;
-  };
-  discount_amount?: number;
-  ship_amount?: number;
-  final_amount?: number;
-  total_amount?: number;
-  address_id?: {
-    receiver_name?: string;
-    phone_number?: string;
-    address_detail?: string;
-    ward?: string;
-    district?: string;
-    province?: string;
-  };
-  expected_delivery?: string;
+  totalAmount: number;
+  items: Array<{
+    book: {
+      _id: string;
+      title: string;
+      author: string;
+      thumbnail?: string;
+      cover_image?: string[];
+    };
+    quantity: number;
+    price: number;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
-
-// Mapping trạng thái đơn hàng sang tiếng Việt
-const ORDER_STATUS_VI: Record<string, string> = {
-  pending: 'Chờ xác nhận',
-  processing: 'Chờ lấy hàng',
-  shipped: 'Chờ giao hàng',
-  delivered: 'Đã giao',
-  returned: 'Trả hàng',
-  cancelled: 'Đã huỷ',
-  completed: 'Hoàn thành',
-};
-
-const ORDER_TABS = [
-  { key: 'pending', label: 'Chờ xác nhận' },
-  { key: 'processing', label: 'Chờ lấy hàng' },
-  { key: 'shipped', label: 'Chờ giao hàng' },
-  { key: 'delivered', label: 'Đã giao' },
-  { key: 'returned', label: 'Trả hàng' },
-  { key: 'cancelled', label: 'Đã huỷ' },
-  { key: 'completed', label: 'Hoàn thành' },
-];
 
 const OrderHistoryScreen = () => {
-  const { user, token } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('pending');
   const router = useRouter();
+  const { token } = useAuth();
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('all');
+
+  const tabs = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'pending', label: 'Chờ xác nhận' },
+    { key: 'confirmed', label: 'Chờ lấy hàng' },
+    { key: 'shipping', label: 'Chờ giao hàng' },
+    { key: 'delivered', label: 'Đã giao' },
+    { key: 'cancelled', label: 'Đã huỷ' },
+    { key: 'completed', label: 'Hoàn thành' },
+  ];
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        console.log('Fetching orders with token:', token ? 'present' : 'missing');
-        const res = await axios.get(API_URL, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        console.log('Orders API response:', res.data);
-        
-        // Đảm bảo orders luôn là array
-        const ordersData = res.data.orders || res.data || [];
-        const ordersArray = Array.isArray(ordersData) ? ordersData : [];
-        console.log('Processed orders:', ordersArray);
-        setOrders(ordersArray);
-      } catch (err: any) {
-        console.error('Error fetching orders:', err);
-        console.error('Error details:', err.response?.data || err.message);
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    if (token) {
-      fetchOrders();
-    } else {
-      console.log('No token available, setting empty orders');
-      setOrders([]);
-      setLoading(false);
-    }
+    loadOrders();
   }, [token]);
 
-  const handleCancel = async (orderId: string) => {
+  const loadOrders = async () => {
+    if (!token) return;
+    
     try {
-      await axios.patch(
-        `https://server-shelf-stacker.onrender.com/api/orders/${orderId}/cancel`,
-        { cancellation_reason: 'User cancelled' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setOrders((prev) => prev.map((o) => o._id === orderId ? { ...o, status: 'Cancelled' } : o));
-    } catch (e) {}
+      setLoading(true);
+      // TODO: Replace with actual API call
+      // const response = await getOrders(token);
+      // setOrders(response);
+      
+      // Mock data for now
+      setOrders([
+        {
+          _id: '1',
+          orderCode: 'ORD001',
+          status: 'pending',
+          totalAmount: 23000,
+          items: [
+            {
+              book: {
+                _id: 'book1',
+                title: 'Sách không xác định',
+                author: 'Tác giả không xác định',
+              },
+              quantity: 1,
+              price: 23000,
+            }
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      ]);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredOrders = (orders || []).filter((order) => {
-    const status = (order.order_status || order.status || '').toLowerCase();
-    return status === tab;
-  });
-
-  // Hàm format địa chỉ
-  const formatAddressText = (addr: any) => {
-    if (!addr) return '';
-    const parts = [];
-    if (addr.address_detail) parts.push(addr.address_detail);
-    if (addr.ward) parts.push(addr.ward);
-    if (addr.district) parts.push(addr.district);
-    if (addr.province) parts.push(addr.province);
-    return parts.join(', ');
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadOrders();
+    setRefreshing(false);
   };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return '#f39c12';
+      case 'confirmed': return '#3498db';
+      case 'shipping': return '#9b59b6';
+      case 'delivered': return '#27ae60';
+      case 'cancelled': return '#4A90E2';
+      case 'completed': return '#2ecc71';
+      default: return '#95a5a6';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Chờ xác nhận';
+      case 'confirmed': return 'Chờ lấy hàng';
+      case 'shipping': return 'Chờ giao hàng';
+      case 'delivered': return 'Đã giao';
+      case 'cancelled': return 'Đã huỷ';
+      case 'completed': return 'Hoàn thành';
+      default: return 'Không xác định';
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(price);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('vi-VN');
+    } catch {
+      return 'Ngày không xác định';
+    }
+  };
+
+  const getBookImage = (book: any) => {
+    if (!book) return 'https://i.imgur.com/gTzT0hA.jpeg';
+    
+    // Try thumbnail first
+    if (book.thumbnail && book.thumbnail.trim() !== '') {
+      return book.thumbnail;
+    }
+    
+    // Try cover_image array
+    if (book.cover_image && Array.isArray(book.cover_image) && book.cover_image.length > 0) {
+      const firstImage = book.cover_image[0];
+      if (firstImage && firstImage.trim() !== '') {
+        return firstImage;
+      }
+    }
+    
+    // Try image field
+    if (book.image && book.image.trim() !== '') {
+      return book.image;
+    }
+    
+    // Try image_url field
+    if (book.image_url && book.image_url.trim() !== '') {
+      return book.image_url;
+    }
+    
+    // Fallback to placeholder
+    return 'https://i.imgur.com/gTzT0hA.jpeg';
+  };
+
+  const filteredOrders = selectedTab === 'all' 
+    ? orders 
+    : orders.filter(order => order.status === selectedTab);
+
+  const renderOrderItem = ({ item }: { item: OrderItem }) => {
+    const firstBook = item.items[0]?.book;
+    
+    return (
+      <TouchableOpacity
+        style={styles.orderCard}
+        onPress={() => router.push({
+          pathname: '/order-detail',
+          params: { orderId: item._id }
+        })}
+        activeOpacity={0.8}
+      >
+        <View style={styles.orderHeader}>
+          <View style={styles.orderInfo}>
+            <Text style={styles.orderCode}>Mã đơn: {item.orderCode}</Text>
+            <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.orderContent}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: getBookImage(firstBook) }}
+              style={styles.bookImage}
+              contentFit="cover"
+              transition={300}
+            />
+          </View>
+          <View style={styles.bookInfo}>
+            <Text style={styles.bookTitle} numberOfLines={2}>
+              {firstBook?.title || 'Sách không xác định'}
+            </Text>
+            <Text style={styles.bookAuthor}>
+              {firstBook?.author || 'Tác giả không xác định'}
+            </Text>
+            <Text style={styles.itemCount}>
+              x{item.items[0]?.quantity || 1}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.orderFooter}>
+          <View style={styles.totalInfo}>
+            <Text style={styles.totalLabel}>
+              Tổng số tiền ({item.items.length} sản phẩm):
+            </Text>
+            <Text style={styles.totalAmount}>
+              {formatPrice(item.totalAmount)}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.detailButton}>
+            <Text style={styles.detailButtonText}>Chi tiết</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Đơn hàng của tôi</Text>
-      <View style={styles.tabContainer}>
-        {ORDER_TABS.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.tab, tab === t.key && styles.tabActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#2c3e50" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+        <View style={{ width: 24 }} />
       </View>
-      {loading ? (
-        <ActivityIndicator size="large" color="#4A3780" style={{ marginTop: 40 }} />
-      ) : filteredOrders.length === 0 ? (
-        <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
+
+      <FlatList
+        horizontal
+        data={tabs}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              selectedTab === item.key && styles.tabActive
+            ]}
+            onPress={() => setSelectedTab(item.key)}
+          >
+            <Text style={[
+              styles.tabText,
+              selectedTab === item.key && styles.tabTextActive
+            ]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+        keyExtractor={(item) => item.key}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabContainer}
+      />
+
+      {filteredOrders.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="receipt-outline" size={64} color="#bdc3c7" />
+          <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
+          <Text style={styles.emptyText}>
+            {selectedTab === 'all' 
+              ? 'Bạn chưa có đơn hàng nào'
+              : `Chưa có đơn hàng ${getStatusText(selectedTab).toLowerCase()}`
+            }
+          </Text>
+        </View>
       ) : (
-        <ScrollView style={{ flex: 1 }}>
-          {filteredOrders.map((order) => {
-            const firstItem = (order.items || order.order_items || [])[0];
-            const statusVi = ORDER_STATUS_VI[(order.order_status || order.status || '').toLowerCase()] || (order.order_status || order.status || 'Không xác định');
-            return (
-              <View key={order._id} style={styles.orderCard}>
-                {/* Trạng thái góc phải trên */}
-                <Text style={{position:'absolute',top:10,right:16,color:'#F55',fontWeight:'bold',fontSize:16}}>{statusVi}</Text>
-                {/* Ảnh và thông tin sản phẩm đầu tiên */}
-                <View style={{flexDirection:'row',alignItems:'center'}}>
-                  <Image source={{ uri: firstItem?.book?.image_url || 'https://via.placeholder.com/60' }} style={styles.bookImage} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text numberOfLines={1} style={styles.bookTitle}>{firstItem?.book?.title || 'Sách không xác định'}</Text>
-                    <Text style={{color:'#888'}}>{(firstItem?.book && (firstItem.book as any).color) ? (firstItem.book as any).color : ''}</Text>
-                    <Text style={styles.bookQty}>x{firstItem?.quantity || 1}</Text>
-                  </View>
-                </View>
-                {/* Giá gốc và giá giảm */}
-                <View style={{flexDirection:'row',alignItems:'center',marginTop:4}}>
-                  <Text style={{textDecorationLine:'line-through',color:'#888',marginRight:8}}>{firstItem?.book?.price ? formatVND(firstItem.book.price) : ''}</Text>
-                  <Text style={{fontWeight:'bold',fontSize:16}}>{(firstItem?.book && (firstItem.book as any).discount_price) ? formatVND((firstItem.book as any).discount_price) : (firstItem?.book?.price ? formatVND(firstItem.book.price) : '')}</Text>
-                </View>
-                {/* Tổng số tiền và tổng số sản phẩm */}
-                <Text style={{marginTop:8,fontWeight:'bold'}}>Tổng số tiền ({(order.items || order.order_items || []).reduce((sum, i) => sum + (i.quantity || 1), 0)} sản phẩm): {formatVND(order.final_amount || order.total_amount || 0)}</Text>
-                {/* Nút chi tiết đơn hàng ở góc phải dưới */}
-                <View style={{flexDirection:'row',justifyContent:'flex-end',marginTop:10}}>
-                  <TouchableOpacity style={{backgroundColor:'#4A3780',paddingVertical:8,paddingHorizontal:18,borderRadius:20}} onPress={() => router.push(`/order-detail?orderId=${order._id}`)}>
-                    <Text style={{color:'#fff',fontWeight:'bold'}}>Chi tiết đơn hàng</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          data={filteredOrders}
+          renderItem={renderOrderItem}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.orderList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#667eea']}
+              tintColor="#667eea"
+            />
+          }
+        />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginVertical: 16 },
-  tabContainer: { flexDirection: 'row', backgroundColor: '#F3F3F3', borderRadius: 8, marginBottom: 16 },
-  tab: { flex: 1, padding: 10, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#fff', elevation: 2 },
-  tabText: { fontSize: 16, color: '#888' },
-  tabTextActive: { color: '#4A3780', fontWeight: 'bold' },
-  orderCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
-  orderId: { fontWeight: 'bold', fontSize: 16, marginBottom: 10 },
-  bookRow: { flexDirection: 'row', marginBottom: 10 },
-  bookImage: { width: 60, height: 60, borderRadius: 8 },
-  bookAuthor: { fontSize: 13, color: '#666' },
-  bookTitle: { fontWeight: 'bold', fontSize: 15, color: '#222' },
-  bookPrice: { color: '#222', fontSize: 14 },
-  bookQty: { color: '#888', fontSize: 13 },
-  deliveryText: { color: '#888', fontSize: 13, marginTop: 5, marginBottom: 10 },
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#FFF2F2', paddingVertical: 10, paddingHorizontal: 30, borderRadius: 20 },
-  cancelText: { color: '#F55', fontWeight: 'bold', fontSize: 16 },
-  viewBtn: { backgroundColor: '#4A3780', paddingVertical: 10, paddingHorizontal: 30, borderRadius: 20 },
-  viewText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  emptyText: { textAlign: 'center', color: '#888', marginTop: 40, fontSize: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
+  tabContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  tabActive: {
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
+  },
+  orderList: {
+    padding: 16,
+  },
+  orderCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  orderInfo: {
+    flex: 1,
+  },
+  orderCode: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  orderDate: {
+    fontSize: 14,
+    color: '#7f8c8d',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '600',
+  },
+  orderContent: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  imageContainer: {
+    width: 60,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  bookImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bookInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bookTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  bookAuthor: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 4,
+  },
+  itemCount: {
+    fontSize: 14,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  totalInfo: {
+    flex: 1,
+  },
+  totalLabel: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 2,
+  },
+  totalAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
+  detailButton: {
+    backgroundColor: '#667eea',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  detailButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });
 
 export default OrderHistoryScreen;

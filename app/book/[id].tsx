@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomAlert from '../../components/BottomAlert';
@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { addToCart, addToWishlist, getBookById } from '../../services/api';
 import { Book } from '../../types';
-import { formatVND, getBookCoverImageUrl } from '../../utils/format';
+import { formatVND } from '../../utils/format';
 
 const BookDetailsScreen = () => {
   const { id } = useLocalSearchParams();
@@ -43,6 +43,8 @@ const BookDetailsScreen = () => {
 
   const { cartCount, cartJustAdded, setCartJustAdded, fetchCartCount, hasFetched } = useCart();
   const [showCartDialog, setShowCartDialog] = useState(false);
+  const [showFullscreenImage, setShowFullscreenImage] = useState(false);
+  const [fullscreenImageIndex, setFullscreenImageIndex] = useState(0);
 
   // Memoize values to prevent unnecessary re-renders
   const tagsStyles = useMemo(() => ({
@@ -146,15 +148,50 @@ const BookDetailsScreen = () => {
     );
   }
 
-  const images = book.cover_image && book.cover_image.length > 0
-    ? book.cover_image.filter(img => img && img.trim() !== '')
-    : [getBookCoverImageUrl(book)]; // Use cover image function
+  const images = (() => {
+    const allImages: string[] = [];
+    
+    // Add thumbnail first if available
+    if (book.thumbnail && book.thumbnail.trim() !== '') {
+      allImages.push(book.thumbnail);
+    }
+    
+    // Add all cover images
+    if (book.cover_image && Array.isArray(book.cover_image)) {
+      book.cover_image.forEach(img => {
+        if (img && img.trim() !== '' && !allImages.includes(img)) {
+          allImages.push(img);
+        }
+      });
+    }
+    
+    // If no images found, use default
+    if (allImages.length === 0) {
+      allImages.push('https://i.imgur.com/gTzT0hA.jpeg');
+    }
+    
+    console.log('Book images:', {
+      thumbnail: book.thumbnail,
+      cover_image: book.cover_image,
+      finalImages: allImages
+    });
+    
+    return allImages;
+  })();
 
   // Helper function to validate image URL
   const getValidImageUrl = (url: string) => {
     if (!url || url.trim() === '') return 'https://i.imgur.com/gTzT0hA.jpeg';
     return url;
   };
+
+  // Fallback image component
+  const FallbackImage = () => (
+    <View style={[styles.sliderImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+      <Ionicons name="image-outline" size={60} color="#ccc" />
+      <Text style={{ color: '#ccc', marginTop: 10 }}>Không có hình ảnh</Text>
+    </View>
+  );
 
   const onMomentumScrollEnd = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
@@ -234,6 +271,11 @@ const BookDetailsScreen = () => {
     addBookToCartAndNavigate();
   };
 
+  const openFullscreenImage = (index: number) => {
+    setFullscreenImageIndex(index);
+    setShowFullscreenImage(true);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Overlay: phủ toàn màn hình, click vào sẽ tắt alert, nằm dưới BottomAlert */}
@@ -278,7 +320,7 @@ const BookDetailsScreen = () => {
           headerRight: () => (
             <View style={{ flexDirection: 'row' }}>
               <TouchableOpacity style={{ marginRight: 15 }} onPress={() => handleFavorite(id)}>
-                <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#E53935' : 'black'} />
+                <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#4A90E2' : 'black'} />
               </TouchableOpacity>
               <TouchableOpacity style={{ marginRight: 15 }}>
                 <Ionicons name="share-outline" size={24} color="black" />
@@ -317,7 +359,7 @@ const BookDetailsScreen = () => {
           </TouchableOpacity>
           <View style={{ flexDirection: 'row' }}>
             <TouchableOpacity style={{ marginRight: 15, padding: 8, backgroundColor: 'transparent', borderRadius: 20 }} onPress={() => handleFavorite(id)}>
-              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#E53935' : 'black'} />
+              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#4A90E2' : 'black'} />
             </TouchableOpacity>
             <TouchableOpacity style={{ marginRight: 15, padding: 8, backgroundColor: 'transparent', borderRadius: 20 }}>
               <Ionicons name="share-outline" size={24} color="black" />
@@ -329,26 +371,53 @@ const BookDetailsScreen = () => {
         </View>
         {images.length > 1 ? (
           <View style={styles.sliderContainer}>
+            {/* Debug info in development */}
+            {/* {__DEV__ && (
+              <View style={styles.debugInfo}>
+                <Text style={styles.debugText}>Debug: {images.length} images found</Text>
+                <Text style={styles.debugText}>Current: {activeIndex + 1}</Text>
+              </View>
+            )} */}
             <FlatList
               ref={flatListRef}
               data={images}
-              renderItem={({ item }) => (
-                <Image
-                  source={{ uri: getValidImageUrl(item) }}
-                  style={[styles.sliderImage, { width }]}
-                  contentFit="contain"
-                  transition={300}
-                />
+              renderItem={({ item, index }) => (
+                <View style={[styles.slideContainer, { width }]}>
+                  <TouchableOpacity 
+                    onPress={() => openFullscreenImage(index)}
+                    activeOpacity={0.9}
+                    style={styles.imageTouchable}
+                  >
+                    {item && item.trim() !== '' ? (
+                      <Image
+                        source={{ uri: getValidImageUrl(item) }}
+                        style={styles.sliderImage}
+                        contentFit="cover"
+                        transition={300}
+                        onError={(error) => {
+                          console.log('Image load error:', error);
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', item);
+                        }}
+                      />
+                    ) : (
+                      <FallbackImage />
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.imageCounter}>
+                    <Text style={styles.imageCounterText}>{index + 1} / {images.length}</Text>
+                  </View>
+                </View>
               )}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={onMomentumScrollEnd}
               keyExtractor={(item, index) => `${item}-${index}`}
-              onEndReached={() => {
-                flatListRef.current?.scrollToIndex({ animated: true, index: 0 });
-              }}
-              onEndReachedThreshold={0.5}
+              decelerationRate="fast"
+              snapToInterval={width}
+              snapToAlignment="center"
             />
             <View style={styles.pagination}>
               {images.map((_, index) => (
@@ -364,12 +433,30 @@ const BookDetailsScreen = () => {
           </View>
         ) : (
           <View style={styles.sliderContainer}>
-            <Image
-              source={{ uri: getValidImageUrl(images[0]) }}
-              style={[styles.sliderImage, { width }]}
-              contentFit="contain"
-              transition={300}
-            />
+            <View style={[styles.slideContainer, { width }]}>
+              <TouchableOpacity 
+                onPress={() => openFullscreenImage(0)}
+                activeOpacity={0.9}
+                style={styles.imageTouchable}
+              >
+                {images[0] && images[0].trim() !== '' ? (
+                  <Image
+                    source={{ uri: getValidImageUrl(images[0]) }}
+                    style={styles.sliderImage}
+                    contentFit="cover"
+                    transition={300}
+                    onError={(error) => {
+                      console.log('Single image load error:', error);
+                    }}
+                    onLoad={() => {
+                      console.log('Single image loaded successfully:', images[0]);
+                    }}
+                  />
+                ) : (
+                  <FallbackImage />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -453,6 +540,49 @@ const BookDetailsScreen = () => {
       )}
       <CustomOutOfStockAlert visible={outOfStock} onClose={() => router.back()} />
       <CartAddedDialog visible={showCartDialog} onHide={() => setShowCartDialog(false)} />
+      
+      {/* Fullscreen Image Modal */}
+      <Modal
+        visible={showFullscreenImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFullscreenImage(false)}
+      >
+        <View style={styles.fullscreenModal}>
+          <TouchableOpacity 
+            style={styles.fullscreenCloseButton}
+            onPress={() => setShowFullscreenImage(false)}
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          <FlatList
+            data={images}
+            renderItem={({ item, index }) => (
+              <View style={[styles.fullscreenSlide, { width }]}>
+                <Image
+                  source={{ uri: getValidImageUrl(item) }}
+                  style={styles.fullscreenImage}
+                  contentFit="contain"
+                  transition={300}
+                />
+                <View style={styles.fullscreenCounter}>
+                  <Text style={styles.fullscreenCounterText}>{index + 1} / {images.length}</Text>
+                </View>
+              </View>
+            )}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={fullscreenImageIndex}
+            getItemLayout={(data, index) => ({
+              length: width,
+              offset: width * index,
+              index,
+            })}
+            keyExtractor={(item, index) => `${item}-${index}`}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -468,28 +598,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sliderContainer: {
-    height: 350,
+    height: 400,
     marginTop: 80,
+    backgroundColor: '#f8f9fa',
+  },
+  slideContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sliderImage: {
-    height: '100%',
+    width: '90%',
+    height: '90%',
     resizeMode: 'contain',
+    borderRadius: 8,
   },
   pagination: {
     flexDirection: 'row',
     position: 'absolute',
-    bottom: 10,
+    bottom: 20,
     alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ccc',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ddd',
     marginHorizontal: 4,
   },
   activeDot: {
     backgroundColor: '#5E5CE6',
+    transform: [{ scale: 1.2 }],
   },
   infoCard: {
     marginHorizontal: 20,
@@ -623,7 +768,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center'
-  }
+  },
+
+  imageCounter: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  fullscreenModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  fullscreenSlide: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenImage: {
+    width: '90%',
+    height: '90%',
+    resizeMode: 'contain',
+    borderRadius: 8,
+  },
+  fullscreenCounter: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  fullscreenCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  imageTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 12,
+  },
 });
 
 export default BookDetailsScreen;

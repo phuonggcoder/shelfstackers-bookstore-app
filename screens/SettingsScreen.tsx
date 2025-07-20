@@ -36,7 +36,7 @@ const SettingsScreen = () => {
       disabled={!onPress && !toggle}
     >
       <View style={[styles.settingIcon, danger && styles.dangerIcon]}>
-        <Ionicons name={icon as any} size={24} color={danger ? "#FF4444" : "#4A3780"} />
+        <Ionicons name={icon as any} size={24} color={danger ? "#4A90E2" : "#4A3780"} />
       </View>
       <View style={styles.settingContent}>
         <Text style={[styles.settingLabel, danger && styles.dangerLabel]}>{label}</Text>
@@ -53,7 +53,7 @@ const SettingsScreen = () => {
         <Ionicons 
           name="chevron-forward" 
           size={24} 
-          color={danger ? "#FF4444" : "#666"} 
+          color={danger ? "#4A90E2" : "#666"} 
         />
       ) : null}
     </TouchableOpacity>
@@ -254,12 +254,15 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   dangerLabel: {
-    color: '#FF4444',
+    color: '#4A90E2',
   },
   version: {
     textAlign: 'center',
     color: '#999',
     marginVertical: 20,
+  },
+  dangerText: {
+    color: '#4A90E2',
   },
 });
 

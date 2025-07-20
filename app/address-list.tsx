@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -150,7 +150,18 @@ const AddressListScreen = () => {
           <Text style={styles.loadingText}>Đang tải địa chỉ...</Text>
         </View>
       ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3255FB']}
+            tintColor="#3255FB"
+          />
+        }
+      >
           {addresses.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="location-outline" size={64} color="#ccc" />
@@ -206,7 +217,7 @@ const AddressListScreen = () => {
                         style={styles.deleteButton}
                         onPress={() => handleDelete(addr._id)}
                       >
-                        <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                        <Ionicons name="trash-outline" size={20} color="#4A90E2" />
                       </TouchableOpacity>
                     </View>
                   )}

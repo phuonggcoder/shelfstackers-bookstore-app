@@ -166,14 +166,65 @@ export const addToWishlist = async (token: string, bookId: string) => {
 };
 
 export const removeFromWishlist = async (token: string, bookId: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/wishlist/remove/${bookId}`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) throw new Error('Failed to remove from wishlist');
-  return response.json();
+  console.log('removeFromWishlist called with:', { bookId, token: token ? 'present' : 'missing' });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/remove/${bookId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    console.log('removeFromWishlist response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('removeFromWishlist error response:', errorText);
+      throw new Error(`Failed to remove from wishlist: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('removeFromWishlist success result:', result);
+    return result;
+  } catch (error) {
+    console.error('removeFromWishlist catch error:', error);
+    throw error;
+  }
+};
+
+export const getWishlist = async (token: string): Promise<Book[]> => {
+  console.log('getWishlist called with token:', token ? 'present' : 'missing');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log('getWishlist response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('getWishlist error response:', errorText);
+      throw new Error(`Failed to fetch wishlist: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    console.log('getWishlist success result:', result);
+    
+    // Handle different response formats
+    if (result.success && result.data && result.data.books) {
+      console.log('📚 Found books in data.books:', result.data.books.length);
+      return result.data.books;
+    } else if (Array.isArray(result)) {
+      console.log('📚 Found books as array:', result.length);
+      return result;
+    } else if (result.books) {
+      console.log('📚 Found books in result.books:', result.books.length);
+      return result.books;
+    } else if (result.wishlist) {
+      console.log('📚 Found books in result.wishlist:', result.wishlist.length);
+      return result.wishlist;
+    } else {
+      console.log('📚 No books found in response');
+      return [];
+    }
+  } catch (error) {
+    console.error('getWishlist catch error:', error);
+    throw error;
+  }
 };
 
 const api = {
@@ -275,9 +326,44 @@ const api = {
     return response.json();
   },
 
+  // Campaign APIs
+  getCampaigns: async () => {
+    try {
+      console.log('Fetching campaigns from:', `${API_BASE_URL}/api/campaigns`);
+      const response = await axios.get(`${API_BASE_URL}/api/campaigns`);
+      console.log('Campaigns response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      throw error;
+    }
+  },
 
+  getCampaignById: async (id: string) => {
+    try {
+      console.log('Fetching campaign by ID:', id, 'from:', `${API_BASE_URL}/api/campaigns/${id}`);
+      const response = await axios.get(`${API_BASE_URL}/api/campaigns/${id}`);
+      console.log('Campaign by ID response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching campaign by ID:', error);
+      throw error;
+    }
+  },
 
-
+  getCampaignBooks: async (id: string) => {
+    try {
+      console.log('Fetching campaign books for ID:', id, 'from:', `${API_BASE_URL}/api/campaigns/${id}/books`);
+      const response = await axios.get(`${API_BASE_URL}/api/campaigns/${id}/books`);
+      console.log('Campaign books response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching campaign books:', error);
+      // Return empty array instead of throwing error for better UX
+      console.log('Returning empty array for campaign books due to error');
+      return [];
+    }
+  },
 };
 
 export default api;
