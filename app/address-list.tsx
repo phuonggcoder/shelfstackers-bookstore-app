@@ -1,18 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
-import { deleteAddress, getAddresses } from '../services/addressService';
+import { deleteAddress, getAddresses, setDefaultAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
   const { token } = useAuth();
   const { from } = useLocalSearchParams();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [showAlert, setShowAlert] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -21,11 +23,20 @@ const AddressListScreen = () => {
 
   const isFromOrderReview = from === 'order-review';
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAddresses();
+    setRefreshing(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAddresses();
+    }, [])
+  );
 
   const fetchAddresses = async () => {
+    if (!token) return;
     setLoading(true);
     try {
       const res = await getAddresses(token);
@@ -44,7 +55,7 @@ const AddressListScreen = () => {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Check if we're coming from add address screen
     const checkAddedAddress = async () => {
       try {
@@ -66,7 +77,7 @@ const AddressListScreen = () => {
   };
 
   const confirmDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !token) return;
     setShowDeleteModal(false);
     setLoading(true);
     try {
@@ -77,6 +88,17 @@ const AddressListScreen = () => {
     }
     setLoading(false);
     setDeleteId(null);
+  };
+
+  const handleSetDefault = async (id: string) => {
+    if (!token) return;
+    try {
+      await setDefaultAddress(token, id);
+      fetchAddresses(); // Refresh list to update default status
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+    }
   };
 
   const handleConfirm = () => {
@@ -96,6 +118,7 @@ const AddressListScreen = () => {
   const formatAddress = (addr: any) => {
     const parts = [];
     if (addr.address_detail) parts.push(addr.address_detail);
+    if (addr.street) parts.push(addr.street);
     if (addr.ward) parts.push(addr.ward);
     if (addr.district) parts.push(addr.district);
     if (addr.province) parts.push(addr.province);
@@ -111,15 +134,15 @@ const AddressListScreen = () => {
         <Text style={styles.headerTitle}>
           {isFromOrderReview ? 'Chọn địa chỉ giao hàng' : 'Địa chỉ giao hàng'}
         </Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={() => router.push('/add-address')}>
+          <Ionicons name="add" size={24} color="#3255FB" />
+        </TouchableOpacity>
       </View>
 
       <BottomAlert
-        type="success"
         title="Thêm địa chỉ thành công!"
-        buttonText="Đóng"
         visible={showAlert}
-        onButtonPress={() => setShowAlert(false)}
+        onHide={() => setShowAlert(false)}
       />
 
       <Modal
@@ -169,93 +192,88 @@ const AddressListScreen = () => {
               <Text style={styles.emptySubtitle}>Thêm địa chỉ để nhận hàng nhanh chóng</Text>
             </View>
           ) : (
-            addresses.map((addr: any) => (
-              <View key={addr._id} style={styles.addressCard}>
-                <TouchableOpacity 
-                  style={styles.radioRow} 
-                  onPress={() => setSelected(addr._id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.radioContainer}>
-                    <Ionicons
-                      name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
-                      size={24}
-                      color={selected === addr._id ? '#3255FB' : '#ccc'}
-                    />
-                  </View>
-                  <View style={styles.addressInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.name}>{addr.receiver_name}</Text>
-                      <Text style={styles.phone}>{addr.phone_number}</Text>
-                      {addr.is_default && (
-                        <View style={styles.defaultTag}>
-                          <Text style={styles.defaultText}>Mặc định</Text>
-                        </View>
+            <>
+              {addresses.map((addr: any) => (
+                <View key={addr._id} style={styles.addressCard}>
+                  <TouchableOpacity 
+                    style={styles.radioRow} 
+                    onPress={() => setSelected(addr._id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.radioContainer}>
+                      <Ionicons
+                        name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
+                        size={24}
+                        color={selected === addr._id ? '#3255FB' : '#ccc'}
+                      />
+                    </View>
+                    <View style={styles.addressInfo}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.name}>{addr.receiver_name}</Text>
+                        <Text style={styles.phone}>{addr.phone_number}</Text>
+                        {addr.is_default && (
+                          <View style={styles.defaultTag}>
+                            <Text style={styles.defaultText}>Mặc định</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.addressText}>{formatAddress(addr)}</Text>
+                      {addr.note && (
+                        <Text style={styles.noteText}>Ghi chú: {addr.note}</Text>
                       )}
                     </View>
-                    <Text style={styles.addressText}>{formatAddress(addr)}</Text>
-                    <View style={styles.typeTag}>
-                      <Ionicons 
-                        name={addr.type === 'office' ? 'business-outline' : 'home-outline'} 
-                        size={16} 
-                        color="#666" 
-                      />
-                      <Text style={styles.typeText}>
-                        {addr.type === 'office' ? 'Văn phòng' : 'Nhà riêng'}
-                      </Text>
-                    </View>
-                  </View>
-                  {!isFromOrderReview && (
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity 
-                        style={styles.editButton}
-                        onPress={() => router.push(`/edit-address?id=${addr._id}`)}
-                      >
-                        <Ionicons name="create-outline" size={20} color="#3255FB" />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.deleteButton}
-                        onPress={() => handleDelete(addr._id)}
-                      >
-                        <Ionicons name="trash-outline" size={20} color="#4A90E2" />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ))
+                    {!isFromOrderReview && (
+                      <View style={styles.actionButtons}>
+                        <TouchableOpacity 
+                          style={styles.editButton}
+                          onPress={() => router.push(`/edit-address?id=${addr._id}`)}
+                        >
+                          <Ionicons name="create-outline" size={20} color="#3255FB" />
+                        </TouchableOpacity>
+                        {!addr.is_default && (
+                          <TouchableOpacity 
+                            style={styles.defaultButton}
+                            onPress={() => handleSetDefault(addr._id)}
+                          >
+                            <Ionicons name="star-outline" size={20} color="#FFD700" />
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => handleDelete(addr._id)}
+                        >
+                          <Ionicons name="trash-outline" size={20} color="#4A90E2" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))}
+              
+              {/* Add address button in list */}
+              <TouchableOpacity 
+                style={styles.addAddressInList}
+                onPress={() => router.push('/add-address')}
+              >
+                <Ionicons name="add" size={20} color="#3255FB" />
+                <Text style={styles.addAddressInListText}>Thêm địa chỉ mới</Text>
+              </TouchableOpacity>
+            </>
           )}
         </ScrollView>
       )}
 
-      <View style={styles.footer}>
-        {isFromOrderReview ? (
-          <View style={styles.footerButtons}>
-            <TouchableOpacity 
-              style={styles.addButtonSmall} 
-              onPress={() => router.push('/add-address')}
-            >
-              <Ionicons name="add" size={20} color="#3255FB" />
-              <Text style={styles.addButtonTextSmall}>Thêm mới</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.confirmButton, !selected && styles.confirmButtonDisabled]} 
-              onPress={handleConfirm}
-              disabled={!selected}
-            >
-              <Text style={styles.confirmButtonText}>Xác nhận địa chỉ</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
+      {isFromOrderReview && addresses.length > 0 && (
+        <View style={styles.footer}>
           <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={() => router.push('/add-address')}
+            style={[styles.confirmButton, !selected && styles.confirmButtonDisabled]} 
+            onPress={handleConfirm}
+            disabled={!selected}
           >
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Thêm địa chỉ mới</Text>
+            <Text style={styles.confirmButtonText}>Xác nhận địa chỉ</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -298,6 +316,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 18,
@@ -369,14 +388,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  typeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  typeText: {
+  noteText: {
     color: '#666',
     fontSize: 12,
-    marginLeft: 4,
+    fontStyle: 'italic',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -386,8 +401,33 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
+  defaultButton: {
+    padding: 8,
+    marginRight: 8,
+  },
   deleteButton: {
     padding: 8,
+  },
+  addAddressInList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addAddressInListText: {
+    color: '#3255FB',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 12,
   },
   footer: {
     padding: 16,
@@ -395,25 +435,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#eee',
   },
-  addButton: {
-    backgroundColor: '#3255FB',
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
   confirmButton: {
     backgroundColor: '#3255FB',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    width: '100%',
   },
   confirmButtonDisabled: {
     backgroundColor: '#ccc',
@@ -422,26 +449,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  footerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  addButtonSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#3255FB',
-    borderRadius: 8,
-  },
-  addButtonTextSmall: {
-    color: '#3255FB',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,

@@ -251,8 +251,13 @@ export default function OrderReviewScreen() {
   };
 
   const handleAddressSelect = () => {
-    // Navigate to address list screen if needed
-    router.push('/address-list?from=order-review');
+    // If no addresses, go to address list to add new one
+    if (addresses.length === 0) {
+      router.push('/address-list?from=order-review');
+    } else {
+      // If has addresses, go to address list to select/edit
+      router.push('/address-list?from=order-review');
+    }
   };
 
   const handleConfirm = async () => {
@@ -571,16 +576,20 @@ export default function OrderReviewScreen() {
         </View>
         
         {address ? (
-          <View style={styles.addressContainer}>
-            <Text style={styles.addressName}>{address.receiver_name}</Text>
-            <Text style={styles.addressPhone}>{address.phone_number}</Text>
-            <Text style={styles.addressText}>{formatAddressText(address)}</Text>
-          </View>
+          <TouchableOpacity style={styles.addressContainer} onPress={handleAddressSelect}>
+            <View style={styles.addressInfo}>
+              <Text style={styles.addressName}>{address.receiver_name}</Text>
+              <Text style={styles.addressPhone}>{address.phone_number}</Text>
+              <Text style={styles.addressText}>{formatAddressText(address)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
         ) : (
-          <View style={styles.noAddressContainer}>
+          <TouchableOpacity style={styles.noAddressContainer} onPress={handleAddressSelect}>
             <Ionicons name="location-outline" size={24} color="#bdc3c7" />
             <Text style={styles.noAddressText}>Không có địa chỉ giao hàng</Text>
-          </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
         )}
         
         {/* Payment Method Selector */}
@@ -754,7 +763,18 @@ const styles = StyleSheet.create({
   grandTotal: { fontWeight: 'bold', fontSize: 18, color: '#222' },
   payButton: { backgroundColor: '#3255FB', borderRadius: 25, paddingVertical: 16, marginTop: 20, alignItems: 'center', marginHorizontal: 10 },
   payButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  addressContainer: { padding: 10 },
+  addressContainer: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15, 
+    backgroundColor: '#f8f9fa', 
+    borderRadius: 8,
+    marginHorizontal: 10
+  },
+  addressInfo: {
+    flex: 1,
+  },
   addressName: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
   addressPhone: { color: '#666', marginBottom: 5 },
   addressText: { color: '#222' },

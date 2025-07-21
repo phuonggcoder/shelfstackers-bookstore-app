@@ -65,12 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Đồng bộ FCM token khi app khởi động nếu đã đăng nhập
   useEffect(() => {
-    if (user && user._id) {
+    if (user && user._id && token) {
       const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-      syncFcmToken(user._id, deviceId);
+      syncFcmToken(user._id, deviceId, token);
       listenFcmTokenRefresh(user._id, deviceId);
     }
-  }, [user]);
+  }, [user, token]);
 
   // Check token expiration periodically (only if user is actively using the app)
   useEffect(() => {
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Đồng bộ FCM token khi load lại user
         const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-        syncFcmToken(parsedUser._id, deviceId);
+        syncFcmToken(parsedUser._id, deviceId, storedToken);
         listenFcmTokenRefresh(parsedUser._id, deviceId);
 
         // Validate token in background without blocking UI
@@ -182,7 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData.user);
       // Đồng bộ FCM token khi login
       const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-      syncFcmToken(userData.user._id, deviceId);
+      syncFcmToken(userData.user._id, deviceId, userData.token);
       listenFcmTokenRefresh(userData.user._id, deviceId);
 
       Alert.alert('Thành công', 'Đăng nhập thành công!');

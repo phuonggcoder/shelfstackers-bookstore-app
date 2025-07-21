@@ -163,4 +163,32 @@ export const deleteAddress = async (token: string, addressId: string) => {
     console.error('Error deleting address:', error);
     throw error;
   }
+};
+
+export const setDefaultAddress = async (token: string, addressId: string) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/addresses/${addressId}/set-default`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error setting default address:', error);
+    throw error;
+  }
+};
+
+export const getAddress = async (token: string, addressId: string) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/addresses/${addressId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching address:', error);
+    throw error;
+  }
 }; 

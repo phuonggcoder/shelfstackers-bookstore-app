@@ -1,15 +1,18 @@
-import messaging from '@react-native-firebase/messaging';
+import { getMessaging, getToken } from '@react-native-firebase/messaging';
 import { useEffect } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-
+import { syncFcmToken } from '../services/fcmService';
 
 export const usePushNotification = () => {
-
-    
     const handleToken = async (newToken: string) => {
-        console.log('✅ New FCM Token:', newToken);
-        
+       console.log('✅ New FCM Token:', newToken);
+       // Gửi token lên server ngay khi có
+       try {
+         const deviceId = Platform.OS + '_' + Date.now();
+         await syncFcmToken('temp_user', deviceId); // Sẽ được update khi user login
+       } catch (error) {
+         console.error('❌ Error syncing FCM token:', error);
+       }
     };
 
     const requestAndroidNotificationPermission = async () => {
@@ -26,23 +29,15 @@ export const usePushNotification = () => {
         const setup = async () => {
             try {
                 let permissionGranted = true;
+                const messagingInstance = getMessaging();
 
-                if (Platform.OS === 'android') {
-                    permissionGranted = await requestAndroidNotificationPermission();
-                } else {
-                    const authStatus = await messaging().requestPermission();
-                    permissionGranted =
-                        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-                        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-                }
+                permissionGranted = await requestAndroidNotificationPermission();
                 
                 if (permissionGranted) {
                     console.log('Notification permission granted.');
-
                     // 2. Lấy FCM token
-                    const token = await messaging().getToken();
+                    const token = await getToken(messagingInstance);
                     console.log('✅ FCM Token:', token);
-
                     handleToken(token)
                 } else {
                     console.warn('Notification permission denied.');
@@ -51,7 +46,6 @@ export const usePushNotification = () => {
                 console.error('❌ Lỗi khi setup notification:', err);
             }
         };
-
         setup();
     }, []);
 }; 

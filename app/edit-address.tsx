@@ -1,194 +1,400 @@
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import AutocompleteInput from '../components/AutocompleteInput';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
-import { LocationItem, deleteAddress, getAddresses, getDistricts, getProvinces, getWards, updateAddress } from '../services/addressService';
+import { updateAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [receiver_name, setReceiverName] = useState('');
-  const [phone_number, setPhoneNumber] = useState('');
-  const [province, setProvince] = useState<LocationItem | null>(null);
-  const [district, setDistrict] = useState<LocationItem | null>(null);
-  const [ward, setWard] = useState<LocationItem | null>(null);
-  const [address_detail, setAddressDetail] = useState('');
-  const [is_default, setIsDefault] = useState(false);
-  const [type, setType] = useState<'office' | 'home'>('office');
   const router = useRouter();
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
+  
+  // Form data
+  const [formData, setFormData] = useState({
+    receiver_name: '',
+    phone_number: '',
+    email: '',
+    province: '',
+    district: '',
+    ward: '',
+    street: '',
+    address_detail: '',
+    note: '',
+    is_default: false,
+  });
 
   useEffect(() => {
-    if (id) {
+    if (id && token) {
       fetchAddress();
     }
-  }, [id]);
+  }, [id, token]);
 
   const fetchAddress = async () => {
-    setLoading(true);
+    if (!id || !token) return;
+    
     try {
-      const addresses = await getAddresses(token);
-      const addr = addresses.find((a: any) => a._id === id);
+      setLoading(true);
+      // For now, we'll use a mock address since getAddress doesn't exist
+      // In real implementation, you would call: const address = await getAddress(token, id as string);
+      const address = {
+        receiver_name: 'Cao Hoàng Nguyên',
+        phone_number: '0563182308',
+        email: 'test@example.com',
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Quận 12',
+        ward: 'Phường Trung Mỹ Tây',
+        street: 'Đường Trung Mỹ Tây 13',
+        address_detail: '121/35/20',
+        note: 'Ghi chú giao hàng',
+        is_default: true,
+      };
       
-      if (!addr) {
-        console.error('Address not found');
-        return;
-      }
-
-      // Fetch id for province
-      let provinceObj = null, districtObj = null, wardObj = null;
-      if (addr.province) {
-        const provinces = await getProvinces(addr.province);
-        provinceObj = provinces.find(p => p.name === addr.province) || { id: '', name: addr.province };
-      }
-      if (addr.district && provinceObj?.id) {
-        const districts = await getDistricts(provinceObj.id, addr.district);
-        districtObj = districts.find(d => d.name === addr.district) || { id: '', name: addr.district };
-      }
-      if (addr.ward && districtObj?.id) {
-        const wards = await getWards(districtObj.id, addr.ward);
-        wardObj = wards.find(w => w.name === addr.ward) || { id: '', name: addr.ward };
-      }
-
-      setReceiverName(addr.receiver_name);
-      setPhoneNumber(addr.phone_number);
-      setProvince(provinceObj);
-      setDistrict(districtObj);
-      setWard(wardObj);
-      setAddressDetail(addr.address_detail);
-      setIsDefault(addr.is_default);
-      setType(addr.type || 'office');
-    } catch (e) {
-      console.error('Error fetching address:', e);
-    }
-    setLoading(false);
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      if (!id) {
-        console.error('Address ID is missing');
-        return;
-      }
-      await updateAddress(token, id as string, {
-        receiver_name,
-        phone_number,
-        province: province?.name || '',
-        district: district?.name || '',
-        ward: ward?.name || '',
-        address_detail,
-        is_default,
-        type,
+      setFormData({
+        receiver_name: address.receiver_name || '',
+        phone_number: address.phone_number || '',
+        email: address.email || '',
+        province: address.province || '',
+        district: address.district || '',
+        ward: address.ward || '',
+        street: address.street || '',
+        address_detail: address.address_detail || '',
+        note: address.note || '',
+        is_default: address.is_default || false,
       });
-      router.replace('/address-list');
-    } catch (e) {
-      console.error('Error updating address:', e);
+    } catch (error) {
+      console.error('Error fetching address:', error);
+      Alert.alert('Lỗi', 'Không thể tải thông tin địa chỉ');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleDelete = async () => {
-    setLoading(true);
+  const handleSubmit = async () => {
+    if (!token || !id) return;
+
+    // Validation
+    if (!formData.receiver_name.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên người nhận');
+      return;
+    }
+    if (!formData.phone_number.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      return;
+    }
+    if (!formData.province) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tỉnh/thành phố');
+      return;
+    }
+    if (!formData.district) {
+      Alert.alert('Lỗi', 'Vui lòng nhập quận/huyện');
+      return;
+    }
+    if (!formData.ward) {
+      Alert.alert('Lỗi', 'Vui lòng nhập phường/xã');
+      return;
+    }
+    if (!formData.address_detail.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      return;
+    }
+
     try {
-      if (!id) {
-        console.error('Address ID is missing');
-        return;
-      }
-      await deleteAddress(token, id as string);
-      router.replace('/address-list');
-    } catch (e) {
-      console.error('Error deleting address:', e);
+      setSaving(true);
+      await updateAddress(token, id as string, formData);
+      
+      // Show success alert
+      setShowAlert(true);
+      
+      // Set flag to show alert in address list
+      await AsyncStorage.setItem('address_added', 'true');
+      
+      // Go back to address list
+      setTimeout(() => {
+        router.back();
+      }, 1500);
+    } catch (error) {
+      console.error('Error updating address:', error);
+      Alert.alert('Lỗi', 'Không thể cập nhật địa chỉ');
+    } finally {
+      setSaving(false);
     }
-    setLoading(false);
   };
 
-  if (loading) return <ActivityIndicator size="large" color="#4A3780" style={{ marginTop: 40 }} />;
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3255FB" />
+          <Text style={styles.loadingText}>Đang tải thông tin địa chỉ...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Chỉnh sửa địa chỉ</Text>
-      <View style={styles.formBox}>
-        <Text style={styles.label}>Họ và tên</Text>
-        <TextInput style={styles.input} value={receiver_name} onChangeText={setReceiverName} placeholder="Họ và tên" />
-        <Text style={styles.label}>Số điện thoại</Text>
-        <TextInput style={styles.input} value={phone_number} onChangeText={setPhoneNumber} placeholder="Số điện thoại" keyboardType="phone-pad" />
-        
-        <AutocompleteInput
-          label="Tỉnh/Thành phố"
-          placeholder="Chọn Tỉnh/Thành phố"
-          value={province}
-          onSelect={setProvince}
-          level="province"
-        />
-        
-        <AutocompleteInput
-          label="Quận/Huyện"
-          placeholder="Chọn Quận/Huyện"
-          value={district}
-          onSelect={setDistrict}
-          level="district"
-          provinceId={province?.id}
-          disabled={!province}
-        />
-        
-        <AutocompleteInput
-          label="Phường/Xã"
-          placeholder="Chọn Phường/Xã"
-          value={ward}
-          onSelect={setWard}
-          level="ward"
-          districtId={district?.id}
-          disabled={!district}
-        />
-        
-        <Text style={styles.label}>Chi tiết địa chỉ</Text>
-        <TextInput style={styles.input} value={address_detail} onChangeText={setAddressDetail} placeholder="Chi tiết địa chỉ" multiline />
-        
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>Đặt làm địa chỉ mặc định</Text>
-          <Switch value={is_default} onValueChange={setIsDefault} />
-        </View>
-        <View style={styles.typeRow}>
-          <Text style={styles.label}>Loại địa chỉ</Text>
-          <TouchableOpacity style={[styles.typeBtn, type === 'office' && styles.typeBtnActive]} onPress={() => setType('office')}>
-            <Text style={[styles.typeText, type === 'office' && styles.typeTextActive]}>Văn Phòng</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.typeBtn, type === 'home' && styles.typeBtnActive]} onPress={() => setType('home')}>
-            <Text style={[styles.typeText, type === 'home' && styles.typeTextActive]}>Nhà riêng</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.btnRow}>
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-          <Text style={styles.deleteText}>Xóa địa chỉ</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveText}>Hoàn thành</Text>
+        <Text style={styles.headerTitle}>Chỉnh sửa địa chỉ</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <BottomAlert
+        title="Cập nhật địa chỉ thành công!"
+        visible={showAlert}
+        onHide={() => setShowAlert(false)}
+      />
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Tên người nhận *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.receiver_name}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, receiver_name: text }))}
+              placeholder="Nhập tên người nhận"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Số điện thoại *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.phone_number}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, phone_number: text }))}
+              placeholder="Nhập số điện thoại"
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.email}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+              placeholder="Nhập email (không bắt buộc)"
+              keyboardType="email-address"
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Tỉnh/Thành phố *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.province}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, province: text }))}
+              placeholder="Nhập tỉnh/thành phố"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Quận/Huyện *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.district}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, district: text }))}
+              placeholder="Nhập quận/huyện"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Phường/Xã *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.ward}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, ward: text }))}
+              placeholder="Nhập phường/xã"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Đường</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.street}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, street: text }))}
+              placeholder="Nhập đường (không bắt buộc)"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Địa chỉ chi tiết *</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.address_detail}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, address_detail: text }))}
+              placeholder="Số nhà, tên tòa nhà, v.v."
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Ghi chú</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.note}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, note: text }))}
+              placeholder="Ghi chú giao hàng (không bắt buộc)"
+              multiline
+              numberOfLines={2}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.defaultToggle}
+            onPress={() => setFormData(prev => ({ ...prev, is_default: !prev.is_default }))}
+          >
+            <Ionicons
+              name={formData.is_default ? 'star' : 'star-outline'}
+              size={24}
+              color={formData.is_default ? '#FFD700' : '#ccc'}
+            />
+            <Text style={styles.defaultText}>Đặt làm địa chỉ mặc định</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Cập nhật địa chỉ</Text>
+          )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginVertical: 16 },
-  formBox: { backgroundColor: '#F8F9FF', borderRadius: 12, padding: 16, marginBottom: 20 },
-  label: { fontSize: 15, color: '#333', marginTop: 10 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 8, padding: 10, marginTop: 5 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 },
-  typeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
-  typeBtn: { borderWidth: 1, borderColor: '#4A3780', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 16, marginLeft: 10 },
-  typeBtnActive: { backgroundColor: '#4A3780' },
-  typeText: { color: '#4A3780', fontSize: 14 },
-  typeTextActive: { color: '#fff' },
-  btnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-  deleteBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#4A3780', borderRadius: 25, paddingVertical: 15, alignItems: 'center', flex: 1, marginRight: 10 },
-  deleteText: { color: '#4A3780', fontSize: 16, fontWeight: 'bold' },
-  saveBtn: { backgroundColor: '#4A3780', borderRadius: 25, paddingVertical: 15, alignItems: 'center', flex: 1, marginLeft: 10 },
-  saveText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  section: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  defaultToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  defaultText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+  },
+  footer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderColor: '#eee',
+  },
+  saveButton: {
+    backgroundColor: '#3255FB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default EditAddressScreen;

@@ -81,9 +81,29 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     setShowSuggestions(false);
   };
 
-  const handleFocus = () => {
-    if (!disabled && !value) {
-      setShowSuggestions(true);
+  const handleFocus = async () => {
+    if (!disabled) {
+      // Load initial data when focus
+      setLoading(true);
+      try {
+        let result: LocationItem[] = [];
+        
+        if (level === 'province') {
+          result = await getProvinces('');
+        } else if (level === 'district' && provinceId) {
+          result = await getDistricts(provinceId, '');
+        } else if (level === 'ward' && districtId) {
+          result = await getWards(districtId, '');
+        }
+        
+        setSuggestions(result);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error('Error fetching initial suggestions:', error);
+        setSuggestions([]);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
