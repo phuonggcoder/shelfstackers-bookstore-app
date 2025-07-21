@@ -6,7 +6,6 @@
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
-
     "web": "expo start --web",
     "lint": "expo lint"
   },
@@ -14,6 +13,7 @@
     "@expo/vector-icons": "^14.1.0",
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/slider": "^4.5.7",
     "@react-native-firebase/app": "^22.4.0",
     "@react-native-firebase/messaging": "^22.4.0",
     "@react-native-google-signin/google-signin": "^15.0.0",

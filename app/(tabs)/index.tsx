@@ -1,13 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BookCarousel from "../../components/BookCarousel";
-import CampaignIcons from "../../components/CampaignIcons";
-import CategoryFilters from "../../components/CategoryFilters";
-import Header from "../../components/Header";
-import SearchBar from "../../components/SearchBar";
+import HomeTopSection from '../../components/HomeTopSection';
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import api from "../../services/api";
@@ -21,6 +18,7 @@ const Index = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [simpleFilter, setSimpleFilter] = useState<{ price: number; sort: 'az' | 'za' | null } | null>(null);
 
   // Auto-load data when tab is focused
   useFocusEffect(
@@ -56,8 +54,24 @@ const Index = () => {
     }
   };
 
+  // Lọc và sắp xếp sách theo filter đơn giản
+  const filteredBooks = useMemo(() => {
+    if (!simpleFilter) return books;
+    let result = books.filter(book => {
+      // Lọc theo giá (giá <= filter.price)
+      if (simpleFilter.price > 0 && book.price > simpleFilter.price) return false;
+      return true;
+    });
+    if (simpleFilter.sort === 'az') {
+      result = [...result].sort((a, b) => a.title.localeCompare(b.title));
+    } else if (simpleFilter.sort === 'za') {
+      result = [...result].sort((a, b) => b.title.localeCompare(a.title));
+    }
+    return result;
+  }, [books, simpleFilter]);
+
   const getBooksForCategory = (categoryId: string) => {
-    return books.filter(book => book.categories.some(cat => cat._id === categoryId));
+    return filteredBooks.filter(book => book.categories.some(cat => cat._id === categoryId));
   }
 
   if (isLoading) {
@@ -103,18 +117,11 @@ const Index = () => {
           />
         }
       >
-        <Header />
-        <SearchBar />
-        <CategoryFilters />
-        
-        {/* Campaigns Section */}
-        {!campaignsLoading && campaigns.length > 0 && (
-          <CampaignIcons 
-            title="Danh Mục" 
-            campaigns={campaigns} 
-          />
-        )}
-        
+        <HomeTopSection 
+          campaigns={campaigns} 
+          campaignsLoading={campaignsLoading}
+          onApplySimpleFilter={setSimpleFilter}
+        />
         {/* Categories Section */}
         {categories.map(category => {
           const categoryBooks = getBooksForCategory(category._id);
