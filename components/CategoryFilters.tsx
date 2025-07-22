@@ -25,12 +25,7 @@ const CategoryFilters = () => {
 
   return (
     <View style={styles.container}>
-        <View style={styles.titleContainer}>
-            <Text style={styles.title}>All Categories</Text>
-            <TouchableOpacity>
-                <Text style={styles.seeAll}>See All</Text>
-            </TouchableOpacity>
-        </View>
+        {/* Đã xóa title và See All */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {categories.map((category) => (
             <TouchableOpacity

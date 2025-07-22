@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import SimpleFilterModal from './SimpleFilterModal';
 
 interface SearchBarProps {
   onApplySimpleFilter?: (filter: { price: number; sort: 'az' | 'za' | null }) => void;
@@ -25,7 +24,8 @@ const SearchBar = ({ onApplySimpleFilter }: SearchBarProps) => {
   const handleBlur = () => setIsFocused(false);
 
   const handleFilterPress = () => {
-    setShowFilterModal(true);
+    // Chuyển thẳng sang trang filtered-books.tsx
+    router.push('/filtered-books');
   };
 
   const handleApplyFilter = (filter: { price: number; sort: 'az' | 'za' | null }) => {
@@ -63,12 +63,7 @@ const SearchBar = ({ onApplySimpleFilter }: SearchBarProps) => {
       <TouchableOpacity style={styles.filterButton} onPress={handleFilterPress}>
         <Ionicons name="filter" size={22} color="#fff" />
       </TouchableOpacity>
-      <SimpleFilterModal
-        visible={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        onApply={handleApplyFilter}
-        onAdvanced={handleAdvanced}
-      />
+      {/* Đã bỏ SimpleFilterModal */}
     </View>
   );
 };
