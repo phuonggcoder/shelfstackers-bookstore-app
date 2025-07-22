@@ -28,4 +28,16 @@ export interface Book {
   updatedAt: string;
   __v: number;
   thumbnail: string;
+}
+
+export interface Campaign {
+  _id: string;
+  name: string;
+  startDate?: Date;
+  endDate?: Date;
+  type: 'promotion' | 'auto_status' | 'collection' | 'event';
+  description?: string;
+  books: Book[];
+  createdAt: Date;
+  updatedAt: Date;
 } 

@@ -12,7 +12,7 @@ interface CustomAlertProps {
 
 const ICONS = {
   success: { color: '#2D5BFF', name: 'checkmark', bg: '#EAF0FF' },
-  error: { color: '#FF2D2D', name: 'close', bg: '#FFEAEA' },
+  error: { color: '#4A90E2', name: 'close', bg: '#FFEAEA' },
   info: { color: '#2D5BFF', name: 'information', bg: '#EAF0FF' },
 };
 

@@ -1,8 +1,10 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +15,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
@@ -23,6 +26,11 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Cấu hình Google Sign-In với Firebase
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -44,6 +52,56 @@ export default function Login() {
     }
   };
 
+  // Hàm đăng nhập Google
+  const handleGoogleLogin = async () => {
+    try {
+      console.log('🔍 Checking Google Play Services...');
+      await GoogleSignin.hasPlayServices();
+      console.log('✅ Google Play Services OK');
+      
+      console.log('🔍 Starting Google Sign-In...');
+      const userInfo = await GoogleSignin.signIn();
+      console.log('✅ Google Sign-In successful:', userInfo);
+      
+      // Lấy idToken từ userInfo.data
+      const idToken = userInfo.data?.idToken;
+      console.log('🔍 ID Token:', idToken ? 'Found' : 'Not found');
+      if (!idToken) {
+        Alert.alert('Không lấy được idToken từ Google');
+        return;
+      }
+      // Gửi idToken lên backend
+      console.log('🔍 Sending idToken to backend:', idToken.substring(0, 50) + '...');
+      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      const data = await res.json();
+      console.log('🔍 Backend response:', data);
+      console.log('🔍 Response status:', res.status);
+      if (res.ok) {
+        // Lưu JWT vào AsyncStorage hoặc context
+        await AsyncStorage.setItem('jwt', data.token);
+        await signIn(data); // data phải trả về { user, token }
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!');
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      console.log('❌ Google Sign-In error:', error);
+      console.log('❌ Error code:', error.code);
+      console.log('❌ Error message:', error.message);
+      
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        Alert.alert('Đã hủy đăng nhập');
+      } else {
+        Alert.alert('Lỗi', error.message);
+      }
+    }
+  };
+
   return (
     <ScrollView style={styles.scrollbox}> 
       
@@ -60,7 +118,7 @@ export default function Login() {
       </View>
 
       <View style={styles.socialContainer}>
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
           <Image source={require('../../assets/images/google.png')} style={styles.icon} />
           <Text style={styles.socialText}>Google</Text>
         </TouchableOpacity>

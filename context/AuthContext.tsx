@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { authService } from '../services/authService';
+import { listenFcmTokenRefresh, removeFcmToken, syncFcmToken } from '../services/fcmService';
 import { AuthResponse, User } from '../types/auth';
 
 interface AuthContextType {
@@ -14,10 +16,12 @@ interface AuthContextType {
   showTokenExpiredAlert: () => void;
   tokenExpiredAlertVisible: boolean;
   hideTokenExpiredAlert: () => void;
+  register: (data: any) => Promise<void>;
+  updateUser: (updateData: any) => Promise<void>; // Thêm hàm cập nhật user
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
+user: null,
   token: null,
   isLoading: true,
   signIn: async () => {},
@@ -26,6 +30,8 @@ const AuthContext = createContext<AuthContextType>({
   showTokenExpiredAlert: () => {},
   tokenExpiredAlertVisible: false,
   hideTokenExpiredAlert: () => {},
+  register: async () => {},
+  updateUser: async () => {}, // Thêm mặc định
 });
 
 export const useAuth = () => {
@@ -41,6 +47,8 @@ export const useAuth = () => {
     showTokenExpiredAlert: () => {},
     tokenExpiredAlertVisible: false,
     hideTokenExpiredAlert: () => {},
+    register: async () => {},
+    updateUser: async () => {}, // Thêm mặc định
   };
 };
 
@@ -54,6 +62,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadStoredAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Đồng bộ FCM token khi app khởi động nếu đã đăng nhập
+  useEffect(() => {
+    if (user && user._id && token) {
+      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+      syncFcmToken(user._id, deviceId, token);
+      listenFcmTokenRefresh(user._id, deviceId);
+    }
+  }, [user, token]);
 
   // Check token expiration periodically (only if user is actively using the app)
   useEffect(() => {
@@ -105,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         
+        // Đồng bộ FCM token khi load lại user
+        const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+        syncFcmToken(parsedUser._id, deviceId, storedToken);
+        listenFcmTokenRefresh(parsedUser._id, deviceId);
+
         // Validate token in background without blocking UI
         setTimeout(async () => {
           try {
@@ -158,6 +180,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(userData.token);
       setUser(userData.user);
+      // Đồng bộ FCM token khi login
+      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
+      syncFcmToken(userData.user._id, deviceId, userData.token);
+      listenFcmTokenRefresh(userData.user._id, deviceId);
 
       Alert.alert('Thành công', 'Đăng nhập thành công!');
     } catch (error) {
@@ -172,6 +198,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (user && user._id) {
+        await removeFcmToken(user._id);
+      }
       await AsyncStorage.multiRemove(['token', 'user']);
       setToken(null);
       setUser(null);
@@ -189,6 +218,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokenExpiredAlertVisible(false);
   };
 
+  const register = async (data: any) => {
+    setIsLoading(true);
+    try {
+      const res = await authService.register(data);
+      await signIn(res); // Đăng nhập luôn sau khi đăng ký thành công
+    } catch (error) {
+      Alert.alert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateUser = async (updateData: any) => {
+    if (!user || !token) return;
+    setIsLoading(true);
+    try {
+      // Giả sử backend có API PUT /auth/update/:id
+      const response = await authService.updateUser(user._id, updateData, token);
+      await AsyncStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user);
+      Alert.alert('Thành công', 'Cập nhật thông tin thành công!');
+    } catch (error) {
+      Alert.alert('Lỗi', 'Cập nhật thông tin thất bại');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -199,7 +258,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       checkTokenExpiration, 
       showTokenExpiredAlert,
       tokenExpiredAlertVisible,
-      hideTokenExpiredAlert
+      hideTokenExpiredAlert,
+      register,
+      updateUser // Thêm vào Provider
     }}>
       {children}
     </AuthContext.Provider>

@@ -5,14 +5,13 @@ import React, { useCallback, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
-    Platform,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
@@ -127,7 +126,7 @@ const AddAddress = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              behavior={undefined}
     >
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => router.back()}>

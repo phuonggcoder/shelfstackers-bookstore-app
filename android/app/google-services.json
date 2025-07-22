@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "346115100070",
+    "project_id": "shelfstacker-project",
+    "storage_bucket": "shelfstacker-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:346115100070:android:d65091845f39ad28c5d367",
+        "android_client_info": {
+          "package_name": "com.lathsenpai.shelfstackersbookstoreappfix"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "346115100070-2lj3psa8lbsvdeleo460jps8kjumemgt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lathsenpai.shelfstackersbookstoreappfix",
+            "certificate_hash": "e8c5475a7a42db2328c778122b13baff7d8207a4"
+          }
+        },
+        {
+          "client_id": "346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjalULt7NMGpNDvWzXgs3kxmkRKPExXw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
