@@ -113,7 +113,9 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Cài đặt chung</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <TouchableOpacity onPress={() => router.push('/Language')}>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
+            </TouchableOpacity>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
         </View>

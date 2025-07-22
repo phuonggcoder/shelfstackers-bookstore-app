@@ -264,6 +264,7 @@ const SearchScreen = () => {
         )}
       </View>
     </TouchableOpacity>
+
   );
 
   return (
