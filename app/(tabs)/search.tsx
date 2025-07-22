@@ -230,7 +230,7 @@ const SearchScreen = () => {
       ListEmptyComponent={resultLoading ? (
         <ActivityIndicator size="small" color="#5E5CE6" style={{ marginVertical: 10 }} />
       ) : searchText.trim() ? (
-        <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>Không tìm thấy kết quả cho từ khóa "{searchText}"</Text>
+        <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>Không tìm thấy kết quả cho từ khóa &quot;{searchText}&quot;</Text>
       ) : null}
     />
   );
