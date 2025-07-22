@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import languageDetector from './languageDetector'; // đường dẫn đúng
 import en from './locales/en.json';
 import vi from './locales/vi.json';
+////code ngôn ngữ///////
 
 i18n
   .use(languageDetector)

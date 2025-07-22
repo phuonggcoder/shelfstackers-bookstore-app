@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LanguageDetectorAsyncModule } from 'i18next';
-
+///////code ngôn ngữ//////
 const languageDetector: LanguageDetectorAsyncModule = {
   type: 'languageDetector',
   async: true,

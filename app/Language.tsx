@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import i18n from '../app/i18n'; 
-
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import i18n from '../app/i18n';
+////code ngôn ngữ///////
 const LanguageScreen = () => {
   const { t } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language || 'vi');
