@@ -7,6 +7,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BookGrid2Col from '../components/BookGrid2Col';
 import BookGrid3Col from '../components/BookGrid3Col';
 import BookGrid4Col from '../components/BookGrid4Col';
+import CampaignCarousel from '../components/CampaignCarousel';
+import EventCampaignGrid from '../components/EventCampaignGrid';
+import api from '../services/api';
 import { Book, Category } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -68,24 +71,29 @@ const FilteredBooksScreen = () => {
   const [inputPage, setInputPage] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const inputPageRef = useRef<TextInput>(null);
+  const [promotionCampaigns, setPromotionCampaigns] = useState<any[]>([]);
+  const [eventCampaigns, setEventCampaigns] = useState<any[]>([]);
 
   // Fetch books & categories from API
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const api = await import('../services/api');
-        const [booksData, categoriesData] = await Promise.all([
+        const [booksData, categoriesData, campaignsData] = await Promise.all([
           api.getBooks(),
-          api.getCategories()
+          api.getCategories(),
+          api.getCampaigns()
         ]);
         setBooks(booksData as BookWithSupplier[]);
         setCategories(categoriesData as Category[]);
         // Lấy danh sách supplier duy nhất từ books
         const allSuppliers = Array.from(new Set((booksData as BookWithSupplier[]).map((b) => b.supplier).filter((s): s is string => Boolean(s))));
         setSupplierList(allSuppliers);
+        // Tách campaign type 'promotion' và 'event'
+        setPromotionCampaigns((campaignsData || []).filter((c: any) => c.type === 'promotion'));
+        setEventCampaigns((campaignsData || []).filter((c: any) => c.type === 'event'));
       } catch (e) {
-        setBooks([]); setCategories([]); setSupplierList([]);
+        setBooks([]); setCategories([]); setSupplierList([]); setPromotionCampaigns([]); setEventCampaigns([]);
       } finally {
         setLoading(false);
       }
@@ -492,8 +500,34 @@ const FilteredBooksScreen = () => {
 
   const insets = useSafeAreaInsets();
 
+  // Thêm log kiểm tra eventCampaigns
+  console.log('eventCampaigns:', eventCampaigns);
+  try {
+    console.log('eventCampaigns JSON:', JSON.stringify(eventCampaigns));
+  } catch (e) {}
+  // Nếu không có event, render event test để xác nhận UI
+  const campaignsToShow = eventCampaigns.length > 0 ? eventCampaigns : [
+    {
+      _id: 'test-event',
+      name: 'Sự kiện test',
+      books: [
+        { cover_image: ['https://i.imgur.com/gTzT0hA.jpeg'], thumbnail: '' }
+      ],
+      type: 'event'
+    }
+  ];
   return (
     <SafeAreaView style={[styles.container, { paddingTop: 0, paddingBottom: 0 }]}> 
+      {/* Banner promotion (carousel) */}
+      <CampaignCarousel title="Khuyến mãi hot" campaigns={promotionCampaigns} />
+      {/* Event Campaign Grid */}
+      {eventCampaigns.length === 0 && (
+        <Text style={{textAlign: 'center', color: '#888', marginVertical: 8}}>Không có sự kiện nào (hiện event test)</Text>
+      )}
+      <EventCampaignGrid
+        campaigns={campaignsToShow}
+        onShowAll={() => router.push('/allcampaigns')}
+      />
       {/* Header */}
       <View style={[styles.headerRow,{backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',paddingBottom:6, paddingTop: insets.top - 20, flexDirection:'row', alignItems:'center'}]}> 
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>

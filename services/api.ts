@@ -326,6 +326,10 @@ const api = {
     return response.json();
   },
 
+  // Thêm các hàm này vào object export default
+  getBooks,
+  getCategories,
+
   // Campaign APIs
   getCampaigns: async () => {
     try {
