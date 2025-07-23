@@ -92,7 +92,7 @@ const SettingsScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bảo mật</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}}  onPress={() => router.push('/ChangePassword')}>
             <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
