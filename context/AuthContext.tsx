@@ -124,10 +124,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         
-        // Đồng bộ FCM token khi load lại user
+        // Đồng bộ FCM token khi load lại user (chỉ khi có token hợp lệ)
         const deviceId = await storageHelper.getOrCreateMobileDeviceId();
-        syncFcmToken(parsedUser._id, deviceId, storedToken);
-        listenFcmTokenRefresh(parsedUser._id, deviceId);
+        // Chỉ sync FCM token nếu có token hợp lệ
+        if (storedToken) {
+          syncFcmToken(parsedUser._id, deviceId, storedToken);
+          listenFcmTokenRefresh(parsedUser._id, deviceId);
+        }
 
         // Validate token in background without blocking UI
         setTimeout(async () => {

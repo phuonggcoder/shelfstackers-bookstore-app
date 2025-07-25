@@ -38,11 +38,10 @@ const OrderHistoryScreen = () => {
   const tabs = [
     { key: 'all', label: 'Tất cả' },
     { key: 'pending', label: 'Chờ xác nhận' },
-    { key: 'confirmed', label: 'Chờ lấy hàng' },
-    { key: 'shipping', label: 'Chờ giao hàng' },
+    { key: 'processing', label: 'Đang xử lý' },
+    { key: 'shipped', label: 'Đang giao hàng' },
     { key: 'delivered', label: 'Đã giao' },
     { key: 'cancelled', label: 'Đã huỷ' },
-    { key: 'completed', label: 'Hoàn thành' },
   ];
 
   useEffect(() => {
@@ -84,29 +83,25 @@ const OrderHistoryScreen = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'confirmed': return '#3498db';
-      case 'shipping': return '#9b59b6';
+      case 'processing': return '#3498db';
+      case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
       case 'cancelled': return '#4A90E2';
-      case 'completed': return '#2ecc71';
       default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
-    console.log('Order status:', status, '->', normalized);
     switch (normalized) {
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
       case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
-      case 'processing': return 'Đang xử lý';
-      case 'created': return 'Đã tạo';
       default: return 'Không xác định';
     }
   };
@@ -158,9 +153,19 @@ const OrderHistoryScreen = () => {
 
   const filteredOrders = selectedTab === 'all' 
     ? orders 
-    : orders.filter(order => order.status === selectedTab);
+    : orders.filter(order => (order.status || '').toLowerCase() === selectedTab);
 
   const renderOrderItem = ({ item }: { item: any }) => {
+    // Lấy thông tin địa chỉ nếu có
+    const address = item.address || {};
+    const receiverName = address.full_name || address.receiver_name || '';
+    const phoneNumber = address.phone || address.phone_number || '';
+    const addressDetail = address.address || address.address_detail || '';
+    const street = address.street || '';
+    const ward = address.ward || '';
+    const district = address.district || '';
+    const province = address.province || '';
+    const fullAddress = [addressDetail, street, ward, district].filter(Boolean).join(', '); // chỉ đến phường/xã
     return (
       <TouchableOpacity
         style={styles.orderCard}
@@ -170,36 +175,7 @@ const OrderHistoryScreen = () => {
         })}
         activeOpacity={0.8}
       >
-        {/* Địa chỉ giao hàng */}
-        {item.address && (
-          <View style={{ marginBottom: 8 }}>
-            <Text style={{ fontWeight: 'bold', color: '#2c3e50' }}>Địa chỉ giao hàng:</Text>
-            <Text>{item.address.full_name} - {item.address.phone}</Text>
-            <Text>{item.address.address}</Text>
-          </View>
-        )}
-        {/* Danh sách sách trong đơn */}
-        {item.items && item.items.length > 0 && (
-          <View style={{ marginBottom: 8 }}>
-            {item.items.map((it: any, idx: number) => (
-              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <Image
-                  source={{ uri: getBookImage(it.book) }}
-                  style={{ width: 48, height: 64, borderRadius: 6, marginRight: 10 }}
-                  contentFit="cover"
-                  transition={200}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bookTitle}>{it.book?.title || 'Không có tên'}</Text>
-                  <Text style={styles.bookAuthor}>Tác giả: {it.book?.author || ''}</Text>
-                  <Text style={styles.itemCount}>Số lượng: {it.quantity || 1}</Text>
-                  <Text style={styles.totalAmount}>{formatPrice(it.price)}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-        {/* Thông tin đơn hàng */}
+        {/* Mã đơn lên đầu */}
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
             <Text style={styles.orderCode}>Mã đơn: {item.order_id || item._id}</Text>
@@ -209,6 +185,37 @@ const OrderHistoryScreen = () => {
             <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
           </View>
         </View>
+        {/* Danh sách sách trong đơn */}
+        {item.items && item.items.length > 0 && (
+          <View style={{ marginBottom: 8, alignItems: 'flex-start', width: '100%' }}>
+            {item.items.map((it: any, idx: number) => (
+              <View
+                key={idx}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  marginBottom: 6,
+                  alignSelf: 'stretch',
+                  width: '100%',
+                }}
+              >
+                <Image
+                  source={{ uri: getBookImage(it.book) }}
+                  style={{ width: 48, height: 64, borderRadius: 6, marginRight: 10 }}
+                  contentFit="cover"
+                  transition={200}
+                />
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Text style={[styles.bookTitle, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">{it.book?.title || 'Không có tên'}</Text>
+                  <Text style={[styles.bookAuthor, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">Tác giả: {it.book?.author || ''}</Text>
+                  <Text style={styles.itemCount}>Số lượng: {it.quantity || 1}</Text>
+                  <Text style={styles.totalAmount}>{formatPrice(it.price)}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+        {/* Thông tin đơn hàng */}
         <View style={styles.orderFooter}>
           <View style={styles.totalInfo}>
             <Text style={styles.totalLabel}>
@@ -218,7 +225,7 @@ const OrderHistoryScreen = () => {
               {formatPrice(item.totalAmount)}
             </Text>
           </View>
-          <TouchableOpacity style={styles.detailButton}>
+          <TouchableOpacity style={styles.detailButton} onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}>
             <Text style={styles.detailButtonText}>Chi tiết</Text>
           </TouchableOpacity>
         </View>
@@ -277,7 +284,11 @@ const OrderHistoryScreen = () => {
           data={filteredOrders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.orderList}
+          contentContainerStyle={{
+            ...styles.orderList,
+            paddingTop: 0,
+            marginTop: 0,
+          }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -355,10 +366,10 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4, // Giảm padding để tab bar gọn lại
   },
   tab: {
-    height: 40, // Chiều cao cố định cho tab
+    height: 36, // Giảm chiều cao cho tab
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -400,7 +411,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   orderList: {
-    padding: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingBottom: 16,
+    paddingTop: 0, // Đảm bảo không có padding top
   },
   orderCard: {
     backgroundColor: 'white',
@@ -412,6 +426,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    alignItems: 'flex-start',
+    // borderWidth: 1, borderColor: 'blue', // debug nếu cần
   },
   orderHeader: {
     flexDirection: 'row',

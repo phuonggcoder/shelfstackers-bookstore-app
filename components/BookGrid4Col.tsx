@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   price: {
-    color: '#1976D2',
+    color: '#FF5252', // màu đỏ
     fontWeight: 'bold',
     fontSize: 11,
   },

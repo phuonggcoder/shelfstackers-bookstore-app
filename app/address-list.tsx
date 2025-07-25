@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
 import { deleteAddress, getAddresses, setDefaultAddress, updateAddress } from '../services/addressService';
 
@@ -26,6 +25,7 @@ const AddressListScreen = () => {
     newId: string;
   } | null>(null);
   const router = useRouter();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const isFromOrderReview = from === 'order-review';
 
@@ -76,6 +76,11 @@ const AddressListScreen = () => {
     };
     checkAddedAddress();
   }, []);
+
+  React.useEffect(() => {
+    if (!token) setShowLoginModal(true);
+    else setShowLoginModal(false);
+  }, [token]);
 
   const handleDelete = async (id: string) => {
     setDeleteId(id);
@@ -182,11 +187,40 @@ const AddressListScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <BottomAlert
-        title="Thêm địa chỉ thành công!"
-        visible={showAlert}
-        onHide={() => setShowAlert(false)}
-      />
+   
+
+      {/* Modal đăng nhập nếu chưa đăng nhập */}
+      <Modal
+        visible={showLoginModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLoginModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', width: 320 }}>
+            <Ionicons name="log-in-outline" size={48} color="#3255FB" style={{ marginBottom: 16 }} />
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>Bạn chưa đăng nhập</Text>
+            <Text style={{ color: '#666', marginBottom: 24, textAlign: 'center' }}>Vui lòng đăng nhập để sử dụng tính năng này.</Text>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <TouchableOpacity
+                style={{ backgroundColor: '#3255FB', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginRight: 8 }}
+                onPress={() => {
+                  setShowLoginModal(false);
+                  router.push('/(auth)/login');
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Đăng nhập</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: '#eee', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24 }}
+                onPress={() => setShowLoginModal(false)}
+              >
+                <Text style={{ color: '#3255FB', fontWeight: 'bold', fontSize: 16 }}>Bỏ qua</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showDeleteModal}

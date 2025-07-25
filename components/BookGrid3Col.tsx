@@ -7,7 +7,19 @@ interface Props {
   onPress?: (book: Book) => void;
 }
 
+// Badge giảm giá random cố định theo _id
+function getDiscountPercent(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Giới hạn từ 10 đến 50%
+  const percent = Math.abs(hash % 41) + 10;
+  return percent;
+}
+
 const BookGrid3Col: React.FC<Props> = ({ book, onPress }) => {
+  const percent = getDiscountPercent(book._id || '');
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress && onPress(book)} activeOpacity={0.85}>
       <Image source={{ uri: book.thumbnail || (book.cover_image && book.cover_image[0]) || 'https://i.imgur.com/gTzT0hA.jpeg' }} style={styles.image} resizeMode="cover" />
@@ -15,7 +27,7 @@ const BookGrid3Col: React.FC<Props> = ({ book, onPress }) => {
         <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
         <View style={styles.priceRow}>
           <Text style={styles.price}>{book.price.toLocaleString()} đ</Text>
-          {book.price && <Text style={styles.oldPrice}>{(book.price * 1.2).toLocaleString()} đ</Text>}
+          
         </View>
       </View>
     </TouchableOpacity>
@@ -58,15 +70,24 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   price: {
-    color: '#1976D2',
+    color: '#FF5252', // màu đỏ
     fontWeight: 'bold',
     fontSize: 13,
     marginRight: 4,
   },
-  oldPrice: {
-    color: '#aaa',
+  badgeDiscount: {
+    backgroundColor: '#FF5252',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+    alignSelf: 'center',
+  },
+  badgeDiscountText: {
+    color: '#fff',
     fontSize: 11,
-    textDecorationLine: 'line-through',
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
 });
 

@@ -10,13 +10,13 @@ export async function getFcmToken() {
 export async function syncFcmToken(userId, deviceId, authToken) {
   const token = await getFcmToken();
   console.log('FCM token:', token, 'userId:', userId, 'deviceId:', deviceId);
-  if (userId && token) {
+  if (userId && token && authToken) {
     try {
       // Sử dụng endpoint mới register-device-token
-      const headers = { 'Content-Type': 'application/json' };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
+      const headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      };
       
       const res = await fetch('https://server-shelf-stacker.onrender.com/auth/register-device-token', {
         method: 'POST',
@@ -35,7 +35,7 @@ export async function syncFcmToken(userId, deviceId, authToken) {
       throw error;
     }
   } else {
-    console.warn('Không có userId hoặc FCM token để sync lên BE');
+    console.warn('Không có userId, FCM token hoặc authToken để sync lên BE');
   }
 }
 
@@ -62,18 +62,9 @@ export function listenFcmTokenRefresh(userId, deviceId) {
   return onTokenRefresh(messagingInstance, (newToken) => {
     if (userId && newToken) {
       console.log('🔄 FCM token refreshed:', newToken);
-      fetch('https://server-shelf-stacker.onrender.com/auth/register-device-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          deviceToken: newToken, 
-          deviceId: deviceId 
-        }),
-      }).then(res => {
-        console.log('✅ Token refresh sync response:', res.status);
-      }).catch(error => {
-        console.error('❌ Error syncing refreshed token:', error);
-      });
+      // Chỉ sync khi có user đăng nhập (có authToken)
+      // Token refresh sync sẽ được handle trong AuthContext
+      console.log('FCM token refresh ready for sync when user is logged in');
     }
   });
 } 
