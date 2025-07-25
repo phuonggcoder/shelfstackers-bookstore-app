@@ -1,3 +1,6 @@
+// config/api.ts
+export const API_BASE_URL = 'https://server-shelf-stacker.onrender.com'; // Đổi sang local khi test: 'http://localhost:3000'
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: 'https://server-shelf-stacker.onrender.com',

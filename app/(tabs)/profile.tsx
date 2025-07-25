@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
-import React from 'react';
+import { Link, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useAvatar } from '../../context/AvatarContext';
 
 const WelcomeScreen = () => (
   <View style={styles.welcomeContainer}>
     <Ionicons name="person-circle-outline" size={100} color="#4A3780" />
-          <Text style={styles.welcomeTitle}>Chào mừng đến với ShelfStackers</Text>
+    <Text style={styles.welcomeTitle}>Chào mừng đến với ShelfStackers</Text>
     <Text style={styles.welcomeText}>
       Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
     </Text>
@@ -37,6 +39,34 @@ const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; on
 
 const SettingsScreen = () => {
   const { user, signOut } = useAuth();
+  const router = useRouter();
+  const { avatarUri } = useAvatar();
+  const [localDetail, setLocalDetail] = React.useState<any>(null);
+  const [displayName, setDisplayName] = useState('');
+
+  useEffect(() => {
+    const loadName = async () => {
+      const lastName = await AsyncStorage.getItem('user_lastName');
+      const firstName = await AsyncStorage.getItem('user_firstName');
+      if (lastName || firstName) {
+        setDisplayName(`${lastName || ''} ${firstName || ''}`.trim());
+      } else {
+        setDisplayName(user?.username || '');
+      }
+    };
+    loadName();
+  }, [user]);
+
+  React.useEffect(() => {
+    (async () => {
+      const saved = await AsyncStorage.getItem('userDetailLocal');
+      if (saved) {
+        setLocalDetail(JSON.parse(saved));
+      } else {
+        setLocalDetail(null);
+      }
+    })();
+  }, []);
 
   const handleLogout = async () => {
     await signOut();
@@ -46,19 +76,22 @@ const SettingsScreen = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
+        {/* Avatar và tên lấy từ API (context user) */}
         <Image
-          source={{ uri: 'https://i.pravatar.cc/150' }}
+          source={{ uri: user?.avatar || 'https://i.pravatar.cc/150?u=' + user?.username }}
           style={styles.avatar}
           contentFit="cover"
         />
-        <Text style={styles.name}>{user?.full_name || 'User Name'}</Text>
-        <Text style={styles.role}>Author</Text>
+        <Text style={styles.name}>{displayName}</Text>
+        {user?.roles && (
+          <Text style={styles.role}>{Array.isArray(user.roles) ? user.roles.join(', ') : user.roles}</Text>
+        )}
       </View>
 
       <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/user-detail')}>
             <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -90,7 +123,7 @@ const SettingsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
+        <View style={styles.section}>y
           <Text style={styles.sectionTitle}>Bảo mật</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
@@ -224,6 +257,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 5,
   },
+  username: {
+    fontSize: 14,
+    color: '#E8E8FF',
+    marginBottom: 5,
+  },
   role: {
     fontSize: 14,
     color: '#E8E8FF',
@@ -275,7 +313,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#ff3742',
   },
