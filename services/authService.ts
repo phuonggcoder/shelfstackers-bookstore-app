@@ -2,6 +2,7 @@ import axios from 'axios';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth';
 
 const API_URL = 'https://server-shelf-stacker.onrender.com/auth';
+const USER_URL = 'https://server-shelf-stacker.onrender.com/api/users';
 
 const mapUserResponse = (serverResponse: any): AuthResponse => {
   if (!serverResponse || !serverResponse.token || !serverResponse.user) {
@@ -97,5 +98,28 @@ export const authService = {
       }
       throw new Error(error.message || 'Update user failed');
     }
+    
+  },
+  changePassword: async (currentPassword: string, newPassword: string, token: string): Promise<string> => {
+    try {
+      const response = await axios.put(`${USER_URL}/change-password`, {
+        currentPassword,
+        newPassword,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.message || 'Password changed successfully';
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error(error.message || 'Password change failed');
+    }
   }
+
+  
 };

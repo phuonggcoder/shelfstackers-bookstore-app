@@ -13,6 +13,7 @@ import { CartProvider } from '../context/CartContext';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
+
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
   usePushNotification();
