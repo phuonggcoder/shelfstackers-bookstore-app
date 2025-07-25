@@ -38,12 +38,17 @@ const HomeTopSection = ({ campaigns, campaignsLoading, onApplySimpleFilter }: Ho
   return (
     <View style={styles.container}>
       <Header />
-      <View style={styles.section}><SearchBar onApplySimpleFilter={onApplySimpleFilter} /></View>
+      <View style={styles.section}>
+        <SearchBar 
+          onApplySimpleFilter={onApplySimpleFilter}
+          onCategoryPress={() => router.push('/AllCategoryScreen')}
+        />
+      </View>
       {/* Slider promotion */}
       {promotionCampaigns.length > 0 && (
         <View style={{ width: '100%', aspectRatio: 2.5, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
           <Image
-            source={{ uri: promotionCampaigns[sliderIndex].image }}
+            source={{ uri: Array.isArray(promotionCampaigns[sliderIndex].image) ? promotionCampaigns[sliderIndex].image[0] : promotionCampaigns[sliderIndex].image }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             transition={300}
@@ -64,7 +69,7 @@ const HomeTopSection = ({ campaigns, campaignsLoading, onApplySimpleFilter }: Ho
               onPress={() => router.push({ pathname: '/campaign/[id]', params: { id: item._id } })}
             >
               <Image
-                source={{ uri: item.image }}
+                source={{ uri: Array.isArray(item.image) ? item.image[0] : item.image }}
                 style={{ width: 44, height: 44, borderRadius: 12, marginBottom: 4 }}
                 contentFit="cover"
               />

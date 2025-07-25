@@ -2,30 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect } from 'react';
 import { Animated, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-interface CustomLoginDialogProps {
+interface LoginRequiredModalProps {
   visible: boolean;
   onClose: () => void;
   onLogin: () => void;
   message?: string;
 }
 
-const CustomLoginDialog: React.FC<CustomLoginDialogProps> = ({ visible, onClose, onLogin, message }) => {
+const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ visible, onClose, onLogin, message }) => {
   const opacity = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) {
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
   }, [visible]);
 
   if (!visible) return null;
@@ -34,24 +26,38 @@ const CustomLoginDialog: React.FC<CustomLoginDialogProps> = ({ visible, onClose,
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Animated.View style={[styles.dialog, { opacity }]}> 
-          <View style={styles.iconWrap}>
-            <Ionicons name="log-in-outline" size={36} color="#5E5CE6" />
-          </View>
-          <Text style={styles.title}>Bạn chưa đăng nhập</Text>
-          <Text style={styles.message}>{message || 'Vui lòng đăng nhập để sử dụng tính năng này.'}</Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Bỏ qua</Text>
-            </TouchableOpacity>
-          </View>
+          <IconSection />
+          <TitleSection message={message} />
+          <ButtonSection onLogin={onLogin} onClose={onClose} />
         </Animated.View>
       </View>
     </Modal>
   );
 };
+
+const IconSection = () => (
+  <View style={styles.iconWrap}>
+    <Ionicons name="log-in-outline" size={36} color="#5E5CE6" />
+  </View>
+);
+
+const TitleSection = ({ message }: { message?: string }) => (
+  <>
+    <Text style={styles.title}>Bạn chưa đăng nhập</Text>
+    <Text style={styles.message}>{message || 'Vui lòng đăng nhập để sử dụng tính năng này.'}</Text>
+  </>
+);
+
+const ButtonSection = ({ onLogin, onClose }: { onLogin: () => void; onClose: () => void }) => (
+  <View style={styles.buttonRow}>
+    <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
+      <Text style={styles.loginButtonText}>Đăng nhập</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+      <Text style={styles.cancelButtonText}>Bỏ qua</Text>
+    </TouchableOpacity>
+  </View>
+);
 
 const styles = StyleSheet.create({
   overlay: {
@@ -122,4 +128,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CustomLoginDialog;
+export default LoginRequiredModal;

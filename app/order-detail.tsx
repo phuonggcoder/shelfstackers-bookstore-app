@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -124,29 +124,25 @@ const OrderDetailScreen = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'confirmed': return '#3498db';
-      case 'shipping': return '#9b59b6';
+      case 'processing': return '#3498db';
+      case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
       case 'cancelled': return '#4A90E2';
-      case 'completed': return '#2ecc71';
       default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
-    console.log('Order status:', status, '->', normalized);
     switch (normalized) {
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
       case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
-      case 'processing': return 'Đang xử lý';
-      case 'created': return 'Đã tạo';
       default: return 'Không xác định';
     }
   };
