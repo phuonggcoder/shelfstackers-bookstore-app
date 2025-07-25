@@ -17,7 +17,8 @@ interface AuthContextType {
   tokenExpiredAlertVisible: boolean;
   hideTokenExpiredAlert: () => void;
   register: (data: any) => Promise<void>;
-  updateUser: (updateData: any) => Promise<void>; // Thêm hàm cập nhật user
+  updateUser: (updateData: any) => Promise<void>;
+  setUser: (user: User) => void; // Thêm hàm này
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,6 +33,7 @@ user: null,
   hideTokenExpiredAlert: () => {},
   register: async () => {},
   updateUser: async () => {}, // Thêm mặc định
+  setUser: () => {}, // Thêm mặc định
 });
 
 export const useAuth = () => {
@@ -49,6 +51,7 @@ export const useAuth = () => {
     hideTokenExpiredAlert: () => {},
     register: async () => {},
     updateUser: async () => {}, // Thêm mặc định
+    setUser: () => {}, // Thêm mặc định
   };
 };
 
@@ -162,28 +165,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!userData?.token || !userData?.user) {
         throw new Error('Invalid authentication data');
       }
-
-      // Log chi tiết khi user login thành công
-      console.log('=== USER LOGIN SUCCESS ===');
-      console.log('Login time:', new Date().toISOString());
-      console.log('User data:', {
-        id: userData.user._id,
-        email: userData.user.email,
-        username: userData.user.username,
-        full_name: userData.user.full_name,
-        roles: userData.user.roles
-      });
-      console.log('Token present:', !!userData.token);
-      console.log('Token length:', userData.token?.length);
-      console.log('========================');
-
-      // Lưu token và user vào AsyncStorage
-      await Promise.all([
-        AsyncStorage.setItem('token', userData.token),
-        AsyncStorage.setItem('user', JSON.stringify(userData.user)),
-      ]);
-
+      // Lưu token vào AsyncStorage
+      await AsyncStorage.setItem('token', userData.token);
       setToken(userData.token);
+
       setUser(userData.user);
       // --- Đồng bộ session và FCM ---
       const deviceId = await storageHelper.getOrCreateMobileDeviceId();
@@ -203,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'Lỗi xác thực',
         'Không thể hoàn thành quá trình xác thực. Vui lòng thử lại.'
       );
-      throw error; // Throw lại error để component có thể xử lý
+      throw error;
     }
   };
 
@@ -246,10 +231,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || !token) return;
     setIsLoading(true);
     try {
-      // Giả sử backend có API PUT /auth/update/:id
-      const response = await authService.updateUser(user._id, updateData, token);
-      await AsyncStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
+      // Gọi API update user
+      const response = await authService.updateUser({ ...updateData, _id: user._id });
+      // Sau khi update, lấy lại user mới nhất từ API
+      const userRes = await authService.getMe(token);
+      setUser(userRes.user || userRes);
+      await AsyncStorage.setItem('user', JSON.stringify(userRes.user || userRes));
       Alert.alert('Thành công', 'Cập nhật thông tin thành công!');
     } catch (error) {
       Alert.alert('Lỗi', 'Cập nhật thông tin thất bại');
@@ -271,7 +258,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       tokenExpiredAlertVisible,
       hideTokenExpiredAlert,
       register,
-      updateUser // Thêm vào Provider
+      updateUser,
+      setUser // Thêm vào Provider
     }}>
       {children}
     </AuthContext.Provider>

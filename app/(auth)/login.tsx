@@ -7,14 +7,14 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
@@ -88,7 +88,15 @@ export default function Login() {
         Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!');
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+        // Xử lý lỗi EMAIL_NOT_VERIFIED
+        if (data.code === 'EMAIL_NOT_VERIFIED') {
+          Alert.alert(
+            'Email Google chưa xác thực',
+            'Tài khoản Google của bạn chưa xác thực email. Vui lòng vào Gmail xác thực email trước khi đăng nhập.'
+          );
+        } else {
+          Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+        }
       }
     } catch (error: any) {
       console.log('❌ Google Sign-In error:', error);

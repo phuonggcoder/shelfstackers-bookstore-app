@@ -284,6 +284,7 @@ const SearchScreen = () => {
         )}
       </View>
     </TouchableOpacity>
+
   );
 
   const ShowAllButton = ({ onPress }: { onPress: () => void }) => (
