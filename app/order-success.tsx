@@ -67,6 +67,9 @@ export default function OrderSuccessScreen() {
   // QR value: lấy từ zaloPay.order_url nếu có
   const qrValue = zaloPay.order_url || '';
 
+  // Xác định có phải COD không (bao gồm mọi biến thể, không phân biệt hoa thường)
+  const isCOD = ['cod', 'cash_on_delivery', 'cash'].includes((order.payment_method || '').toLowerCase());
+
   // Download QR code as image (dùng ref của QRCode)
   const handleDownloadQR = async () => {
     if (!qrValue || !qrRef.current) return;
@@ -92,6 +95,40 @@ export default function OrderSuccessScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.verticalContainer}>
+        {isCOD ? (
+          <>
+            <View style={styles.logoRow}>
+              <Image source={require('../assets/images/app.png')} style={styles.shopLogo} />
+              <Text style={styles.shopName}>Bookstore</Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoLabel}>Giá trị đơn hàng</Text>
+              <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
+              <Text style={styles.infoLabel}>Số tiền thanh toán</Text>
+              <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
+              <Text style={styles.infoLabel}>Mã đơn hàng</Text>
+              <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
+              {order.createdAt && (
+                <>
+                  <Text style={styles.infoLabel}>Ngày đặt hàng</Text>
+                  <Text style={styles.infoValue}>{dayjs(order.createdAt).format('HH:mm DD/MM/YYYY')}</Text>
+                </>
+              )}
+            </View>
+            <View style={styles.statusBox}>
+              <Text style={styles.statusTitle}>Trạng thái thanh toán</Text>
+              <Text style={[styles.statusValue, {color: '#FFA500'}]}>Thanh toán khi nhận hàng</Text>
+            </View>
+            <TouchableOpacity style={styles.button} onPress={() => router.replace({ pathname: '/order-history', params: { orderId: order.order_id || order._id } })}>
+              <Text style={styles.buttonText}>Xem lịch sử đơn hàng</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
+              <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+        // (giữ nguyên phần QR/ZaloPay cho non-COD)
+        <>
         {/* QR code lớn ở trên cùng nếu có order_url */}
         {qrValue && (
           <View style={styles.qrBoxTop}>
@@ -158,6 +195,8 @@ export default function OrderSuccessScreen() {
         <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
           <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
         </TouchableOpacity>
+        </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

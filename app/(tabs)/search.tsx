@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getBooks, getCategories } from '../../services/api';
@@ -21,6 +21,8 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const SearchScreen = () => {
   const router = useRouter();
+  const { autoFocus } = useLocalSearchParams();
+  const searchInputRef = useRef<TextInput>(null);
   const [activeTab, setActiveTab] = useState<'books' | 'categories'>('books');
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
@@ -30,6 +32,8 @@ const SearchScreen = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
+  const [showAllBooks, setShowAllBooks] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // Auto-load data when tab is focused
   useFocusEffect(
@@ -41,6 +45,22 @@ const SearchScreen = () => {
   useEffect(() => {
     filterData();
   }, [searchQuery, books, categories]);
+
+  useEffect(() => {
+    if (autoFocus) {
+      const timer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+        });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
+
+  useEffect(() => {
+    setShowAllBooks(false);
+    setShowAllCategories(false);
+  }, [searchQuery]);
 
   const isCacheValid = async () => {
     try {
@@ -266,6 +286,27 @@ const SearchScreen = () => {
     </TouchableOpacity>
   );
 
+  const ShowAllButton = ({ onPress }: { onPress: () => void }) => (
+    <TouchableOpacity
+      style={{
+        borderWidth: 1,
+        borderColor: '#007bff',
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        paddingVertical: 10,
+        alignItems: 'center',
+        marginVertical: 12,
+        marginHorizontal: 16,
+      }}
+      onPress={onPress}
+    >
+      <Text style={{ color: '#007bff', fontWeight: 'bold', fontSize: 16 }}>Xem tất cả</Text>
+    </TouchableOpacity>
+  );
+
+  const displayedBooks = showAllBooks ? filteredBooks : filteredBooks.slice(0, 14);
+  const displayedCategories = showAllCategories ? filteredCategories : filteredCategories.slice(0, 14);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Search Header */}
@@ -273,6 +314,7 @@ const SearchScreen = () => {
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#7f8c8d" style={styles.searchIcon} />
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder="Tìm kiếm sách, tác giả, danh mục..."
             value={searchQuery}
@@ -322,7 +364,7 @@ const SearchScreen = () => {
       ) : (
         <>
           {activeTab === 'books' ? (
-            filteredBooks.length === 0 ? (
+            displayedBooks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="search-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
@@ -334,7 +376,7 @@ const SearchScreen = () => {
               </View>
             ) : (
               <FlatList
-                data={filteredBooks}
+                data={displayedBooks}
                 renderItem={renderBookItem}
                 keyExtractor={(item) => item._id}
                 numColumns={2}
@@ -345,10 +387,15 @@ const SearchScreen = () => {
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
+                ListFooterComponent={
+                  !showAllBooks && filteredBooks.length > 14 ? (
+                    <ShowAllButton onPress={() => router.push({ pathname: '/filtered-books', params: { searchText: searchQuery } })} />
+                  ) : null
+                }
               />
             )
           ) : (
-            filteredCategories.length === 0 ? (
+            displayedCategories.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="grid-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
@@ -360,14 +407,21 @@ const SearchScreen = () => {
               </View>
             ) : (
               <FlatList
-                data={filteredCategories}
+                data={displayedCategories}
                 renderItem={renderCategoryItem}
                 keyExtractor={(item) => item._id}
+                numColumns={2}
+                columnWrapperStyle={styles.row}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
                 key="categories-list"
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                ListFooterComponent={
+                  !showAllCategories && filteredCategories.length > 14 ? (
+                    <ShowAllButton onPress={() => setShowAllCategories(true)} />
+                  ) : null
                 }
               />
             )
@@ -544,6 +598,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   categoryCard: {
+    width: (width - 48) / 2,
     backgroundColor: 'white',
     borderRadius: 12,
     marginBottom: 16,

@@ -40,4 +40,6 @@ export interface Campaign {
   books: Book[];
   createdAt: Date;
   updatedAt: Date;
+  image?: string;
+  thumbnail?: string;
 } 

@@ -77,3 +77,41 @@ export function listenFcmTokenRefresh(userId, deviceId) {
     }
   });
 } 
+
+// Gửi session khi login thành công
+export async function createOrUpdateSession(userId, deviceId, loginTime, deviceInfo, authToken) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const res = await fetch('https://server-shelf-stacker.onrender.com/session', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: userId, device_id: deviceId, login_time: loginTime, device_info: deviceInfo }),
+    });
+    const resJson = await res.json().catch(() => ({}));
+    console.log('✅ Create/Update session response:', res.status, resJson);
+    return resJson;
+  } catch (error) {
+    console.error('❌ Error creating/updating session:', error);
+    throw error;
+  }
+}
+
+// Gửi fcm_token lên session
+export async function updateSessionFcmToken(userId, deviceId, fcmToken, authToken) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const res = await fetch('https://server-shelf-stacker.onrender.com/session/fcm', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: userId, device_id: deviceId, fcm_token: fcmToken }),
+    });
+    const resJson = await res.json().catch(() => ({}));
+    console.log('✅ Update session FCM response:', res.status, resJson);
+    return resJson;
+  } catch (error) {
+    console.error('❌ Error updating session FCM token:', error);
+    throw error;
+  }
+} 

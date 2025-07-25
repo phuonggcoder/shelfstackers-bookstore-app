@@ -7,8 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BookGrid2Col from '../components/BookGrid2Col';
 import BookGrid3Col from '../components/BookGrid3Col';
 import BookGrid4Col from '../components/BookGrid4Col';
-import CampaignCarousel from '../components/CampaignCarousel';
-import EventCampaignGrid from '../components/EventCampaignGrid';
 import api from '../services/api';
 import { Book, Category } from '../types';
 
@@ -100,6 +98,10 @@ const FilteredBooksScreen = () => {
     }
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (params.searchText) setSearchText(params.searchText as string);
+  }, [params.searchText]);
 
   // Lọc và sắp xếp toàn bộ sách
   const filteredBooks = useMemo(() => {
@@ -505,35 +507,18 @@ const FilteredBooksScreen = () => {
   try {
     console.log('eventCampaigns JSON:', JSON.stringify(eventCampaigns));
   } catch (e) {}
-  // Nếu không có event, render event test để xác nhận UI
-  const campaignsToShow = eventCampaigns.length > 0 ? eventCampaigns : [
-    {
-      _id: 'test-event',
-      name: 'Sự kiện test',
-      books: [
-        { cover_image: ['https://i.imgur.com/gTzT0hA.jpeg'], thumbnail: '' }
-      ],
-      type: 'event'
-    }
-  ];
+
+  // Hàm chuyển sang trang chi tiết sách
+  const handleBookPress = (book: Book) => {
+    router.push({ pathname: '/book/[id]', params: { id: book._id } });
+  };
   return (
     <SafeAreaView style={[styles.container, { paddingTop: 0, paddingBottom: 0 }]}> 
-      {/* Banner promotion (carousel) */}
-      <CampaignCarousel title="Khuyến mãi hot" campaigns={promotionCampaigns} />
-      {/* Event Campaign Grid */}
-      {eventCampaigns.length === 0 && (
-        <Text style={{textAlign: 'center', color: '#888', marginVertical: 8}}>Không có sự kiện nào (hiện event test)</Text>
-      )}
-      <EventCampaignGrid
-        campaigns={campaignsToShow}
-        onShowAll={() => router.push('/allcampaigns')}
-      />
-      {/* Header */}
+      {/* Header: nút back + thanh tìm kiếm */}
       <View style={[styles.headerRow,{backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',paddingBottom:6, paddingTop: insets.top - 20, flexDirection:'row', alignItems:'center'}]}> 
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#1976D2" style={{marginRight:4}} />
         </TouchableOpacity>
-      
         <View style={{flex:1, marginLeft: 4, justifyContent:'center'}}>
           <View style={{flexDirection:'row', alignItems:'center', backgroundColor:'#f2f2f2', borderRadius:18, paddingHorizontal:18, height:56}}>
             <Ionicons name="search" size={28} color="#888" style={{marginRight:10}} />
@@ -568,13 +553,13 @@ const FilteredBooksScreen = () => {
           contentContainerStyle={{ ...styles.listContent, paddingBottom: 24 + insets.bottom + 50 }}
           columnWrapperStyle={{ justifyContent: 'center', marginHorizontal: 4 }}
           renderItem={({ item }) => {
-            let Comp: React.ComponentType<{ book: Book }> = BookGrid2Col;
-            if (itemPerRow === 3) Comp = BookGrid3Col;
-            else if (itemPerRow === 4) Comp = BookGrid4Col;
-            // default 2 col
+            let Comp: React.ComponentType<{ book: Book; onPress?: (book: Book) => void }> = BookGrid2Col;
+            let fixedHeight = 300;
+            if (itemPerRow === 3) { Comp = BookGrid3Col; fixedHeight = 210; }
+            else if (itemPerRow === 4) { Comp = BookGrid4Col; fixedHeight = 170; }
             return (
-              <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4 }}>
-                <Comp book={item} />
+              <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4, height: fixedHeight }}>
+                <Comp book={item} onPress={handleBookPress} />
               </View>
             );
           }}

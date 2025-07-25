@@ -167,9 +167,14 @@ export const deleteAddress = async (token: string, addressId: string) => {
 
 export const setDefaultAddress = async (token: string, addressId: string) => {
   try {
-    const response = await axios.put(`${API_BASE_URL}/addresses/${addressId}/set-default`, {}, {
+    // Gửi request với flag để backend tự động xử lý việc set default
+    const response = await axios.put(`${API_BASE_URL}/addresses/${addressId}`, {
+      is_default: true,
+      set_as_default: true // Flag để backend biết đây là thao tác set default
+    }, {
       headers: {
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
     return response.data;

@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
+    height: 300,
   },
   image: {
     width: '100%',
@@ -52,6 +53,8 @@ const styles = StyleSheet.create({
   },
   info: {
     padding: 10,
+    minHeight: 90,
+    justifyContent: 'flex-start',
   },
   title: {
     fontWeight: 'bold',

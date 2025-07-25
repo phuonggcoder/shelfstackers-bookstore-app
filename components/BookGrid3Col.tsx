@@ -42,12 +42,15 @@ const styles = StyleSheet.create({
   },
   info: {
     padding: 7,
+    minHeight: 56,
+    justifyContent: 'flex-start',
   },
   title: {
     fontWeight: 'bold',
     fontSize: 13,
     color: '#222',
     marginBottom: 2,
+    minHeight: 36,
   },
   priceRow: {
     flexDirection: 'row',
