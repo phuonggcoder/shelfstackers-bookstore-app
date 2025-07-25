@@ -1,8 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { useEffect } from 'react';
+
+// ... trong component
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
@@ -104,7 +109,7 @@ const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; on
 
 const SettingsScreen = () => {
   const { user, signOut } = useAuth();
-  const router = useRouter();
+  const navigation = useNavigation();
   const { avatarUri } = useAvatar();
   const [localDetail, setLocalDetail] = React.useState<any>(null);
   const [displayName, setDisplayName] = useState('');
@@ -135,7 +140,7 @@ const SettingsScreen = () => {
 
   const handleLogout = async () => {
     await signOut();
-    router.replace('/');
+    navigation.navigate('index' as never); // Tab Home
   };
 
   return (
@@ -156,41 +161,41 @@ const SettingsScreen = () => {
       <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/user-detail')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('user-detail' as never)}>
             <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>router.push('/vouchers')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>navigation.navigate('vouchers' as never)}>
             <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Mã giảm giá</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/favourite')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('favourite' as never)}>
             <Ionicons name="heart-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Sách yêu thích</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/order-history')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('order-history' as never)}>
             <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Lịch sử mua hàng</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/payment')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>
             <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Phương thức thanh toán</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/address-list')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('address-list' as never)}>
             <Ionicons name="location-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Địa chỉ đặt hàng</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>y
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bảo mật</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}}  onPress={() => router.push('/ChangePassword')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}}  onPress={() => navigation.navigate('ChangePassword' as never)}>
             <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -211,7 +216,7 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Cài đặt chung</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <TouchableOpacity onPress={() => router.push('/Language')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Language' as never)}>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
             </TouchableOpacity>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -230,7 +235,7 @@ const SettingsScreen = () => {
   );
 };
 
-export default function ProfileTab() {
+export default function ProfileScreen() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
