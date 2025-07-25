@@ -1,17 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
-import RenderHTML from 'react-native-render-html';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import BottomAlert from '../../components/BottomAlert';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import BookCard from '../../components/BookCard';
+import CustomLoginDialog from '../../components/BottomAlert';
 import CartAddedDialog from '../../components/CartAddedDialog';
 import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { addToCart, addToWishlist, getBookById } from '../../services/api';
+import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
 
@@ -31,6 +31,7 @@ const BookDetailsScreen = () => {
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const router = useRouter();
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   // Animated overlay state
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -40,11 +41,32 @@ const BookDetailsScreen = () => {
   const [toast, setToast] = useState<{ visible: boolean, message: string }>({ visible: false, message: '' });
 
   const [outOfStock, setOutOfStock] = useState(false);
+  const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
+  const [quantity, setQuantity] = useState(1);
+  const intervalRef = useRef<any>(null);
+  const handleIncrease = () => setQuantity(q => Math.min(q + 1, 99));
+  const handleDecrease = () => setQuantity(q => Math.max(q - 1, 1));
+  const startHold = (type: 'inc' | 'dec') => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      if (type === 'inc') handleIncrease();
+      else handleDecrease();
+    }, 120);
+  };
+  const stopHold = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
 
   const { cartCount, cartJustAdded, setCartJustAdded, fetchCartCount, hasFetched } = useCart();
   const [showCartDialog, setShowCartDialog] = useState(false);
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState(0);
+
+  const [showQtyModal, setShowQtyModal] = useState(false);
+  const [inputQty, setInputQty] = useState(quantity.toString());
+  const [qtyError, setQtyError] = useState('');
+  const inputQtyRef = useRef<TextInput>(null);
+  const maxQty = book?.stock || 99;
 
   // Memoize values to prevent unnecessary re-renders
   const tagsStyles = useMemo(() => ({
@@ -115,6 +137,21 @@ const BookDetailsScreen = () => {
   useEffect(() => {
     if (book && (book.stock === 0 || book.stock === undefined)) {
       setOutOfStock(true);
+    }
+  }, [book]);
+
+  useEffect(() => {
+    if (book && book.categories && book.categories.length > 0) {
+      const fetchRelated = async () => {
+        try {
+          const books = await getBooksByCategory(book.categories[0]._id);
+          // Loại bỏ sách hiện tại khỏi danh sách liên quan
+          setRelatedBooks(books.filter(b => b._id !== book._id));
+        } catch (e) {
+          setRelatedBooks([]);
+        }
+      };
+      fetchRelated();
     }
   }, [book]);
 
@@ -208,7 +245,7 @@ const BookDetailsScreen = () => {
 
   const handleFavorite = async (bookId: string | string[] | undefined) => {
     if (!token || !bookId) {
-      setShowLoginAlert(true);
+      setShowLoginDialog(true);
       return;
     }
     if (isFavorite) {
@@ -229,13 +266,13 @@ const BookDetailsScreen = () => {
   // Thêm vào giỏ hàng
   const handleAddToCart = async () => {
     if (!token) {
-      setShowLoginAlert(true);
+      setShowLoginDialog(true);
       return;
     }
     if (!book) return;
     setAddingCart(true);
     try {
-      await addToCart(token, book._id, 1);
+      await addToCart(token, book._id, quantity);
       setShowCartDialog(true);
       fetchCartCount(token);
       setCartJustAdded(true);
@@ -248,7 +285,7 @@ const BookDetailsScreen = () => {
   // Buy now: sang trang order review
   const handleBuyNow = () => {
     if (!token) {
-      setShowLoginAlert(true);
+      setShowLoginDialog(true);
       return;
     }
     if (!book) return;
@@ -256,7 +293,7 @@ const BookDetailsScreen = () => {
     // Add book to cart first, then navigate to order review
     const addBookToCartAndNavigate = async () => {
       try {
-        await addToCart(token, book._id, 1);
+        await addToCart(token, book._id, quantity);
         // Navigate to order review with the book ID
         router.push({ 
           pathname: '/order-review', 
@@ -276,8 +313,40 @@ const BookDetailsScreen = () => {
     setShowFullscreenImage(true);
   };
 
+  // Khi nhấn vào số lượng
+  const handleQtyPress = () => {
+    setInputQty(quantity.toString());
+    setQtyError('');
+    setShowQtyModal(true);
+    setTimeout(() => inputQtyRef.current?.focus(), 300);
+  };
+  const handleQtyConfirm = () => {
+    const val = parseInt(inputQty, 10);
+    if (isNaN(val) || val < 1) {
+      setQtyError('Số lượng phải lớn hơn 0');
+      return;
+    }
+    if (val > maxQty) {
+      setQtyError('Chỉ còn ' + maxQty + ' sản phẩm');
+      return;
+    }
+    setQuantity(val);
+    setShowQtyModal(false);
+  };
+
+  // Badge giảm giá random cố định theo _id
+  function getDiscountPercent(id: string) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    // Giới hạn từ 10 đến 50%
+    const percent = Math.abs(hash % 41) + 10;
+    return percent;
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
       {/* Overlay: phủ toàn màn hình, click vào sẽ tắt alert, nằm dưới BottomAlert */}
       {overlayVisible && (
         <TouchableWithoutFeedback onPress={() => setShowLoginAlert(false)}>
@@ -297,10 +366,14 @@ const BookDetailsScreen = () => {
         </TouchableWithoutFeedback>
       )}
       {/* BottomAlert nằm trên overlay */}
-      <BottomAlert
-        visible={showLoginAlert}
-        title="Bạn chưa đăng nhập"
-        onHide={() => setShowLoginAlert(false)}
+      <CustomLoginDialog
+        visible={showLoginDialog}
+        onClose={() => setShowLoginDialog(false)}
+        onLogin={() => {
+          setShowLoginDialog(false);
+          router.push('/(auth)/login');
+        }}
+        message="Bạn cần đăng nhập để sử dụng tính năng này."
       />
       <Stack.Screen
         options={{
@@ -326,21 +399,19 @@ const BookDetailsScreen = () => {
                 <Ionicons name="share-outline" size={24} color="black" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push('/cart')}>
-                <CartIconWithBadge count={cartCount} animated={cartJustAdded} />
+                <View style={{ alignItems: 'center', height: 40, justifyContent: 'center' }}>
+                  <CartIconWithBadge count={cartCount} animated={cartJustAdded} />
+                </View>
               </TouchableOpacity>
             </View>
           ),
         }}
       />
-      <ScrollView
-        style={styles.container}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} onScroll={handleScroll} scrollEventThrottle={16}>
         {/* Custom Header: Nổi trên cùng */}
         <View style={{
           position: 'absolute',
-          top: insets.top || 30,
+          top: insets.top - 20,
           left: 0,
           right: 0,
           zIndex: 20,
@@ -348,7 +419,7 @@ const BookDetailsScreen = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 10,
-          height: 56,
+          height: 10 + insets.top,
           backgroundColor: '#fff',
           opacity: 1,
           borderBottomWidth: 1,
@@ -365,7 +436,9 @@ const BookDetailsScreen = () => {
               <Ionicons name="share-outline" size={24} color="black" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/cart')}>
-              <CartIconWithBadge count={cartCount} animated={cartJustAdded} />
+              <View style={{ alignItems: 'center', height: 40, justifyContent: 'center' }}>
+                <CartIconWithBadge count={cartCount} animated={cartJustAdded} />
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -459,77 +532,148 @@ const BookDetailsScreen = () => {
             </View>
           </View>
         )}
-
-        <View style={styles.infoCard}>
-          <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>Tác giả: {book.author}</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Trang</Text>
-              <Text style={styles.statValue}>316</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Ngôn ngữ</Text>
-              <Text style={styles.statValue}>{book.language}</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Đánh giá</Text>
-              <Text style={styles.statValue}>5.0</Text>
+  {/* Title, price, discount badge ra ngoài, ngay dưới hình ảnh */}
+  <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'flex-start' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#222', marginBottom: 6, textAlign: 'left' }}>{book.title}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#E53935', marginRight: 10 }}>{formatVND(book.price)}</Text>
+            <View style={{ backgroundColor: '#E53935', borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 0 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>-{getDiscountPercent(book._id)}%</Text>
             </View>
           </View>
         </View>
-
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>{formatVND(book.price)}</Text>
-          <Text style={styles.oldPrice}>{formatVND(book.price * 1.2)}</Text>
-        </View>
-
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.sectionTitle}>Mô tả</Text>
-          <RenderHTML
-            contentWidth={contentWidth}
-            source={{ html: truncatedHtml }}
-            tagsStyles={tagsStyles}
-          />
-          <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-            <Text style={styles.readMore}>{isExpanded ? 'Thu gọn' : 'Đọc thêm'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })}>
-            <Text style={styles.readMore}>Xem thông tin chi tiết</Text>
-          </TouchableOpacity>
+        {/* Gộp mô tả và thông tin sản phẩm */}
+        <View style={styles.infoSectionBox}>
+ 
+          <View style={styles.detailTable}>
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>Thể loại:</Text><Text style={styles.detailValue}>{book.categories && book.categories.length > 0 ? book.categories.map((c: any) => c.name).join(', ') : '-'}</Text></View>
+            <View style={styles.separator} />
+            {(book as any).supplier && <><View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà cung cấp:</Text><Text style={styles.detailValue}>{(book as any).supplier}</Text></View><View style={styles.separator} /></>}
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà xuất bản:</Text><Text style={styles.detailValue}>{book.publisher || '-'}</Text></View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngày xuất bản:</Text><Text style={styles.detailValue}>{book.publication_date || '-'}</Text></View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngôn ngữ:</Text><Text style={styles.detailValue}>{book.language || '-'}</Text></View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>Tồn kho:</Text><Text style={styles.detailValue}>{book.stock}</Text></View>
+          </View>
+          {/* Mô tả: chỉ show 6 dòng đầu, không ghi tiêu đề, cuối dòng 6 có nút xem thêm, căn giữa nút */}
+          <View style={{ minHeight: 120 }}>
+            {(() => {
+              const plainText = book.description?.replace(/<[^>]+>/g, '') || '';
+              const lines = plainText.split(/\r?\n/).filter(Boolean);
+              const preview = lines.slice(0, 6).join('\n');
+              const isLong = lines.length > 6;
+              return <>
+                <Text style={{ fontSize: 15, color: '#333', lineHeight: 22, textAlign: 'justify' }}>{preview}{isLong ? '...' : ''}</Text>
+                {isLong && (
+                  <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}>
+                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>Xem thêm</Text>
+                  </TouchableOpacity>
+                )}
+              </>;
+            })()}
+          </View>
         </View>
 
         <View style={styles.authorContainer}>
           <Text style={styles.sectionTitle}>Tác giả</Text>
           <View style={styles.authorInfo}>
-            <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} />
+            {/* Xóa avatar tác giả */}
+            {/* <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} /> */}
             <View>
               <Text style={styles.authorName}>{book.author}</Text>
-              <Text style={styles.authorSubtitle}>Tác giả</Text>
             </View>
-            <TouchableOpacity style={styles.profileButton}>
+            {/* <TouchableOpacity style={styles.profileButton}>
               <Text style={styles.profileButtonText}>Xem hồ sơ</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 10 }} />
+        {/* Sách liên quan */}
+        {relatedBooks.length > 0 && (
+          <View style={styles.relatedSection}>
+            <Text style={styles.relatedTitle}>Sách liên quan</Text>
+            <FlatList
+              data={relatedBooks}
+              renderItem={({ item }) => <BookCard book={item} />}
+              keyExtractor={item => item._id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+              style={{ marginTop: 10 }}
+            />
+          </View>
+        )}
       </ScrollView>
-      <Animated.View style={[
-        styles.footer,
-        {
-          paddingBottom: insets.bottom || 10,
-          transform: [{ translateY: footerAnim }],
-          zIndex: showLoginAlert ? -1 : 1, // Đảm bảo footer không bị block khi alert hiện
-        }
-      ]}>
-        <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart} disabled={addingCart || showLoginAlert || outOfStock}>
-          <Ionicons name={cartSuccess ? 'checkmark-done' : 'cart-outline'} size={24} color={cartSuccess ? '#4CAF50' : '#5E5CE6'} />
+      <Animated.View
+        style={[
+          styles.footer,
+          {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: insets.bottom,
+            transform: [{ translateY: footerAnim }],
+            zIndex: 2,
+          },
+        ]}
+      >
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <View style={styles.qtyGroup}>
+            <TouchableOpacity
+              style={[styles.qtyBtn, quantity === 1 && { opacity: 0.5 }]}
+              onPress={handleDecrease}
+              onPressIn={() => startHold('dec')}
+              onPressOut={stopHold}
+              disabled={quantity === 1}
+            >
+              <Text style={{ color: '#bbb', fontSize: 22, fontWeight: 'bold' }}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.qtyText}>{quantity}</Text>
+            <TouchableOpacity
+              style={styles.qtyBtn}
+              onPress={handleIncrease}
+              onPressIn={() => startHold('inc')}
+              onPressOut={stopHold}
+            >
+              <Text style={{ color: '#bbb', fontSize: 22, fontWeight: 'bold' }}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', height: '100%' }}
+          onPress={handleAddToCart}
+          disabled={addingCart || showLoginAlert || outOfStock}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
+            Thêm vào{"\n"}giỏ hàng
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow} disabled={showLoginAlert || outOfStock}>
-          <Text style={styles.buyButtonText}>Mua ngay</Text>
+        <TouchableOpacity
+          style={{ width: 130, backgroundColor: '#1890FF', justifyContent: 'center', alignItems: 'center', height: '100%' }}
+          onPress={handleBuyNow}
+          disabled={showLoginAlert || outOfStock}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Mua ngay</Text>
         </TouchableOpacity>
       </Animated.View>
+      {insets.bottom > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: insets.bottom,
+            backgroundColor: '#FFFFFF',
+            zIndex: 1,
+          }}
+        />
+      )}
       {toast.visible && (
         <View style={{ position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center', zIndex: 100 }}>
           <View style={{ backgroundColor: '#5E5CE6', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 }}>
@@ -583,7 +727,32 @@ const BookDetailsScreen = () => {
           />
         </View>
       </Modal>
-    </View>
+
+      {/* Modal nhập số lượng */}
+      <Modal visible={showQtyModal} transparent animationType="fade" onRequestClose={() => setShowQtyModal(false)}>
+        <View style={styles.qtyModalOverlay}>
+          <View style={styles.qtyModalBox}>
+            <Text style={styles.qtyModalTitle}>Nhập số lượng</Text>
+            <TextInput
+              ref={inputQtyRef}
+              style={styles.qtyModalInput}
+              keyboardType="number-pad"
+              value={inputQty}
+              onChangeText={setInputQty}
+              maxLength={3}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleQtyConfirm}
+            />
+            {qtyError ? <Text style={styles.qtyModalError}>{qtyError}</Text> : null}
+            <View style={{ flexDirection: 'row', marginTop: 16, gap: 12 }}>
+              <TouchableOpacity style={styles.qtyModalBtn} onPress={() => setShowQtyModal(false)}><Text style={styles.qtyModalBtnText}>Hủy</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.qtyModalBtn, { backgroundColor: '#5E5CE6' }]} onPress={handleQtyConfirm}><Text style={[styles.qtyModalBtnText, { color: '#fff' }]}>Xác nhận</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
@@ -739,37 +908,70 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
-    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderColor: '#eee',
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
+    height: 68,
+    paddingHorizontal: 0,
+    borderRadius: 0,
+    gap: 0,
+    paddingTop: 0,
   },
-  cartButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  qtyGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E8E8FF',
+    borderColor: '#e0e0e0',
+    minWidth: 120,
+    justifyContent: 'center',
+    height: 40,
+    marginLeft: 8, // nhỏ lại cho cân đối
+    marginRight: 8,
+  },
+  qtyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#f7f7f7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginHorizontal: 2,
   },
-  buyButton: {
-    backgroundColor: '#5E5CE6',
-    paddingVertical: 18,
-    borderRadius: 30,
-    flex: 1,
-  },
-  buyButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  qtyText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center'
+    color: '#222',
+    marginHorizontal: 8,
   },
-
+  cartBtnBlack: {
+    backgroundColor: '#222',
+    borderRadius: 8,
+    paddingVertical: 16,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  buyBtnPurple: {
+    backgroundColor: '#5E5CE6',
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   imageCounter: {
     position: 'absolute',
     top: 10,
@@ -840,6 +1042,152 @@ const styles = StyleSheet.create({
   debugText: {
     color: '#fff',
     fontSize: 12,
+  },
+  fadeOut: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 40,
+    zIndex: 2,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  relatedSection: {
+    marginTop: 10,
+    marginBottom: 30,
+    paddingHorizontal: 0,
+  },
+  relatedTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  infoSectionBox: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: '#F3F4F8',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+  },
+  infoTable: {
+    width: '100%',
+    marginBottom: 10,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  descTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  descText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    textAlign: 'justify',
+  },
+  qtyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'flex-end',
+  },
+  qtyModalBox: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    minHeight: 220,
+  },
+  qtyModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  qtyModalInput: {
+    borderWidth: 1,
+    borderColor: '#5E5CE6',
+    borderRadius: 10,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#222',
+    padding: 12,
+    width: 120,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  qtyModalError: {
+    color: '#E53935',
+    marginTop: 4,
+  },
+  qtyModalBtn: {
+    backgroundColor: '#f2f2f2',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+  },
+  qtyModalBtnText: {
+    fontWeight: 'bold',
+    fontSize: 15,
+    color: '#222',
+  },
+  detailTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#222',
+    textAlign: 'center',
+  },
+  detailPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E53935',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  detailTable: {
+    width: '100%',
+    marginBottom: 10,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  separator: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginVertical: 0,
+  },
+  cartBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Device from 'expo-device';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import { storageHelper } from '../config/storage';
 import { authService } from '../services/authService';
-import { listenFcmTokenRefresh, removeFcmToken, syncFcmToken } from '../services/fcmService';
+import { createOrUpdateSession, listenFcmTokenRefresh, removeFcmToken, syncFcmToken, updateSessionFcmToken } from '../services/fcmService';
 import { AuthResponse, User } from '../types/auth';
 
 interface AuthContextType {
@@ -69,9 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Đồng bộ FCM token khi app khởi động nếu đã đăng nhập
   useEffect(() => {
     if (user && user._id && token) {
-      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-      syncFcmToken(user._id, deviceId, token);
-      listenFcmTokenRefresh(user._id, deviceId);
+      (async () => {
+        const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+        syncFcmToken(user._id, deviceId, token);
+        listenFcmTokenRefresh(user._id, deviceId);
+      })();
     }
   }, [user, token]);
 
@@ -125,10 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         
-        // Đồng bộ FCM token khi load lại user
-        const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-        syncFcmToken(parsedUser._id, deviceId, storedToken);
-        listenFcmTokenRefresh(parsedUser._id, deviceId);
+        // Đồng bộ FCM token khi load lại user (chỉ khi có token hợp lệ)
+        const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+        // Chỉ sync FCM token nếu có token hợp lệ
+        if (storedToken) {
+          syncFcmToken(parsedUser._id, deviceId, storedToken);
+          listenFcmTokenRefresh(parsedUser._id, deviceId);
+        }
 
         // Validate token in background without blocking UI
         setTimeout(async () => {
@@ -163,14 +168,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Lưu token vào AsyncStorage
       await AsyncStorage.setItem('token', userData.token);
       setToken(userData.token);
-      // Lấy lại user từ API theo token
-      const userRes = await authService.getMe(userData.token);
-      setUser(userRes.user || userRes);
-      await AsyncStorage.setItem('user', JSON.stringify(userRes.user || userRes));
-      // Đồng bộ FCM token khi login
-      const deviceId = Device.osBuildId || Device.modelId || Device.deviceName || 'unknown';
-      syncFcmToken((userRes.user || userRes)._id, deviceId, userData.token);
-      listenFcmTokenRefresh((userRes.user || userRes)._id, deviceId);
+
+      setUser(userData.user);
+      // --- Đồng bộ session và FCM ---
+      const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+      const loginTime = new Date().toISOString();
+      const deviceInfo = { platform: Platform.OS, version: Platform.Version };
+      await createOrUpdateSession(userData.user._id, deviceId, loginTime, deviceInfo, userData.token);
+      // Lấy FCM token và update vào session
+      const fcmToken = await syncFcmToken(userData.user._id, deviceId, userData.token); // syncFcmToken trả về token
+      if (fcmToken) {
+        await updateSessionFcmToken(userData.user._id, deviceId, fcmToken, userData.token);
+      }
+      listenFcmTokenRefresh(userData.user._id, deviceId);
       Alert.alert('Thành công', 'Đăng nhập thành công!');
     } catch (error) {
       console.error('Error saving auth:', error);

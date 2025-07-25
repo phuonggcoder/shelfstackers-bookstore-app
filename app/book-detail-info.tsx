@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -153,6 +153,49 @@ const styles = StyleSheet.create({
   value: {
     color: '#222',
     fontSize: 15,
+  },
+  detailSection: {
+    margin: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  detailTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#222',
+    textAlign: 'center',
+  },
+  detailPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E53935',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  detailTable: {
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: 15,
+    color: '#666',
+    minWidth: 100,
+  },
+  detailValue: {
+    fontSize: 15,
+    color: '#222',
+    flex: 1,
+    textAlign: 'right',
   },
 });
 

@@ -1,17 +1,20 @@
 import { getMessaging, getToken } from '@react-native-firebase/messaging';
 import { useEffect } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
-import { syncFcmToken } from '../services/fcmService';
+import { storageHelper } from '../config/storage';
 
 export const usePushNotification = () => {
     const handleToken = async (newToken: string) => {
        console.log('✅ New FCM Token:', newToken);
-       // Gửi token lên server ngay khi có
+       // Chỉ sync FCM token khi có user đăng nhập
+       // Token sẽ được sync trong AuthContext khi user login
        try {
-         const deviceId = Platform.OS + '_' + Date.now();
-         await syncFcmToken('temp_user', deviceId); // Sẽ được update khi user login
+         const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+         // Không gọi syncFcmToken ở đây vì chưa có user login
+         // syncFcmToken sẽ được gọi trong AuthContext khi user đăng nhập
+         console.log('FCM token ready for sync when user logs in');
        } catch (error) {
-         console.error('❌ Error syncing FCM token:', error);
+         console.error('❌ Error handling FCM token:', error);
        }
     };
 

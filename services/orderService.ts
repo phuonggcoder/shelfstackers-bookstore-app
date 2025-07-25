@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiUrl, getAuthHeaders } from '../config/api';
+import { storageHelper } from '../config/storage';
 
 // Order Management
 export const createOrder = async (token: string, orderData: {
@@ -10,7 +11,11 @@ export const createOrder = async (token: string, orderData: {
   quantity?: number;
 }) => {
   try {
-    const response = await axios.post(getApiUrl('/api/orders'), orderData, {
+    // Lấy device_id từ storage
+    const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+    const dataWithDevice = { ...orderData, created_device_id: deviceId };
+
+    const response = await axios.post(getApiUrl('/api/orders'), dataWithDevice, {
       headers: getAuthHeaders(token)
     });
     console.log('createOrder response:', response.data);
