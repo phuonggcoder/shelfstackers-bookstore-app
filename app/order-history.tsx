@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +12,7 @@ interface OrderItem {
   orderCode: string;
   status: string;
   totalAmount: number;
-  items: Array<{
+  items: {
     book: {
       _id: string;
       title: string;
@@ -21,7 +22,7 @@ interface OrderItem {
     };
     quantity: number;
     price: number;
-  }>;
+  }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -33,15 +34,16 @@ const OrderHistoryScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState('all');
+  const { t } = useTranslation();
 
   const tabs = [
-    { key: 'all', label: 'Tất cả' },
-    { key: 'pending', label: 'Chờ xác nhận' },
-    { key: 'confirmed', label: 'Chờ lấy hàng' },
-    { key: 'shipping', label: 'Chờ giao hàng' },
-    { key: 'delivered', label: 'Đã giao' },
-    { key: 'cancelled', label: 'Đã huỷ' },
-    { key: 'completed', label: 'Hoàn thành' },
+    { key: 'all', label: t('all') },
+    { key: 'pending', label: t('pending') },
+    { key: 'confirmed', label: t('confirmed') },
+    { key: 'shipping', label: t('shipping') },
+    { key: 'delivered', label: t('delivered') },
+    { key: 'cancelled', label: t('cancelled') },
+    { key: 'completed', label: t('completed') },
   ];
 
   useEffect(() => {
@@ -106,13 +108,13 @@ const OrderHistoryScreen = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
-      case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
-      default: return 'Không xác định';
+      case 'pending': return t('pending');
+      case 'confirmed': return t('confirmed');
+      case 'shipping': return t('shipping');
+      case 'delivered': return t('delivered');
+      case 'cancelled': return t('cancelled');
+      case 'completed': return t('completed');
+      default: return t('unknown');
     }
   };
 
@@ -179,7 +181,7 @@ const OrderHistoryScreen = () => {
       >
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderCode}>Mã đơn: {item.orderCode}</Text>
+            <Text style={styles.orderCode}>{t('order code')}: {item.orderCode}</Text>
             <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -212,14 +214,14 @@ const OrderHistoryScreen = () => {
         <View style={styles.orderFooter}>
           <View style={styles.totalInfo}>
             <Text style={styles.totalLabel}>
-              Tổng số tiền ({item.items.length} sản phẩm):
+              {t('total amount', { count: item.items.length })}
             </Text>
             <Text style={styles.totalAmount}>
               {formatPrice(item.totalAmount)}
             </Text>
           </View>
           <TouchableOpacity style={styles.detailButton}>
-            <Text style={styles.detailButtonText}>Chi tiết</Text>
+            <Text style={styles.detailButtonText}>{t('detail')}</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -233,12 +235,12 @@ const OrderHistoryScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+          <Text style={styles.headerTitle}>{t('my orders')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+          <Text style={styles.loadingText}>{t('loading orders')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -250,7 +252,7 @@ const OrderHistoryScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+        <Text style={styles.headerTitle}>{t('my orders')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -281,11 +283,11 @@ const OrderHistoryScreen = () => {
       {filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
+          <Text style={styles.emptyTitle}>{t('no orders')}</Text>
           <Text style={styles.emptyText}>
             {selectedTab === 'all' 
-              ? 'Bạn chưa có đơn hàng nào'
-              : `Chưa có đơn hàng ${getStatusText(selectedTab).toLowerCase()}`
+              ? t('you have no orders')
+              : t('no orders status', { status: getStatusText(selectedTab).toLowerCase() })
             }
           </Text>
         </View>

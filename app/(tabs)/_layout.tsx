@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions } from 'react-native';
 import { DataProvider } from '../../context/DataContext';
 
 const { width } = Dimensions.get('window');
 
 const TabsLayout = () => {
+  const { t } = useTranslation();
   const slideAnim = React.useRef(new Animated.Value(0)).current;
 
   const slideToTab = (direction: 'left' | 'right') => {
@@ -89,31 +91,31 @@ const TabsLayout = () => {
         <Tabs.Screen 
           name="index" 
           options={{ 
-            title: 'Trang chủ'
+            title: t('home')
           }} 
         />
         <Tabs.Screen 
           name="search" 
           options={{ 
-            title: 'Tìm kiếm'
+            title: t('search')
           }} 
         />
         <Tabs.Screen 
           name="categories" 
           options={{ 
-            title: 'Danh mục'
+            title: t('categories')
           }} 
         />
         <Tabs.Screen 
           name="favourite" 
           options={{ 
-            title: 'Yêu thích'
+            title: t('favourite')
           }} 
         />
         <Tabs.Screen 
           name="profile" 
           options={{ 
-            title: 'Cá nhân'
+            title: t('profile')
           }} 
         />
       </Tabs>

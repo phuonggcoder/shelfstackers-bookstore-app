@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -15,9 +16,12 @@ interface HeaderProps {
 const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps) => {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const [, setLang] = React.useState(i18n.language);
+  React.useEffect(() => { setLang(i18n.language); }, [i18n.language]);
   const fullName = user?.full_name;
   const isLoggedIn = !!user;
-  const displayName = (isLoggedIn && fullName) ? fullName : 'bạn';
+  const displayName = (isLoggedIn && fullName) ? fullName : t('you');
   const { cartCount, cartJustAdded } = useCart();
 
   return (
@@ -37,11 +41,12 @@ const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps
           ) : (
             <>
               <Text style={styles.greeting}>
-                {`Chào mừng ${displayName}\n Đến với ShelfStackers 👋`}
-                
+                {t('welcome', { name: displayName })}
               </Text>
-              <Text style={styles.title}>Hôm nay bạn muốn đọc sách gì?</Text>
-
+              <Text style={styles.greeting}>
+                {t('welcome to app', { app: 'ShelfStackers' })} 👋
+              </Text>
+              <Text style={styles.title}>{t('today you want to read')}</Text>
             </>
           )}
         </View>

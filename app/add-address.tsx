@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -20,6 +21,7 @@ import { createAddress, LocationItem } from '../services/addressService';
 const AddAddress = () => {
   const router = useRouter();
   const { token } = useAuth();
+  const { t } = useTranslation();
   const [isDefault, setIsDefault] = useState(true);
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
@@ -50,27 +52,27 @@ const AddAddress = () => {
 
   const handleSubmit = async () => {
     if (!token) {
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm địa chỉ');
+      Alert.alert(t('error'), t('pleaseLoginToAddAddress'));
       return;
     }
 
     if (!receiverName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập họ và tên');
+      Alert.alert(t('error'), t('pleaseEnterFullName'));
       return;
     }
 
     if (!phoneNumber.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
       return;
     }
 
     if (!province || !district || !ward) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ địa chỉ');
+      Alert.alert(t('error'), t('pleaseSelectFullAddress'));
       return;
     }
 
     if (!addressDetail.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      Alert.alert(t('error'), t('pleaseEnterAddressDetail'));
       return;
     }
 
@@ -97,9 +99,9 @@ const AddAddress = () => {
       // Set flag to show success alert in address list
       await AsyncStorage.setItem('address_added', 'true');
       
-      Alert.alert('Thành công', 'Địa chỉ đã được thêm thành công', [
+      Alert.alert(t('success'), t('addressAddedSuccessfully'), [
         {
-          text: 'OK',
+          text: t('ok'),
           onPress: () => {
             // Go back to address list instead of order review
             router.back();
@@ -108,7 +110,7 @@ const AddAddress = () => {
       ]);
     } catch (error) {
       console.error('Create address failed:', error);
-      Alert.alert('Lỗi', 'Không thể thêm địa chỉ. Vui lòng thử lại.');
+      Alert.alert(t('error'), t('cannotAddAddress'));
     } finally {
       setLoading(false);
     }
@@ -130,9 +132,9 @@ const AddAddress = () => {
     >
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Quay lại</Text>
+          <Text style={styles.backText}>{t('backArrow')} {t('goBack')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Địa chỉ mới</Text>
+        <Text style={styles.headerTitle}>{t('newAddress')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -141,17 +143,17 @@ const AddAddress = () => {
         contentContainerStyle={styles.formContainer}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
+        <Text style={styles.sectionTitle}>{t('receiverInfo')}</Text>
 
         <View style={styles.inputGroup}>
           <TextInput
-            placeholder="Họ và tên"
+            placeholder={t('fullName')}
             style={styles.input}
             value={receiverName}
             onChangeText={setReceiverName}
           />
           <TextInput
-            placeholder="Số điện thoại"
+            placeholder={t('phoneNumber')}
             keyboardType="phone-pad"
             style={styles.input}
             value={phoneNumber}
@@ -159,20 +161,20 @@ const AddAddress = () => {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Địa chỉ</Text>
+        <Text style={styles.sectionTitle}>{t('address')}</Text>
 
         <View style={styles.inputGroup}>
           <AutocompleteInput
-            label="Tỉnh/Thành phố"
-            placeholder="Chọn Tỉnh/Thành phố"
+            label={t('province')}
+            placeholder={t('chooseProvince')}
             value={province}
             onSelect={setProvince}
             level="province"
           />
           
           <AutocompleteInput
-            label="Quận/Huyện"
-            placeholder="Chọn Quận/Huyện"
+            label={t('district')}
+            placeholder={t('chooseDistrict')}
             value={district}
             onSelect={setDistrict}
             level="district"
@@ -181,8 +183,8 @@ const AddAddress = () => {
           />
           
           <AutocompleteInput
-            label="Phường/Xã"
-            placeholder="Chọn Phường/Xã"
+            label={t('ward')}
+            placeholder={t('chooseWard')}
             value={ward}
             onSelect={setWard}
             level="ward"
@@ -191,7 +193,7 @@ const AddAddress = () => {
           />
           
           <TextInput
-            placeholder="Tên đường, Tòa nhà, Số nhà..."
+            placeholder={t('streetBuilding')}
             style={styles.input}
             value={addressDetail}
             onChangeText={setAddressDetail}
@@ -201,13 +203,13 @@ const AddAddress = () => {
 
         {formatAddress() && (
           <View style={styles.addressPreview}>
-            <Text style={styles.previewTitle}>Địa chỉ đã chọn:</Text>
+            <Text style={styles.previewTitle}>{t('selectedAddress')}:</Text>
             <Text style={styles.previewText}>{formatAddress()}</Text>
           </View>
         )}
 
         <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>Đặt làm địa chỉ mặc định</Text>
+          <Text style={styles.switchLabel}>{t('setAsDefaultAddress')}</Text>
           <Switch
             value={isDefault}
             onValueChange={setIsDefault}
@@ -217,14 +219,14 @@ const AddAddress = () => {
         </View>
 
         <View style={styles.typeContainer}>
-          <Text style={styles.switchLabel}>Loại địa chỉ</Text>
+          <Text style={styles.switchLabel}>{t('addressType')}</Text>
           <View style={styles.typeButtons}>
             <TouchableOpacity
               style={[styles.typeButton, addressType === 'office' && styles.typeButtonActive]}
               onPress={() => setAddressType('office')}
             >
               <Text style={[styles.typeText, addressType === 'office' && styles.typeTextActive]}>
-                Văn phòng
+                {t('office')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -232,7 +234,7 @@ const AddAddress = () => {
               onPress={() => setAddressType('home')}
             >
               <Text style={[styles.typeText, addressType === 'home' && styles.typeTextActive]}>
-                Nhà riêng
+                {t('homeType')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -246,7 +248,7 @@ const AddAddress = () => {
           disabled={loading}
         >
           <Text style={styles.submitText}>
-            {loading ? 'Đang thêm...' : 'Hoàn thành'}
+            {loading ? t('adding') : t('complete')}
           </Text>
         </TouchableOpacity>
       </View>

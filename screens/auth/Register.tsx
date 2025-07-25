@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const Register = () => {
+  const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,23 +27,23 @@ const Register = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
+      <Text style={styles.title}>{t('createAccount')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Username"
+        placeholder={t('username')}
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
-        placeholder="Full Name"
+        placeholder={t('fullName')}
         value={fullName}
         onChangeText={setFullName}
       />
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('email')}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -49,23 +51,23 @@ const Register = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('password')}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
       <TextInput
         style={styles.input}
-        placeholder="Confirm Password"
+        placeholder={t('confirmPassword')}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
       />
       <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Register</Text>
+        <Text style={styles.buttonText}>{t('register')}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => router.push('/login')}>
-        <Text style={styles.link}>Already have an account? Login</Text>
+        <Text style={styles.link}>{t('loginLink')}</Text>
       </TouchableOpacity>
     </View>
   );

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
 
 const BookDetailsScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -143,7 +145,7 @@ const BookDetailsScreen = () => {
   if (!book) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Đang tải...</Text>
+        <Text>{t('loading')}</Text>
       </View>
     );
   }
@@ -189,7 +191,7 @@ const BookDetailsScreen = () => {
   const FallbackImage = () => (
     <View style={[styles.sliderImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
       <Ionicons name="image-outline" size={60} color="#ccc" />
-      <Text style={{ color: '#ccc', marginTop: 10 }}>Không có hình ảnh</Text>
+      <Text style={{ color: '#ccc', marginTop: 10 }}>{t('no image')}</Text>
     </View>
   );
 
@@ -212,17 +214,17 @@ const BookDetailsScreen = () => {
       return;
     }
     if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
+      showToast(t('add to wishlist'));
       return;
     }
     try {
       const res = await addToWishlist(token, bookId as string);
       console.log('Add to wishlist response:', res);
       setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      showToast(t('add to wishlist'));
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      showToast(t('cannot add to wishlist'));
     }
   };
 
@@ -299,7 +301,7 @@ const BookDetailsScreen = () => {
       {/* BottomAlert nằm trên overlay */}
       <BottomAlert
         visible={showLoginAlert}
-        title="Bạn chưa đăng nhập"
+        title={t('login required')}
         onHide={() => setShowLoginAlert(false)}
       />
       <Stack.Screen
@@ -462,53 +464,53 @@ const BookDetailsScreen = () => {
 
         <View style={styles.infoCard}>
           <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>Tác giả: {book.author}</Text>
+          <Text style={styles.author}>{t('author')}: {book.author}</Text>
           <View style={styles.statsContainer}>
             <View style={styles.stat}>
-              <Text style={styles.statLabel}>Trang</Text>
+              <Text style={styles.statLabel}>{t('page')}</Text>
               <Text style={styles.statValue}>316</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statLabel}>Ngôn ngữ</Text>
+              <Text style={styles.statLabel}>{t('language')}</Text>
               <Text style={styles.statValue}>{book.language}</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statLabel}>Đánh giá</Text>
+              <Text style={styles.statLabel}>{t('rating')}</Text>
               <Text style={styles.statValue}>5.0</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>{formatVND(book.price)}</Text>
-          <Text style={styles.oldPrice}>{formatVND(book.price * 1.2)}</Text>
+          <Text style={styles.price}>{t('price')}: {formatVND(book.price)}</Text>
+          <Text style={styles.oldPrice}>{t('old price')}: {formatVND(book.price * 1.2)}</Text>
         </View>
 
         <View style={styles.descriptionContainer}>
-          <Text style={styles.sectionTitle}>Mô tả</Text>
+          <Text style={styles.sectionTitle}>{t('description')}</Text>
           <RenderHTML
             contentWidth={contentWidth}
             source={{ html: truncatedHtml }}
             tagsStyles={tagsStyles}
           />
           <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-            <Text style={styles.readMore}>{isExpanded ? 'Thu gọn' : 'Đọc thêm'}</Text>
+            <Text style={styles.readMore}>{isExpanded ? t('read less') : t('read more')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })}>
-            <Text style={styles.readMore}>Xem thông tin chi tiết</Text>
+            <Text style={styles.readMore}>{t('view detail info')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.authorContainer}>
-          <Text style={styles.sectionTitle}>Tác giả</Text>
+          <Text style={styles.sectionTitle}>{t('author')}</Text>
           <View style={styles.authorInfo}>
             <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} />
             <View>
               <Text style={styles.authorName}>{book.author}</Text>
-              <Text style={styles.authorSubtitle}>Tác giả</Text>
+              <Text style={styles.authorSubtitle}>{t('author')}</Text>
             </View>
             <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileButtonText}>Xem hồ sơ</Text>
+              <Text style={styles.profileButtonText}>{t('view profile')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -527,7 +529,7 @@ const BookDetailsScreen = () => {
           <Ionicons name={cartSuccess ? 'checkmark-done' : 'cart-outline'} size={24} color={cartSuccess ? '#4CAF50' : '#5E5CE6'} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow} disabled={showLoginAlert || outOfStock}>
-          <Text style={styles.buyButtonText}>Mua ngay</Text>
+          <Text style={styles.buyButtonText}>{t('buy now')}</Text>
         </TouchableOpacity>
       </Animated.View>
       {toast.visible && (

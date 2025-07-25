@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { getOrderDetail } from '../services/orderService';
 import { formatVND } from '../utils/format';
 
 export default function OrderSuccessScreen() {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
@@ -46,7 +48,7 @@ export default function OrderSuccessScreen() {
   }, [token, orderId]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
-  if (!order) return <Text>Không tìm thấy đơn hàng.</Text>;
+  if (!order) return <Text>{t('not found')}</Text>;
 
   // Lấy thông tin payment nếu có - Safe access với fallback
   const payment = order.payment_id || order.payment || {};
@@ -95,7 +97,7 @@ export default function OrderSuccessScreen() {
         {/* QR code lớn ở trên cùng nếu có order_url */}
         {qrValue && (
           <View style={styles.qrBoxTop}>
-            <Text style={styles.qrTitle}>Quét QR để thanh toán</Text>
+            <Text style={styles.qrTitle}>{t('scan qr to pay')}</Text>
             <View style={{ alignItems: 'center', position: 'relative' }}>
               <QRCode value={qrValue} size={220} getRef={c => (qrRef.current = c)} />
               <View style={styles.qrActionRow}>
@@ -112,27 +114,27 @@ export default function OrderSuccessScreen() {
         {/* Logo và tên shop */}
         <View style={styles.logoRow}>
           <Image source={require('../assets/images/app.png')} style={styles.shopLogo} />
-          <Text style={styles.shopName}>Bookstore</Text>
+          <Text style={styles.shopName}>{t('shop name')}</Text>
         </View>
         {/* Thông tin đơn hàng */}
         <View style={styles.infoBox}>
-          <Text style={styles.infoLabel}>Giá trị đơn hàng</Text>
+          <Text style={styles.infoLabel}>{t('order value')}</Text>
           <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
-          <Text style={styles.infoLabel}>Số tiền thanh toán</Text>
+          <Text style={styles.infoLabel}>{t('payment amount')}</Text>
           <Text style={styles.infoValue}>{formatVND(paymentAmount)}</Text>
           {transactionId && <>
-            <Text style={styles.infoLabel}>Mã giao dịch</Text>
+            <Text style={styles.infoLabel}>{t('transaction id')}</Text>
             <Text style={styles.infoValue}>{transactionId}</Text>
           </>}
-          <Text style={styles.infoLabel}>Mã đơn hàng</Text>
+          <Text style={styles.infoLabel}>{t('order id')}</Text>
           <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
           {paymentNotes && <>
-            <Text style={styles.infoLabel}>Nội dung</Text>
+            <Text style={styles.infoLabel}>{t('notes')}</Text>
             <Text style={styles.infoValue}>{paymentNotes}</Text>
           </>}
           {expireTime && <>
-            <Text style={styles.infoLabel}>Giao dịch kết thúc lúc</Text>
-            <Text style={[styles.infoValue, isExpired && {color:'#4A90E2'}]}>{expireTime} {isExpired ? '(Đã hết hạn)' : ''}</Text>
+            <Text style={styles.infoLabel}>{t('transaction ends at')}</Text>
+            <Text style={[styles.infoValue, isExpired && {color:'#4A90E2'}]}>{expireTime} {isExpired ? `(${t('expired')})` : ''}</Text>
           </>}
         </View>
         {/* Nút chuyển sang web/app thanh toán (order_url) */}
@@ -141,22 +143,22 @@ export default function OrderSuccessScreen() {
             style={styles.payButton}
             onPress={() => router.push({ pathname: '/zalo-pay', params: { orderId: order.order_id || order._id } })}
           >
-            <Text style={styles.payButtonText}>Thanh toán qua ZaloPay</Text>
+            <Text style={styles.payButtonText}>{t('pay with zalo pay')}</Text>
           </TouchableOpacity>
         )}
         {/* Trạng thái thanh toán */}
         <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>Trạng thái thanh toán</Text>
+          <Text style={styles.statusTitle}>{t('payment status')}</Text>
           <Text style={[styles.statusValue, {color: paymentStatus === 'Completed' ? '#4CAF50' : '#FFA500'}]}>
-            {paymentStatus === 'Completed' ? 'Đã thanh toán' : (isExpired ? 'Hết hạn' : (paymentStatus || 'Đang xử lý'))}
+            {paymentStatus === 'Completed' ? t('paid') : (isExpired ? t('expired') : (paymentStatus ? t(paymentStatus.toLowerCase()) : t('processing')))}
           </Text>
         </View>
         {/* Nút điều hướng */}
         <TouchableOpacity style={styles.button} onPress={() => router.replace('/order-history')}>
-          <Text style={styles.buttonText}>Xem lịch sử đơn hàng</Text>
+          <Text style={styles.buttonText}>{t('view order history')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
-          <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
+          <Text style={styles.buttonOutlineText}>{t('back to home')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -39,11 +40,11 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
-  orderHistory: Array<{
+  orderHistory: {
     status: string;
     timestamp: string;
     description: string;
-  }>;
+  }[];
 }
 
 const OrderDetailScreen = () => {
@@ -52,6 +53,7 @@ const OrderDetailScreen = () => {
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadOrderDetail();
@@ -108,7 +110,7 @@ const OrderDetailScreen = () => {
       });
     } catch (error) {
       console.error('Error loading order detail:', error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng');
+      Alert.alert(t('error'), t('cannot load order'));
     } finally {
       setLoading(false);
     }
@@ -205,12 +207,12 @@ const OrderDetailScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+          <Text style={styles.headerTitle}>{t('order detail')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải thông tin...</Text>
+          <Text style={styles.loadingText}>{t('loading info')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -223,12 +225,12 @@ const OrderDetailScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+          <Text style={styles.headerTitle}>{t('order detail')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#4A90E2" />
-          <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+          <Text style={styles.errorText}>{t('not found')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -240,7 +242,7 @@ const OrderDetailScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+        <Text style={styles.headerTitle}>{t('order detail')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -254,7 +256,7 @@ const OrderDetailScreen = () => {
             <View style={styles.statusInfo}>
               <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
               <Text style={styles.statusDescription}>
-                Đơn hàng của bạn đang được xử lý
+                {t('order status processing')}
               </Text>
             </View>
           </View>
@@ -262,20 +264,20 @@ const OrderDetailScreen = () => {
 
         {/* Order Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('order info')}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mã đơn hàng:</Text>
+            <Text style={styles.infoLabel}>{t('order code')}:</Text>
             <Text style={styles.infoValue}>{order.orderCode}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Ngày đặt:</Text>
+            <Text style={styles.infoLabel}>{t('order date')}:</Text>
             <Text style={styles.infoValue}>{formatDate(order.createdAt)}</Text>
           </View>
         </View>
 
         {/* Purchased Products */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
+          <Text style={styles.sectionTitle}>{t('purchased products')}</Text>
           {order.items.map((item, index) => (
             <View key={index} style={styles.productItem}>
               <View style={styles.productImageContainer}>
@@ -303,7 +305,7 @@ const OrderDetailScreen = () => {
 
         {/* Shipping Address */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+          <Text style={styles.sectionTitle}>{t('shipping address')}</Text>
           <View style={styles.addressContainer}>
             <Ionicons name="location-outline" size={20} color="#667eea" />
             <View style={styles.addressInfo}>
@@ -318,13 +320,13 @@ const OrderDetailScreen = () => {
 
         {/* Payment Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin thanh toán</Text>
+          <Text style={styles.sectionTitle}>{t('payment info')}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Phương thức:</Text>
+            <Text style={styles.infoLabel}>{t('method')}:</Text>
             <Text style={styles.infoValue}>{order.paymentMethod}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Trạng thái:</Text>
+            <Text style={styles.infoLabel}>{t('status')}:</Text>
             <Text style={[styles.infoValue, { color: getStatusColor(order.paymentStatus) }]}>
               {getPaymentStatusText(order.paymentStatus)}
             </Text>
@@ -333,26 +335,26 @@ const OrderDetailScreen = () => {
 
         {/* Order Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tóm tắt đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('order summary')}</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tạm tính</Text>
+            <Text style={styles.summaryLabel}>{t('subtotal')}</Text>
             <Text style={styles.summaryValue}>{formatPrice(order.subtotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+            <Text style={styles.summaryLabel}>{t('shipping fee')}</Text>
             <Text style={[styles.summaryValue, { color: '#667eea' }]}>
               {order.shippingFee === 0 ? 'Miễn phí' : formatPrice(order.shippingFee)}
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={styles.totalLabel}>{t('total')}</Text>
             <Text style={styles.totalValue}>{formatPrice(order.totalAmount)}</Text>
           </View>
         </View>
 
         {/* Order History */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lịch sử đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('order history')}</Text>
           {order.orderHistory.map((history, index) => (
             <View key={index} style={styles.historyItem}>
               <View style={[styles.historyIcon, { backgroundColor: getStatusColor(history.status) }]}>

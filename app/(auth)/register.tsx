@@ -2,21 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import AvoidKeyboardDummyView from '../../components/AvoidKeyboardDummyView';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
 export default function Register() {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -76,16 +78,16 @@ export default function Register() {
             style={styles.logo}
             contentFit="contain"
           />
-          <Text style={styles.title}>Đăng ký tài khoản</Text>
-          <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+          <Text style={styles.title}>{t('register title')}</Text>
+          <Text style={styles.subtitle}>{t('register subtitle')}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tên người dùng</Text>
+            <Text style={styles.label}>{t('username')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập tên người dùng"
+              placeholder={t('username placeholder')}
               value={username}
               onChangeText={setUsername}
               editable={!isLoading}
@@ -93,10 +95,10 @@ export default function Register() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('email')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập email"
+              placeholder={t('email placeholder')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -106,10 +108,10 @@ export default function Register() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Mật khẩu</Text>
+            <Text style={styles.label}>{t('password')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập mật khẩu"
+              placeholder={t('password placeholder')}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -128,10 +130,10 @@ export default function Register() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nhập lại mật khẩu</Text>
+            <Text style={styles.label}>{t('confirm password')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập lại mật khẩu"
+              placeholder={t('confirm password placeholder')}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
@@ -160,14 +162,14 @@ export default function Register() {
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.registerButtonText}>Đăng ký</Text>
+              <Text style={styles.registerButtonText}>{t('register')}</Text>
             )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Đã có tài khoản?</Text>
+            <Text style={styles.loginText}>{t('have account')}</Text>
             <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.loginLink}>Đăng nhập</Text>
+              <Text style={styles.loginLink}>{t('login')}</Text>
             </TouchableOpacity>
           </View>
         </View>

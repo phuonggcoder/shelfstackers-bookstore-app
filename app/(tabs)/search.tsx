@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getBooks, getCategories } from '../../services/api';
@@ -20,6 +21,7 @@ const CACHE_KEYS = {
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const SearchScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'books' | 'categories'>('books');
   const [searchQuery, setSearchQuery] = useState('');
@@ -275,7 +277,7 @@ const SearchScreen = () => {
           <Ionicons name="search" size={20} color="#7f8c8d" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm sách, tác giả, danh mục..."
+            placeholder={t('search placeholder')}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#7f8c8d"
@@ -301,7 +303,7 @@ const SearchScreen = () => {
           onPress={() => setActiveTab('books')}
         >
           <Text style={[styles.tabText, activeTab === 'books' && styles.tabTextActive]}>
-            Sách ({filteredBooks.length})
+            {t('books')} ({filteredBooks.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -309,7 +311,7 @@ const SearchScreen = () => {
           onPress={() => setActiveTab('categories')}
         >
           <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>
-            Danh mục ({filteredCategories.length})
+            {t('categories')} ({filteredCategories.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -318,7 +320,7 @@ const SearchScreen = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+          <Text style={styles.loadingText}>{t('loading data')}</Text>
         </View>
       ) : (
         <>
@@ -327,10 +329,10 @@ const SearchScreen = () => {
               <View style={styles.emptyContainer}>
                 <Ionicons name="search-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'Không tìm thấy sách phù hợp' : 'Chưa có sách nào'}
+                  {searchQuery ? t('no books found') : t('no books yet')}
                 </Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm sách bạn muốn'}
+                  {searchQuery ? t('try another keyword') : t('try searching for the book you want')}
                 </Text>
               </View>
             ) : (
@@ -353,10 +355,10 @@ const SearchScreen = () => {
               <View style={styles.emptyContainer}>
                 <Ionicons name="grid-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có danh mục nào'}
+                  {searchQuery ? t('no categories found') : t('no categories yet')}
                 </Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm danh mục bạn muốn'}
+                  {searchQuery ? t('try another keyword') : t('try searching for the category you want')}
                 </Text>
               </View>
             ) : (

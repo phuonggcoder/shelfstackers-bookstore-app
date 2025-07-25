@@ -1,4 +1,4 @@
-// src/components/LoadingSpinner.tsx
+  // src/components/LoadingSpinner.tsx
 import React from 'react';
 import ReactLoading from 'react-loading'; // Cần cài đặt: npm install react-loading
 

@@ -2,28 +2,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
-const WelcomeScreen = () => (
-  <View style={styles.welcomeContainer}>
-    <Ionicons name="person-circle-outline" size={100} color="#4A3780" />
-          <Text style={styles.welcomeTitle}>Chào mừng đến với ShelfStackers</Text>
-    <Text style={styles.welcomeText}>
-      Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
-    </Text>
-    <Link href="/login" asChild>
-      <TouchableOpacity style={styles.signInButton}>
-        <Text style={styles.signInButtonText}>Đăng nhập</Text>
-      </TouchableOpacity>
-    </Link>
-    <Link href="/register" asChild>
-      <TouchableOpacity style={styles.registerButton}>
-        <Text style={styles.registerButtonText}>Tạo tài khoản</Text>
-      </TouchableOpacity>
-    </Link>
-  </View>
-);
+
+const WelcomeScreen = () => {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.welcomeContainer}>
+      <Ionicons name="person-circle-outline" size={100} color="#4A3780" />
+      <Text style={styles.welcomeTitle}>{t('profile welcome title')}</Text>
+      <Text style={styles.welcomeText}>
+        {t('profile welcome text')}
+      </Text>
+      <Link href="/login" asChild>
+        <TouchableOpacity style={styles.signInButton}>
+          <Text style={styles.signInButtonText}>{t('profile sign in')}</Text>
+        </TouchableOpacity>
+      </Link>
+      <Link href="/register" asChild>
+        <TouchableOpacity style={styles.registerButton}>
+          <Text style={styles.registerButtonText}>{t('profile register')}</Text>
+        </TouchableOpacity>
+      </Link>
+    </View>
+  );
+};
 
 const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
   <TouchableOpacity style={styles.settingItem} onPress={onPress}>
@@ -36,6 +41,7 @@ const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; on
 );
 
 const SettingsScreen = () => {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -51,80 +57,84 @@ const SettingsScreen = () => {
           style={styles.avatar}
           contentFit="cover"
         />
-        <Text style={styles.name}>{user?.full_name || 'User Name'}</Text>
-        <Text style={styles.role}>Author</Text>
+        <Text style={styles.name}>{user?.full_name || t('user name')}</Text>
+        <Text style={styles.role}>{t(user?.roles?.[0] || 'role author')}</Text>
       </View>
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <Text style={styles.sectionTitle}>{t('personal info')}</Text>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => { }}>
+            <Ionicons name="person-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>
+              {t('profile info')}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>router.push('/vouchers')}>
-            <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Mã giảm giá</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => router.push('/vouchers')}>
+            <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('voucher')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/favourite')}>
-            <Ionicons name="heart-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Sách yêu thích</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => router.push('/favourite')}>
+            <Ionicons name="heart-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('favorite books')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/order-history')}>
-            <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Lịch sử mua hàng</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => router.push('/order-history')}>
+            <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('order history')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/payment')}>
-            <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Phương thức thanh toán</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => router.push('/payment')}>
+            <Ionicons name="card-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('payment method')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/address-list')}>
-            <Ionicons name="location-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Địa chỉ đặt hàng</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bảo mật</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="help-circle-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Quên mật khẩu</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Bảo mật</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => router.push('/address-list')}>
+            <Ionicons name="location-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('shipping address')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài đặt chung</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <TouchableOpacity onPress={() => router.push('/Language')}>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
-            </TouchableOpacity>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+        <Text style={styles.sectionTitle}>{t('security')}</Text>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => { }}>
+            <Ionicons name="key-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('change password')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => { }}>
+            <Ionicons name="help-circle-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('forgot password')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} onPress={() => { }}>
+            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('security')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('common_settings')}</Text>
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+            onPress={() => router.push('/Language')}
+          >
+            <Ionicons name="language-outline" size={22} color="#3255FB" style={{ marginRight: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#222' }}>{t('language')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
+          <Text style={styles.logoutText}>{t('logout')}</Text>
         </TouchableOpacity>
-        
+
         {/* Spacer to ensure button is not hidden */}
         <View style={{ height: 20 }} />
       </View>

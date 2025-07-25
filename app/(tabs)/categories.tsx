@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ const CACHE_KEYS = {
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const CategoriesScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ const CategoriesScreen = () => {
       }
     } catch (err) {
       console.error('Error loading categories:', err);
-      setError('Không thể tải danh mục');
+      setError(t('cannot load categories'));
       // Try to load from cache as fallback
       await loadCachedData();
     } finally {
@@ -114,7 +116,7 @@ const CategoriesScreen = () => {
       console.log('Categories refreshed from API and cached');
     } catch (err) {
       console.error('Error refreshing categories:', err);
-      setError('Không thể tải danh mục');
+      setError(t('cannot load categories'));
     } finally {
       setRefreshing(false);
     }
@@ -223,14 +225,12 @@ const CategoriesScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Danh Mục</Text>
-          <Text style={styles.headerSubtitle}>
-            Khám phá sách theo chủ đề yêu thích
-          </Text>
+          <Text style={styles.headerTitle}>{t('categories')}</Text>
+          <Text style={styles.headerSubtitle}>{t('explore books')}</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải danh mục...</Text>
+          <Text style={styles.loadingText}>{t('loading categories')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -240,17 +240,15 @@ const CategoriesScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Danh Mục</Text>
-          <Text style={styles.headerSubtitle}>
-            Khám phá sách theo chủ đề yêu thích
-          </Text>
+          <Text style={styles.headerTitle}>{t('categories')}</Text>
+          <Text style={styles.headerSubtitle}>{t('explore books')}</Text>
         </View>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#4A90E2" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
             <Ionicons name="refresh" size={20} color="white" />
-            <Text style={styles.retryButtonText}>Thử lại</Text>
+            <Text style={styles.retryButtonText}>{t('retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -260,10 +258,8 @@ const CategoriesScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Danh Mục</Text>
-        <Text style={styles.headerSubtitle}>
-          Khám phá sách theo chủ đề yêu thích
-        </Text>
+        <Text style={styles.headerTitle}>{t('categories')}</Text>
+        <Text style={styles.headerSubtitle}>{t('explore books')}</Text>
       </View>
 
       <FlatList

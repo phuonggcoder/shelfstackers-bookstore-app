@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type PaymentMethod = 'card' | 'momo' | 'cod';
 
 const PaymentScreen = () => {
+  const { t } = useTranslation();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('card');
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -30,37 +32,35 @@ const PaymentScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Phương thức thanh toán</Text>
+      <Text style={styles.title}>{t('payment method')}</Text>
       
       <View style={styles.paymentMethodsContainer}>
-        {renderPaymentMethodOption('card', 'Thẻ tín dụng', 'card-outline')}
-        {renderPaymentMethodOption('momo', 'Momo', 'wallet-outline')}
-        {renderPaymentMethodOption('cod', 'Thanh toán khi nhận hàng', 'cash-outline')}
+        {renderPaymentMethodOption('card', t('credit card'), 'card-outline')}
+        {renderPaymentMethodOption('momo', t('momo'), 'wallet-outline')}
+        {renderPaymentMethodOption('cod', t('cod'), 'cash-outline')}
       </View>
 
       {selectedMethod === 'card' && (
         <View style={styles.cardDetailsContainer}>
-          <Text style={styles.sectionTitle}>Thông tin thẻ</Text>
-          
+          <Text style={styles.sectionTitle}>{t('card info')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Số thẻ"
+            placeholder={t('card number')}
             value={cardNumber}
             onChangeText={setCardNumber}
             keyboardType="numeric"
           />
-          
           <View style={styles.row}>
             <TextInput
               style={[styles.input, styles.halfInput]}
-              placeholder="MM/YY"
+              placeholder={t('mm/yy')}
               value={expiryDate}
               onChangeText={setExpiryDate}
               keyboardType="numeric"
             />
             <TextInput
               style={[styles.input, styles.halfInput]}
-              placeholder="CVV"
+              placeholder={t('cvv')}
               value={cvv}
               onChangeText={setCvv}
               keyboardType="numeric"
@@ -71,26 +71,22 @@ const PaymentScreen = () => {
       )}
 
       <View style={styles.summaryContainer}>
-        <Text style={styles.sectionTitle}>Tóm tắt đơn hàng</Text>
-        
+        <Text style={styles.sectionTitle}>{t('order summary')}</Text>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tạm tính</Text>
+          <Text style={styles.summaryLabel}>{t('subtotal')}</Text>
           <Text style={styles.summaryValue}>500,000 ₫</Text>
         </View>
-        
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+          <Text style={styles.summaryLabel}>{t('shipping fee')}</Text>
           <Text style={styles.summaryValue}>30,000 ₫</Text>
         </View>
-        
         <View style={[styles.summaryRow, styles.totalRow]}>
-          <Text style={styles.totalLabel}>Tổng cộng</Text>
+          <Text style={styles.totalLabel}>{t('total')}</Text>
           <Text style={styles.totalValue}>530,000 ₫</Text>
         </View>
       </View>
-
       <TouchableOpacity style={styles.payButton}>
-        <Text style={styles.payButtonText}>Thanh toán ngay</Text>
+        <Text style={styles.payButtonText}>{t('pay now')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

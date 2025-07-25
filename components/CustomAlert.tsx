@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface CustomAlertProps {
@@ -23,18 +24,19 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
   buttonText,
   onButtonPress,
 }) => {
+  const { t } = useTranslation();
   const icon = ICONS[type];
   return (
     <View style={styles.container}>
-      <View style={[styles.iconWrap, { backgroundColor: icon.bg }]}>  
-        <View style={[styles.iconCircle, { backgroundColor: icon.color }]}>  
-          <Ionicons name={icon.name} size={32} color="#fff" />
+      <View style={[styles.iconWrap, { backgroundColor: icon.bg }]}>
+        <View style={[styles.iconCircle, { backgroundColor: icon.color }]}>
+          <Ionicons name={icon.name as any} size={32} color="#fff" />
         </View>
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {!!description && <Text style={styles.desc}>{description}</Text>}
+      <Text style={styles.title}>{t(title) || title}</Text>
+      {!!description && <Text style={styles.desc}>{t(description) || description}</Text>}
       <TouchableOpacity style={styles.button} onPress={onButtonPress}>
-        <Text style={styles.buttonText}>{buttonText}</Text>
+        <Text style={styles.buttonText}>{t(buttonText) || buttonText}</Text>
       </TouchableOpacity>
     </View>
   );

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomAlert from '../components/BottomAlert';
@@ -10,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { deleteAddress, getAddresses, setDefaultAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { from } = useLocalSearchParams();
   const [addresses, setAddresses] = useState([]);
@@ -132,7 +134,7 @@ const AddressListScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isFromOrderReview ? 'Chọn địa chỉ giao hàng' : 'Địa chỉ giao hàng'}
+          {isFromOrderReview ? t('chooseDeliveryAddress') : t('deliveryAddress')}
         </Text>
         <TouchableOpacity onPress={() => router.push('/add-address')}>
           <Ionicons name="add" size={24} color="#3255FB" />
@@ -140,7 +142,7 @@ const AddressListScreen = () => {
       </View>
 
       <BottomAlert
-        title="Thêm địa chỉ thành công!"
+        title={t('addAddressSuccess')}
         visible={showAlert}
         onHide={() => setShowAlert(false)}
       />
@@ -153,14 +155,14 @@ const AddressListScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.deleteModalBox}>
-            <Text style={styles.deleteTitle}>Xóa địa chỉ</Text>
-            <Text style={styles.deleteDesc}>Không thể khôi phục địa chỉ đã xóa.</Text>
+            <Text style={styles.deleteTitle}>{t('deleteAddress')}</Text>
+            <Text style={styles.deleteDesc}>{t('cannotRestoreDeletedAddress')}</Text>
             <View style={styles.deleteBtnRow}>
               <TouchableOpacity style={styles.keepBtn} onPress={() => setShowDeleteModal(false)}>
-                <Text style={styles.keepBtnText}>Giữ lại</Text>
+                <Text style={styles.keepBtnText}>{t('keep')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
-                <Text style={styles.confirmDeleteText}>Đồng ý</Text>
+                <Text style={styles.confirmDeleteText}>{t('agree')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -170,7 +172,7 @@ const AddressListScreen = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>Đang tải địa chỉ...</Text>
+          <Text style={styles.loadingText}>{t('loadingAddress')}</Text>
         </View>
       ) : (
         <ScrollView 
@@ -188,8 +190,8 @@ const AddressListScreen = () => {
           {addresses.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="location-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyTitle}>Chưa có địa chỉ nào</Text>
-              <Text style={styles.emptySubtitle}>Thêm địa chỉ để nhận hàng nhanh chóng</Text>
+              <Text style={styles.emptyTitle}>{t('noAddressYet')}</Text>
+              <Text style={styles.emptySubtitle}>{t('addAddressToReceiveGoods')}</Text>
             </View>
           ) : (
             <>
@@ -213,13 +215,13 @@ const AddressListScreen = () => {
                         <Text style={styles.phone}>{addr.phone_number}</Text>
                         {addr.is_default && (
                           <View style={styles.defaultTag}>
-                            <Text style={styles.defaultText}>Mặc định</Text>
+                            <Text style={styles.defaultText}>{t('default')}</Text>
                           </View>
                         )}
                       </View>
                       <Text style={styles.addressText}>{formatAddress(addr)}</Text>
                       {addr.note && (
-                        <Text style={styles.noteText}>Ghi chú: {addr.note}</Text>
+                        <Text style={styles.noteText}>{t('note')}: {addr.note}</Text>
                       )}
                     </View>
                     {!isFromOrderReview && (
@@ -256,7 +258,7 @@ const AddressListScreen = () => {
                 onPress={() => router.push('/add-address')}
               >
                 <Ionicons name="add" size={20} color="#3255FB" />
-                <Text style={styles.addAddressInListText}>Thêm địa chỉ mới</Text>
+                <Text style={styles.addAddressInListText}>{t('addNewAddress')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -270,7 +272,7 @@ const AddressListScreen = () => {
             onPress={handleConfirm}
             disabled={!selected}
           >
-            <Text style={styles.confirmButtonText}>Xác nhận địa chỉ</Text>
+            <Text style={styles.confirmButtonText}>{t('confirmAddress')}</Text>
           </TouchableOpacity>
         </View>
       )}

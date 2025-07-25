@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const Login = () => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -12,10 +14,10 @@ const Login = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
+      <Text style={styles.title}>{t('login')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t('email')}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -23,16 +25,16 @@ const Login = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder={t('password')}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
+        <Text style={styles.buttonText}>{t('login')}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => router.push('/register')}>
-        <Text style={styles.link}>Don&apos;t have an account? Register</Text>
+        <Text style={styles.link}>{t('registerLink')}</Text>
       </TouchableOpacity>
     </View>
   );

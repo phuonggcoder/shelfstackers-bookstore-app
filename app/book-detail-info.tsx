@@ -1,29 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBookById } from '../services/api';
 
 const FIELD_LABELS = [
-  { key: 'title', label: 'Tên sách' },
-  { key: 'author', label: 'Tác giả' },
-  { key: 'price', label: 'Giá bán' },
-  { key: 'description', label: 'Mô tả' },
-  { key: 'cover_image', label: 'Ảnh bìa' },
-  { key: 'stock', label: 'Tồn kho' },
-  { key: 'publication_date', label: 'Ngày xuất bản' },
-  { key: 'publisher', label: 'Nhà xuất bản' },
-  { key: 'weight', label: 'Khối lượng' },
-  { key: 'dimensions', label: 'Kích thước' },
-  { key: 'page_count', label: 'Số trang' },
-  { key: 'supplier', label: 'Nhà cung cấp' },
-  { key: 'language', label: 'Ngôn ngữ' },
-  { key: 'categories', label: 'Thể loại' },
+  { key: 'title', label: 'bookTitle' },
+  { key: 'author', label: 'bookAuthor' },
+  { key: 'price', label: 'bookPrice' },
+  { key: 'description', label: 'bookDescription' },
+  { key: 'cover_image', label: 'bookCoverImage' },
+  { key: 'stock', label: 'bookStock' },
+  { key: 'publication_date', label: 'bookPublicationDate' },
+  { key: 'publisher', label: 'bookPublisher' },
+  { key: 'weight', label: 'bookWeight' },
+  { key: 'dimensions', label: 'bookDimensions' },
+  { key: 'page_count', label: 'bookPageCount' },
+  { key: 'supplier', label: 'bookSupplier' },
+  { key: 'language', label: 'bookLanguage' },
+  { key: 'categories', label: 'bookCategories' },
 ];
 
 const BookDetailInfoScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<any>(null);
   const router = useRouter();
@@ -45,17 +47,17 @@ const BookDetailInfoScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="black" accessibilityLabel="Quay lại" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông tin chi tiết sách</Text>
+        <Text style={styles.headerTitle}>{t('bookDetailInfo')}</Text>
       </View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 16 + (insets.bottom || 0) }]}>
         {FIELD_LABELS.map(field => (
           <View style={styles.row} key={field.key}>
-            <Text style={styles.label}>{field.label}:</Text>
+            <Text style={styles.label}>{t(field.label)}:</Text>
             <View style={styles.valueContainer}>
               {(() => {
-                if (!book) return <Text style={styles.value}>Không có</Text>;
+                if (!book) return <Text style={styles.value}>{t('notAvailable')}</Text>;
                 const value = book[field.key];
-                if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return <Text style={styles.value}>Không có</Text>;
+                if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return <Text style={styles.value}>{t('notAvailable')}</Text>;
                 if (field.key === 'price') return <Text style={styles.value}>{value.toLocaleString('vi-VN')}₫</Text>;
                 if (field.key === 'publication_date') return <Text style={styles.value}>{new Date(value).toLocaleDateString('vi-VN')}</Text>;
                 if (field.key === 'cover_image') return <Text style={styles.value}>{Array.isArray(value) ? value.join(', ') : value}</Text>;

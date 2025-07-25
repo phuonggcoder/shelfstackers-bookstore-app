@@ -5,6 +5,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
 export default function Login() {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -113,8 +115,8 @@ export default function Login() {
           style={styles.logo}
           contentFit="contain"
         />
-        <Text style={styles.title}>Đăng nhập tài khoản</Text>
-        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+        <Text style={styles.title}>{t('login title')}</Text>
+        <Text style={styles.subtitle}>{t('login subtitle')}</Text>
       </View>
 
       <View style={styles.socialContainer}>
@@ -130,14 +132,14 @@ export default function Login() {
 
       <View style={styles.dividerContainer}>
         <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
+        <Text style={styles.dividerText}>{t('login with other')}</Text>
         <View style={styles.dividerLine} />
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('email')}</Text>
         <TextInput
-          placeholder="Nhập email"
+          placeholder={t('email placeholder')}
           style={styles.input}
           value={email}
           onChangeText={setEmail}
@@ -146,10 +148,10 @@ export default function Login() {
           editable={!isLoading}
         />
 
-        <Text style={styles.label}>Mật khẩu</Text>
+        <Text style={styles.label}>{t('password')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Nhập mật khẩu"
+          placeholder={t('password placeholder')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -171,10 +173,10 @@ export default function Login() {
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
               {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
             </View>
-            <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+            <Text style={styles.rememberText}>{t('remember me')}</Text>
           </TouchableOpacity>
           <TouchableOpacity>
-            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+            <Text style={styles.forgotText}>{t('forgot password')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -189,20 +191,20 @@ export default function Login() {
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            <Text style={styles.loginButtonText}>{t('login')}</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Chưa có tài khoản?</Text>
+          <Text style={styles.registerText}>{t('no account')}</Text>
           <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.registerLink}> Đăng ký ngay</Text>
+            <Text style={styles.registerLink}> {t('register now')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.orContainer}>
           <View style={styles.orLine} />
-          <Text style={styles.orText}>hoặc</Text>
+          <Text style={styles.orText}>{t('or')}</Text>
           <View style={styles.orLine} />
         </View>
 
@@ -211,7 +213,7 @@ export default function Login() {
           onPress={() => router.replace('/(tabs)')}
         >
           <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
-          <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
+          <Text style={styles.skipLoginText}>{t('skip login')}</Text>
         </TouchableOpacity>
       </View>
      

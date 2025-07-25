@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +27,7 @@ const FavouriteScreen = () => {
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const { t } = useTranslation();
 
 
   // Auto-load favorites when tab is focused
@@ -197,10 +199,10 @@ const FavouriteScreen = () => {
     // Use Alert instead of inline menu
     Alert.alert(
       book.title,
-      'Chọn hành động:',
+      t('choose_action'),
       [
         {
-          text: 'Xóa khỏi yêu thích',
+          text: t('remove_from_favorites'),
           style: 'destructive',
           onPress: () => {
             console.log('🗑️ Remove from Alert for bookId:', book._id);
@@ -208,21 +210,21 @@ const FavouriteScreen = () => {
           }
         },
         {
-          text: 'Thanh toán',
+          text: t('pay'),
           onPress: () => {
             console.log('💳 Pay from Alert for bookId:', book._id);
             handlePayPress(book);
           }
         },
         {
-          text: 'Chia sẻ',
+          text: t('share'),
           onPress: () => {
             console.log('📤 Share from Alert for bookId:', book._id);
             handleSharePress(book);
           }
         },
         {
-          text: 'Hủy',
+          text: t('cancel'),
           style: 'cancel'
         }
       ]
@@ -238,7 +240,7 @@ const FavouriteScreen = () => {
   };
 
   const handleSharePress = (book: any) => {
-    Alert.alert('Chia sẻ', `Chia sẻ sách "${book.title}"`);
+    Alert.alert(t('share'), t('share_book', { title: book.title }));
   };
 
   const formatPrice = (price: number) => {
@@ -285,9 +287,9 @@ const FavouriteScreen = () => {
           </View>
           
           <View style={styles.bookInfo}>
-            <Text style={styles.bookAuthor}>By {book.author || 'Unknown'}</Text>
+            <Text style={styles.bookAuthor}>{t('by_author', { author: book.author || t('unknown') })}</Text>
             <Text style={styles.bookTitle} numberOfLines={2}>
-              {book.title || 'Unknown Title'}
+              {book.title || t('unknown_title')}
             </Text>
             <Text style={styles.currentPrice}>
               {formatPrice(book.price || 0)}
@@ -324,11 +326,11 @@ const FavouriteScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Danh sách yêu thích</Text>
+          <Text style={styles.headerTitle}>{t('favorites_list')}</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải sách yêu thích...</Text>
+          <Text style={styles.loadingText}>{t('loading_favorites')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -344,29 +346,29 @@ const FavouriteScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Danh sách yêu thích</Text>
+        <Text style={styles.headerTitle}>{t('favorites_list')}</Text>
         {loading && (
           <View style={styles.headerLoading}>
             <ActivityIndicator size="small" color="#667eea" />
           </View>
         )}
         {favorites.length > 0 && !loading && (
-          <Text style={styles.favoriteCount}>{favorites.length} sách</Text>
+          <Text style={styles.favoriteCount}>{t('books_count', { count: favorites.length })}</Text>
         )}
       </View>
 
       {favorites.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="heart-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyTitle}>Chưa có sách yêu thích</Text>
+          <Text style={styles.emptyTitle}>{t('no_favorites')}</Text>
           <Text style={styles.emptyText}>
-            Hãy thêm sách vào danh sách yêu thích để dễ dàng tìm lại sau.
+            {t('add_favorites_hint')}
           </Text>
           <TouchableOpacity 
             style={styles.browseButton}
             onPress={() => router.push('/(tabs)')}
           >
-            <Text style={styles.browseButtonText}>Duyệt sách</Text>
+            <Text style={styles.browseButtonText}>{t('browse_books')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
