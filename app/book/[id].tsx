@@ -591,6 +591,30 @@ const BookDetailsScreen = () => {
         </View>
 
         <View style={{ height: 10 }} />
+        
+        {/* Review Section */}
+        <View style={styles.reviewSection}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewTitle}>Đánh giá sản phẩm</Text>
+            <TouchableOpacity 
+              style={styles.viewAllReviewsButton}
+              onPress={() => router.push('/product-reviews' as any)}
+            >
+              <Text style={styles.viewAllReviewsText}>Xem tất cả</Text>
+              <Ionicons name="chevron-forward" size={16} color="#3255FB" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Placeholder for review summary */}
+          <View style={styles.reviewPlaceholder}>
+            <Ionicons name="star-outline" size={48} color="#CCC" />
+            <Text style={styles.reviewPlaceholderText}>Chưa có đánh giá nào</Text>
+            <Text style={styles.reviewPlaceholderSubtext}>
+              Hãy là người đầu tiên đánh giá sản phẩm này
+            </Text>
+          </View>
+        </View>
+
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
@@ -1188,6 +1212,51 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  reviewSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  viewAllReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllReviewsText: {
+    fontSize: 14,
+    color: '#3255FB',
+    fontWeight: '500',
+  },
+  reviewPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+  },
+  reviewPlaceholderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  reviewPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
 
