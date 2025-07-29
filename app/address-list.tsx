@@ -5,9 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
-import { deleteAddress, getAddresses, setDefaultAddress } from '../services/addressService';
+import { deleteAddress, getAddresses, setDefaultAddress, updateAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
   const { token } = useAuth();
@@ -19,7 +18,14 @@ const AddressListScreen = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showDefaultModal, setShowDefaultModal] = useState(false);
+  const [defaultChangeData, setDefaultChangeData] = useState<{
+    currentName: string;
+    newName: string;
+    newId: string;
+  } | null>(null);
   const router = useRouter();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const isFromOrderReview = from === 'order-review';
 
@@ -71,6 +77,11 @@ const AddressListScreen = () => {
     checkAddedAddress();
   }, []);
 
+  React.useEffect(() => {
+    if (!token) setShowLoginModal(true);
+    else setShowLoginModal(false);
+  }, [token]);
+
   const handleDelete = async (id: string) => {
     setDeleteId(id);
     setShowDeleteModal(true);
@@ -92,12 +103,49 @@ const AddressListScreen = () => {
 
   const handleSetDefault = async (id: string) => {
     if (!token) return;
+    const addrArr = addresses as any[];
+    const currentDefault = addrArr.find((a) => a.is_default);
+    const newDefault = addrArr.find((a) => a._id === id);
+    if (currentDefault && newDefault && currentDefault._id !== id) {
+      setDefaultChangeData({
+        currentName: currentDefault.receiver_name,
+        newName: newDefault.receiver_name,
+        newId: id
+      });
+      setShowDefaultModal(true);
+    } else if (!currentDefault && newDefault) {
+      // Nếu chưa có mặc định, cho phép set luôn
+      try {
+        await setDefaultAddress(token, id);
+        fetchAddresses();
+      } catch (error) {
+        console.error('Error setting default address:', error);
+        Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+      }
+    }
+  };
+
+  const confirmSetDefault = async () => {
+    if (!defaultChangeData || !token) return;
+    setShowDefaultModal(false);
+    setLoading(true);
     try {
-      await setDefaultAddress(token, id);
-      fetchAddresses(); // Refresh list to update default status
+      const addrArr = addresses as any[];
+      // Set tất cả địa chỉ thành false trước
+      const updatePromises = addrArr.map((addr) => 
+        updateAddress(token, addr._id, { is_default: false })
+      );
+      await Promise.all(updatePromises);
+      
+      // Sau đó set địa chỉ mới thành true
+      await setDefaultAddress(token, defaultChangeData.newId);
+      fetchAddresses();
     } catch (error) {
       console.error('Error setting default address:', error);
       Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+    } finally {
+      setLoading(false);
+      setDefaultChangeData(null);
     }
   };
 
@@ -139,11 +187,40 @@ const AddressListScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <BottomAlert
-        title="Thêm địa chỉ thành công!"
-        visible={showAlert}
-        onHide={() => setShowAlert(false)}
-      />
+   
+
+      {/* Modal đăng nhập nếu chưa đăng nhập */}
+      <Modal
+        visible={showLoginModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLoginModal(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', width: 320 }}>
+            <Ionicons name="log-in-outline" size={48} color="#3255FB" style={{ marginBottom: 16 }} />
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>Bạn chưa đăng nhập</Text>
+            <Text style={{ color: '#666', marginBottom: 24, textAlign: 'center' }}>Vui lòng đăng nhập để sử dụng tính năng này.</Text>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <TouchableOpacity
+                style={{ backgroundColor: '#3255FB', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginRight: 8 }}
+                onPress={() => {
+                  setShowLoginModal(false);
+                  router.push('/(auth)/login');
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Đăng nhập</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: '#eee', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24 }}
+                onPress={() => setShowLoginModal(false)}
+              >
+                <Text style={{ color: '#3255FB', fontWeight: 'bold', fontSize: 16 }}>Bỏ qua</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showDeleteModal}
@@ -161,6 +238,30 @@ const AddressListScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
                 <Text style={styles.confirmDeleteText}>Đồng ý</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showDefaultModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDefaultModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.defaultChangeModalBox}>
+            <Text style={styles.defaultChangeTitle}>Thay đổi địa chỉ mặc định</Text>
+            <Text style={styles.defaultChangeDesc}>
+              Bạn có muốn thay đổi địa chỉ mặc định từ "{defaultChangeData?.currentName}" thành "{defaultChangeData?.newName}" không?
+            </Text>
+            <View style={styles.defaultChangeBtnRow}>
+              <TouchableOpacity style={styles.cancelDefaultChangeBtn} onPress={() => setShowDefaultModal(false)}>
+                <Text style={styles.cancelDefaultChangeText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmDefaultChangeBtn} onPress={confirmSetDefault}>
+                <Text style={styles.confirmDefaultChangeText}>Đồng ý</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -211,6 +312,7 @@ const AddressListScreen = () => {
                       <View style={styles.nameRow}>
                         <Text style={styles.name}>{addr.receiver_name}</Text>
                         <Text style={styles.phone}>{addr.phone_number}</Text>
+                        {/* Chỉ hiển thị Mặc định cho địa chỉ mặc định thực sự */}
                         {addr.is_default && (
                           <View style={styles.defaultTag}>
                             <Text style={styles.defaultText}>Mặc định</Text>
@@ -218,6 +320,14 @@ const AddressListScreen = () => {
                         )}
                       </View>
                       <Text style={styles.addressText}>{formatAddress(addr)}</Text>
+                      {/* Hiển thị loại địa chỉ */}
+                      <View style={styles.addressTypeRow}>
+                        <View style={styles.typeTag}>
+                          <Text style={styles.typeText}>
+                            {addr.type === 'office' ? '🏢 Văn phòng' : '🏠 Nhà riêng'}
+                          </Text>
+                        </View>
+                      </View>
                       {addr.note && (
                         <Text style={styles.noteText}>Ghi chú: {addr.note}</Text>
                       )}
@@ -393,6 +503,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+  addressTypeRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  typeTag: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  typeText: {
+    fontSize: 12,
+    color: '#3255FB',
+    fontWeight: '500',
+  },
   actionButtons: {
     flexDirection: 'row',
     marginLeft: 12,
@@ -506,6 +632,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmDeleteText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  defaultChangeModalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: 280,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  defaultChangeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#222',
+  },
+  defaultChangeDesc: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  defaultChangeBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  cancelDefaultChangeBtn: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  cancelDefaultChangeText: {
+    color: '#e57373',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  confirmDefaultChangeBtn: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmDefaultChangeText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

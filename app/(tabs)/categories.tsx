@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import RenderHtml from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCategories } from '../../services/api';
 import { Category } from '../../types';
@@ -148,76 +146,19 @@ const CategoriesScreen = () => {
   };
 
   const getCategoryColor = (index: number) => {
-    const colors = [
-      { bg: '#667eea', gradient: '#764ba2' },
-      { bg: '#f093fb', gradient: '#f5576c' },
-      { bg: '#4facfe', gradient: '#00f2fe' },
-      { bg: '#43e97b', gradient: '#38f9d7' },
-      { bg: '#fa709a', gradient: '#fee140' },
-      { bg: '#a8edea', gradient: '#fed6e3' },
-      { bg: '#ffecd2', gradient: '#fcb69f' },
-      { bg: '#ff9a9e', gradient: '#fecfef' },
-      { bg: '#a18cd1', gradient: '#fbc2eb' },
-      { bg: '#fad0c4', gradient: '#ffd1ff' }
-    ];
-    return colors[index % colors.length];
+    // Dùng màu xanh dương tươi #3B82F6 cho tất cả danh mục
+    return { bg: '#3B82F6', gradient: '#3B82F6' };
   };
 
-  const renderCategoryCard = ({ item, index }: { item: Category; index: number }) => {
-    const iconName = getCategoryIcon(item.name);
-    const colors = getCategoryColor(index);
-    
-    return (
-      <TouchableOpacity
-        style={styles.categoryCard}
-        onPress={() => handleCategoryPress(item)}
-        activeOpacity={0.9}
-      >
-        <View style={[styles.cardGradient, { backgroundColor: colors.bg }]}>
-          <View style={styles.cardContent}>
-            <View style={styles.imageContainer}>
-              {item.image ? (
-                <Image
-                  source={{ uri: item.image }}
-                  style={styles.categoryImage}
-                  contentFit="cover"
-                  transition={300}
-                />
-              ) : (
-                <View style={styles.iconContainer}>
-                  <Ionicons name={iconName as any} size={32} color="white" />
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.textContainer}>
-              <Text style={styles.categoryName} numberOfLines={2}>
-                {item.name}
-              </Text>
-              {item.description && (
-                <View style={styles.descriptionContainer}>
-                  <RenderHtml
-                    contentWidth={width - 80}
-                    source={{ html: item.description }}
-                    baseStyle={styles.htmlBaseStyle}
-                    tagsStyles={{
-                      p: styles.htmlParagraph,
-                      div: styles.htmlParagraph,
-                      span: styles.htmlParagraph,
-                    }}
-                  />
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.arrowContainer}>
-              <Ionicons name="chevron-forward" size={18} color="white" />
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderCategoryCard = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      onPress={() => handleCategoryPress(item)}
+      activeOpacity={0.7}
+      style={{ paddingVertical: 14, paddingHorizontal: 8 }}
+    >
+      <Text style={{ fontSize: 17 }}>{item.name}</Text>
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
@@ -272,8 +213,6 @@ const CategoriesScreen = () => {
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -362,77 +301,57 @@ const styles = StyleSheet.create({
     marginBottom: 0, // Remove margin since cards have their own margin
   },
   categoryCard: {
-    width: (width - 48) / 2,
-    height: 200, // Fixed height for consistent aspect ratio
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    width: '100%',
+    minHeight: 80,
+    borderRadius: 16,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    backgroundColor: 'transparent',
   },
   cardGradient: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     flex: 1,
   },
-  cardContent: {
-    padding: 16,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  imageContainer: {
-    width: '100%',
-    height: 70, // Fixed height for image container
+  listImageContainer: {
+    width: 56,
+    height: 56,
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  categoryImage: {
+  listCategoryImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 12,
   },
-  iconContainer: {
+  listIconContainer: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  textContainer: {
+  listTextContainer: {
     flex: 1,
-    marginBottom: 8,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  categoryName: {
-    fontSize: 15,
+  listCategoryName: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 6,
-    lineHeight: 18,
+    marginBottom: 4,
   },
-  descriptionContainer: {
-    marginTop: 4,
-    flex: 1,
-  },
-  htmlBaseStyle: {
+  listCategoryDesc: {
+    fontSize: 13,
     color: 'white',
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.9,
-  },
-  htmlParagraph: {
-    color: 'white',
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.9,
-    margin: 0,
-    padding: 0,
+    opacity: 0.85,
   },
   arrowContainer: {
     alignSelf: 'flex-end',

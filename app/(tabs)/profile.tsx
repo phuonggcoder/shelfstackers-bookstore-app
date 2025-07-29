@@ -1,28 +1,100 @@
 import { Ionicons } from '@expo/vector-icons';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { useEffect } from 'react';
+
+// ... trong component
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
-import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Link } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useAvatar } from '../../context/AvatarContext';
+
+const { width, height } = Dimensions.get('window');
+
+const AnimatedSplash = ({ children }: { children: React.ReactNode }) => {
+  const scaleAnim = useRef(new Animated.Value(0.1)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const [showContent, setShowContent] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Reset lại mỗi lần tab được focus
+      scaleAnim.setValue(0.1);
+      contentOpacity.setValue(0);
+      setShowContent(false);
+      Animated.timing(scaleAnim, {
+        toValue: 16, // scale lớn hơn để che phủ toàn bộ màn hình
+        duration: 1200,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowContent(true);
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, [])
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: width / 2 - 40,
+          top: height / 2 - 40,
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: '#1890FF',
+          transform: [{ scale: scaleAnim }],
+          zIndex: 1,
+        }}
+      />
+      <Animated.View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: contentOpacity,
+          zIndex: 2,
+        }}
+        pointerEvents={showContent ? 'auto' : 'none'}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+};
 
 const WelcomeScreen = () => (
-  <View style={styles.welcomeContainer}>
-    <Ionicons name="person-circle-outline" size={100} color="#4A3780" />
-          <Text style={styles.welcomeTitle}>Chào mừng đến với ShelfStackers</Text>
-    <Text style={styles.welcomeText}>
-      Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
-    </Text>
-    <Link href="/login" asChild>
-      <TouchableOpacity style={styles.signInButton}>
-        <Text style={styles.signInButtonText}>Đăng nhập</Text>
-      </TouchableOpacity>
-    </Link>
-    <Link href="/register" asChild>
-      <TouchableOpacity style={styles.registerButton}>
-        <Text style={styles.registerButtonText}>Tạo tài khoản</Text>
-      </TouchableOpacity>
-    </Link>
-  </View>
+
+<AnimatedSplash>
+    <View style={{ alignItems: 'center', width: '100%' }}>
+      <Ionicons name="person-circle-outline" size={100} color="#fff" style={{ marginBottom: 24 }} />
+      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 10, textAlign: 'center' }}>
+        Chào mừng bạn đến với Ebook
+      </Text>
+      <Text style={{ fontSize: 16, color: '#fff', textAlign: 'center', marginBottom: 30 }}>
+        Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
+      </Text>
+      <Link href="/login" asChild>
+        <TouchableOpacity style={{ backgroundColor: '#fff', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 40, marginBottom: 15, width: '80%' }}>
+          <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Đăng nhập</Text>
+        </TouchableOpacity>
+      </Link>
+      <Link href="/register" asChild>
+        <TouchableOpacity style={{ backgroundColor: 'transparent', borderRadius: 10, borderWidth: 2, borderColor: '#fff', paddingVertical: 15, paddingHorizontal: 40, width: '80%' }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Tạo tài khoản</Text>
+        </TouchableOpacity>
+      </Link>
+    </View>
+  </AnimatedSplash>
 );
 
 const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
@@ -37,53 +109,84 @@ const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; on
 
 const SettingsScreen = () => {
   const { user, signOut } = useAuth();
+  const navigation = useNavigation();
+  const { avatarUri } = useAvatar();
+  const [localDetail, setLocalDetail] = React.useState<any>(null);
+  const [displayName, setDisplayName] = useState('');
+
+  useEffect(() => {
+    const loadName = async () => {
+      const lastName = await AsyncStorage.getItem('user_lastName');
+      const firstName = await AsyncStorage.getItem('user_firstName');
+      if (lastName || firstName) {
+        setDisplayName(`${lastName || ''} ${firstName || ''}`.trim());
+      } else {
+        setDisplayName(user?.username || '');
+      }
+    };
+    loadName();
+  }, [user]);
+
+  React.useEffect(() => {
+    (async () => {
+      const saved = await AsyncStorage.getItem('userDetailLocal');
+      if (saved) {
+        setLocalDetail(JSON.parse(saved));
+      } else {
+        setLocalDetail(null);
+      }
+    })();
+  }, []);
 
   const handleLogout = async () => {
     await signOut();
-    router.replace('/');
+    navigation.navigate('index' as never); // Tab Home
   };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
+        {/* Avatar và tên lấy từ API (context user) */}
         <Image
-          source={{ uri: 'https://i.pravatar.cc/150' }}
+          source={{ uri: user?.avatar || 'https://i.pravatar.cc/150?u=' + user?.username }}
           style={styles.avatar}
           contentFit="cover"
         />
-        <Text style={styles.name}>{user?.full_name || 'User Name'}</Text>
-        <Text style={styles.role}>Author</Text>
+        <Text style={styles.name}>{displayName}</Text>
+        {user?.roles && (
+          <Text style={styles.role}>{Array.isArray(user.roles) ? user.roles.join(', ') : user.roles}</Text>
+        )}
       </View>
 
       <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('user-detail' as never)}>
             <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>router.push('/vouchers')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>navigation.navigate('vouchers' as never)}>
             <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Mã giảm giá</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/favourite')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('favourite' as never)}>
             <Ionicons name="heart-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Sách yêu thích</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/order-history')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('order-history' as never)}>
             <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Lịch sử mua hàng</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/payment')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>
             <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Phương thức thanh toán</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/address-list')}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('address-list' as never)}>
             <Ionicons name="location-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Địa chỉ đặt hàng</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -92,7 +195,7 @@ const SettingsScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bảo mật</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}}  onPress={() => navigation.navigate('ChangePassword' as never)}>
             <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -113,7 +216,7 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Cài đặt chung</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <TouchableOpacity onPress={() => router.push('/Language')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Language' as never)}>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
             </TouchableOpacity>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
@@ -132,7 +235,7 @@ const SettingsScreen = () => {
   );
 };
 
-export default function ProfileTab() {
+export default function ProfileScreen() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -224,6 +327,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 5,
   },
+  username: {
+    fontSize: 14,
+    color: '#E8E8FF',
+    marginBottom: 5,
+  },
   role: {
     fontSize: 14,
     color: '#E8E8FF',
@@ -275,7 +383,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#ff3742',
   },

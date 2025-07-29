@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Animated, Dimensions } from 'react-native';
+import { Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { DataProvider } from '../../context/DataContext';
 
 const { width } = Dimensions.get('window');
@@ -26,7 +26,6 @@ const TabsLayout = () => {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName: any;
-
             if (route.name === 'index') {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'search') {
@@ -38,13 +37,11 @@ const TabsLayout = () => {
             } else if (route.name === 'profile') {
               iconName = focused ? 'person' : 'person-outline';
             }
-
             return <Ionicons name={iconName} size={size} color={color} />;
           },
-          tabBarActiveTintColor: '#4A3780',
+          tabBarActiveTintColor: '#3B82F6',
           tabBarInactiveTintColor: 'gray',
           headerShown: false,
-          // Position tab bar above Android navigation buttons
           tabBarStyle: {
             backgroundColor: 'white',
             borderTopWidth: 1,
@@ -62,59 +59,28 @@ const TabsLayout = () => {
             shadowOpacity: 0.15,
             shadowRadius: 6,
           },
-          // Add press effect
-          tabBarPressColor: 'transparent',
-          tabBarPressOpacity: 0.8,
+          tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />, // Tắt hiệu ứng nhấn
         })}
-        screenListeners={{
-          tabPress: (e) => {
-            // Add slide animation based on tab position
-            const currentRoute = e.target?.split('-')[0];
-            const targetRoute = e.target?.split('-')[1];
-            
-            if (currentRoute && targetRoute) {
-              const tabOrder = ['index', 'search', 'categories', 'favourite', 'profile'];
-              const currentIndex = tabOrder.indexOf(currentRoute);
-              const targetIndex = tabOrder.indexOf(targetRoute);
-              
-              if (targetIndex > currentIndex) {
-                slideToTab('right');
-              } else if (targetIndex < currentIndex) {
-                slideToTab('left');
-              }
-            }
-          },
-        }}
       >
         <Tabs.Screen 
           name="index" 
-          options={{ 
-            title: 'Trang chủ'
-          }} 
+          options={{ title: 'Trang chủ' }} 
         />
         <Tabs.Screen 
           name="search" 
-          options={{ 
-            title: 'Tìm kiếm'
-          }} 
+          options={{ title: 'Tìm kiếm' }} 
         />
         <Tabs.Screen 
           name="categories" 
-          options={{ 
-            title: 'Danh mục'
-          }} 
+          options={{ title: 'Danh mục' }} 
         />
         <Tabs.Screen 
           name="favourite" 
-          options={{ 
-            title: 'Yêu thích'
-          }} 
+          options={{ title: 'Yêu thích', unmountOnBlur: true }} // Chỉ tab này unmount khi chuyển tab
         />
         <Tabs.Screen 
           name="profile" 
-          options={{ 
-            title: 'Cá nhân'
-          }} 
+          options={{ title: 'Cá nhân' }} 
         />
       </Tabs>
     </DataProvider>

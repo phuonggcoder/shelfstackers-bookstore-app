@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, Touc
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
-import { updateAddress } from '../services/addressService';
+import { getAddresses, updateAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { token } = useAuth();
@@ -29,6 +29,7 @@ const EditAddressScreen = () => {
     address_detail: '',
     note: '',
     is_default: false,
+    type: 'office' as 'office' | 'home', // Thêm type
   });
 
   useEffect(() => {
@@ -39,23 +40,21 @@ const EditAddressScreen = () => {
 
   const fetchAddress = async () => {
     if (!id || !token) return;
-    
     try {
       setLoading(true);
-      // For now, we'll use a mock address since getAddress doesn't exist
-      // In real implementation, you would call: const address = await getAddress(token, id as string);
-      const address = {
-        receiver_name: 'Cao Hoàng Nguyên',
-        phone_number: '0563182308',
-        email: 'test@example.com',
-        province: 'Thành phố Hồ Chí Minh',
-        district: 'Quận 12',
-        ward: 'Phường Trung Mỹ Tây',
-        street: 'Đường Trung Mỹ Tây 13',
-        address_detail: '121/35/20',
-        note: 'Ghi chú giao hàng',
-        is_default: true,
-      };
+      console.log('Fetching address with id:', id, 'token:', token);
+      
+      // Lấy danh sách địa chỉ và tìm địa chỉ cần edit
+      const addresses = await getAddresses(token);
+      const address = addresses.find((addr: any) => addr._id === id);
+      
+      if (!address) {
+        Alert.alert('Lỗi', 'Địa chỉ không tồn tại hoặc đã bị xóa');
+        router.back();
+        return;
+      }
+      
+      console.log('Found address:', address);
       
       setFormData({
         receiver_name: address.receiver_name || '',
@@ -68,10 +67,12 @@ const EditAddressScreen = () => {
         address_detail: address.address_detail || '',
         note: address.note || '',
         is_default: address.is_default || false,
+        type: address.type || 'office', // Thêm type
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching address:', error);
       Alert.alert('Lỗi', 'Không thể tải thông tin địa chỉ');
+      router.back();
     } finally {
       setLoading(false);
     }
@@ -258,21 +259,32 @@ const EditAddressScreen = () => {
               numberOfLines={2}
             />
           </View>
+
+          {/* Thêm phần chọn loại địa chỉ */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Loại địa chỉ</Text>
+            <View style={styles.typeButtons}>
+              <TouchableOpacity
+                style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
+              >
+                <Text style={[styles.typeText, formData.type === 'office' && styles.typeTextActive]}>
+                  🏢 Văn phòng
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, formData.type === 'home' && styles.typeButtonActive]}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'home' }))}
+              >
+                <Text style={[styles.typeText, formData.type === 'home' && styles.typeTextActive]}>
+                  🏠 Nhà riêng
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.defaultToggle}
-            onPress={() => setFormData(prev => ({ ...prev, is_default: !prev.is_default }))}
-          >
-            <Ionicons
-              name={formData.is_default ? 'star' : 'star-outline'}
-              size={24}
-              color={formData.is_default ? '#FFD700' : '#ccc'}
-            />
-            <Text style={styles.defaultText}>Đặt làm địa chỉ mặc định</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Xóa phần toggle star (mặc định) khỏi UI */}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -393,6 +405,33 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  typeButtons: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  typeButtonActive: {
+    backgroundColor: '#3255FB',
+    borderColor: '#3255FB',
+  },
+  typeText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  typeTextActive: {
+    color: '#fff',
     fontWeight: 'bold',
   },
 });

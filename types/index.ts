@@ -40,4 +40,7 @@ export interface Campaign {
   books: Book[];
   createdAt: Date;
   updatedAt: Date;
+  image?: string;
+  thumbnail?: string;
+  vouchers?: any[]; // Thêm dòng này, có thể import Voucher nếu muốn strict hơn
 } 

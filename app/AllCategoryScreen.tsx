@@ -1,14 +1,14 @@
-import { Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
-import CategoryCard from '../components/CategoryCard';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Header from '../components/Header';
 import { getCategories } from '../services/api';
 import { Category } from '../types';
 
-export default function AllCategoriesScreen() {
+export default function AllCategoryScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     loadCategories();
@@ -25,15 +25,14 @@ export default function AllCategoriesScreen() {
     }
   };
 
+  const handleCategoryPress = (category: Category) => {
+    router.push({ pathname: '/filtered-books', params: { categoryId: category._id, categoryName: category.name } });
+  };
+
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{
-          headerShown: false,
-        }} 
-      />
-      <Header title="All Categories" showBackButton showIcons={false} />
-      
+      <Header title="Danh Mục" showBackButton showIcons={false} />
+      <Text style={styles.subtitle}>Khám phá sách theo chủ đề yêu thích</Text>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
@@ -42,17 +41,10 @@ export default function AllCategoriesScreen() {
         <FlatList
           data={categories}
           keyExtractor={(item) => item._id}
-          numColumns={2}
-          contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <CategoryCard
-              id={item._id}
-              name={item.name}
-              image={item.image}
-              slug={item.slug}
-            />
+            <TouchableOpacity style={styles.itemRow} onPress={() => handleCategoryPress(item)}>
+              <Text style={styles.itemText}>{item.name}</Text>
+            </TouchableOpacity>
           )}
         />
       )}
@@ -64,19 +56,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingHorizontal: 0,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listContent: {
-    paddingTop: 16,
-    paddingBottom: 24,
+  subtitle: {
+    fontSize: 16,
+    color: '#888',
+    marginTop: 8,
+    marginBottom: 12,
+    marginLeft: 16,
   },
-  row: {
-    justifyContent: 'space-between',
+  itemRow: {
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-});
+  itemText: {
+    fontSize: 18,
+    color: '#222',
+    fontWeight: '400',
+  },
+}); 

@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Book } from '../types';
 import BookCard from './BookCard';
@@ -56,12 +56,14 @@ const BookCarousel = ({ title, books, categoryId, categoryName }: Props) => {
 const styles = StyleSheet.create({
   container: {
     marginVertical: 15,
+    paddingHorizontal: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
+    paddingHorizontal: 8,
   },
   title: {
     fontSize: 22,

@@ -1,166 +1,146 @@
-import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import React, { memo, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { addToWishlist, removeFromWishlist } from '../services/api';
+import { useRouter } from 'expo-router';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Book } from '../types';
-import { formatVND, getBookImageUrl } from '../utils/format';
 
-interface Props {
-  book: Book;
-  isFavorited?: boolean;
-  onFavoriteChange?: (bookId: string, isFavorited: boolean) => void;
-}
+export default function BookCard({ book }: { book: Book }) {
+  const router = useRouter();
+  // Tính giá gốc (giá gạch ngang): nếu có original_price thì dùng, không thì lấy price * 1.2
+  const originalPrice = (book as any).original_price || book.price * 1.2;
+  // Giá ảo (giá gạch ngang) dựa trên discount cố định
+  const discount = getDiscountPercent(book._id);
+  const fakeOriginalPrice = Math.round(book.price / (1 - discount / 100));
 
-const BookCard = ({ book, isFavorited = false, onFavoriteChange }: Props) => {
-  const { token } = useAuth();
-  const [favorited, setFavorited] = useState(isFavorited);
-  const [loading, setLoading] = useState(false);
-  
-  const firstCategory = book.categories && book.categories.length > 0 ? book.categories[0] : null;
-
-  useEffect(() => {
-    setFavorited(isFavorited);
-  }, [isFavorited]);
-
-  const handleFavoritePress = async () => {
-    if (!token) {
-      Alert.alert('Thông báo', 'Vui lòng đăng nhập để thêm sách yêu thích');
-      return;
+  // Badge giảm giá random cố định theo _id
+  function getDiscountPercent(id: string) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
     }
-
-    if (loading) return;
-
-    try {
-      setLoading(true);
-      
-      if (favorited) {
-        // Remove from favorites
-        await removeFromWishlist(token, book._id);
-        setFavorited(false);
-        onFavoriteChange?.(book._id, false);
-      } else {
-        // Add to favorites
-        await addToWishlist(token, book._id);
-        setFavorited(true);
-        onFavoriteChange?.(book._id, true);
-      }
-    } catch (error) {
-      console.error('Favorite error:', error);
-      Alert.alert('Lỗi', 'Không thể thay đổi trạng thái yêu thích');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Giới hạn từ 10 đến 50%
+    const percent = Math.abs(hash % 41) + 10;
+    return percent;
+  }
 
   return (
-    <Link href={`/book/${book._id}` as any} asChild>
-      <TouchableOpacity style={styles.container}>
-        <View>
-            <Image 
-                source={{ uri: getBookImageUrl(book) }} 
-                style={styles.image}
-                contentFit="cover"
-                transition={300}
-            />
-            <TouchableOpacity 
-              style={[styles.favIcon, favorited && styles.favIconActive]}
-              onPress={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFavoritePress();
-              }}
-              disabled={loading}
-            >
-                <Feather 
-                  name={favorited ? "heart" : "heart"} 
-                  size={18} 
-                  color={favorited ? "#ff4757" : "#fff"} 
-                  fill={favorited ? "#ff4757" : "none"}
-                />
-            </TouchableOpacity>
+    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => router.push({ pathname: '/book/[id]', params: { id: book._id } })}>
+      {/* Badge giảm giá ở góc trên bên phải */}
+      <View style={styles.badgeTopRight}>
+        <Text style={styles.badgeText}>-{getDiscountPercent(book._id)}%</Text>
+      </View>
+      <View style={styles.imagesRow}>
+        <Image
+          source={{ uri: book.thumbnail || (book.cover_image && book.cover_image[0]) || '' }}
+          style={styles.mainImage}
+          resizeMode="cover"
+        />
+      </View>
+      <View style={styles.infoSection}>
+        <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
+        {book.author && <Text style={styles.author} numberOfLines={1}>{book.author}</Text>}
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{book.price?.toLocaleString()} đ</Text>
+          <Text style={styles.oldPrice}>{fakeOriginalPrice.toLocaleString()} đ</Text>
         </View>
-        <View style={styles.content}>
-            <View>
-                <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
-                <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
-                {firstCategory && (
-                  <Link href={`/category/${firstCategory._id}?name=${encodeURIComponent(firstCategory.name)}` as any} asChild>
-                    <TouchableOpacity>
-                      <Text style={styles.category}>{firstCategory.name}</Text>
-                    </TouchableOpacity>
-                  </Link>
-                )}
-            </View>
-            <View style={styles.priceContainer}>
-                <Text style={styles.price}>{formatVND(book.price)}</Text>
-                <Text style={styles.oldPrice}>{formatVND(book.price * 1.2)}</Text>
-            </View>
-        </View>
-      </TouchableOpacity>
-    </Link>
+      </View>
+    </TouchableOpacity>
   );
-};
+}
 
 const styles = StyleSheet.create({
-    container: {
-        width: 130,
-        marginRight: 15,
-    },
-    image: {
-        width: '100%',
-        height: 170,
-        borderRadius: 10,
-    },
-    favIcon: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        padding: 5,
-        borderRadius: 15,
-    },
-    favIconActive: {
-        backgroundColor: 'rgba(255, 71, 87, 0.3)',
-    },
-    content: {
-        marginTop: 8,
-        flex: 1,
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-    },
-    author: {
-        fontSize: 12,
-        color: '#888',
-    },
-    title: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginVertical: 3,
-        color: '#333'
-    },
-    priceContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    price: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#5E5CE6',
-    },
-    oldPrice: {
-        fontSize: 12,
-        color: '#999',
-        textDecorationLine: 'line-through',
-        marginLeft: 8,
-    },
-    category: {
-        fontSize: 12,
-        color: '#5E5CE6',
-        marginTop: 2,
-    },
-});
-
-export default memo(BookCard); 
+  card: {
+    width: 150,
+    height: 270,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    margin: 8,
+    padding: 8,
+    elevation: 3,
+  },
+  imagesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 170,
+    backgroundColor: '#fff',
+    position: 'relative',
+  },
+  mainImage: {
+    width: 120,
+    height: 165,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  subImage: {
+    width: 70,
+    height: 100,
+    borderRadius: 12,
+    marginLeft: -16,
+    zIndex: 1,
+    opacity: 0.85,
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignSelf: 'center',
+  },
+  infoSection: {
+    flex: 1,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    justifyContent: 'space-between',
+    height: 80,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 2,
+    minHeight: 34,
+  },
+  author: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 2,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  price: {
+    color: '#E53935',
+    fontWeight: 'bold',
+    fontSize: 15,
+    marginRight: 6,
+  },
+  oldPrice: {
+    color: '#aaa',
+    fontSize: 11,
+    textDecorationLine: 'line-through',
+    marginRight: 4,
+    marginLeft: 0,
+  },
+  badge: {
+    backgroundColor: '#E53935',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 0,
+    marginRight: 0,
+    alignSelf: 'center',
+  },
+  badgeTopRight: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#E53935',
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    zIndex: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 11,
+  },
+}); 

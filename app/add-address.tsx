@@ -7,7 +7,6 @@ import {
     KeyboardAvoidingView,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -20,7 +19,7 @@ import { createAddress, LocationItem } from '../services/addressService';
 const AddAddress = () => {
   const router = useRouter();
   const { token } = useAuth();
-  const [isDefault, setIsDefault] = useState(true);
+  const [isDefault, setIsDefault] = useState(false); // luôn là false
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -83,7 +82,7 @@ const AddAddress = () => {
         district: district.name,
         ward: ward.name,
         address_detail: addressDetail.trim(),
-        is_default: isDefault,
+        is_default: false, // luôn là false khi thêm mới
         type: addressType,
       });
 
@@ -205,16 +204,6 @@ const AddAddress = () => {
             <Text style={styles.previewText}>{formatAddress()}</Text>
           </View>
         )}
-
-        <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>Đặt làm địa chỉ mặc định</Text>
-          <Switch
-            value={isDefault}
-            onValueChange={setIsDefault}
-            thumbColor="#fff"
-            trackColor={{ false: '#ccc', true: '#3255FB' }}
-          />
-        </View>
 
         <View style={styles.typeContainer}>
           <Text style={styles.switchLabel}>Loại địa chỉ</Text>

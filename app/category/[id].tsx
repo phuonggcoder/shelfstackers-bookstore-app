@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import BookCard from '../../components/BookCard';
 import { useCategoryBooks } from '../../hooks/useCategoryBooks';

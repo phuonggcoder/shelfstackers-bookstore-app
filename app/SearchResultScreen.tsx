@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const API_BOOKS = 'https://server-shelf-stacker.onrender.com/api/books';
-const API_CATEGORIES = 'https://server-shelf-stacker.onrender.com/api/categories';
+const API_BOOKS = 'https://server-shelf-stacker-w1ds.onrender.com/api/books';
+const API_CATEGORIES = 'https://server-shelf-stacker-w1ds.onrender.com/api/categories';
 
 const removeAccents = (str: string) =>
   str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

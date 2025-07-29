@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { cancelOrder, getOrderDetail } from '../services/orderService';
 
 interface OrderItem {
   book: {
@@ -36,6 +37,7 @@ interface OrderDetail {
     ward: string;
     district: string;
     province: string;
+    street?: string; // Added for new mapping
   };
   createdAt: string;
   updatedAt: string;
@@ -52,6 +54,7 @@ const OrderDetailScreen = () => {
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     loadOrderDetail();
@@ -59,52 +62,39 @@ const OrderDetailScreen = () => {
 
   const loadOrderDetail = async () => {
     if (!token || !orderId) return;
-    
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await getOrderDetail(token, orderId as string);
-      // setOrder(response);
-      
-      // Mock data for now
+      const response = await getOrderDetail(token, orderId as string);
+      // Map lại dữ liệu từ BE
+      const order = response.order || response;
+      // Ưu tiên lấy snapshot địa chỉ giao hàng
+      const shippingAddressRaw = order.shipping_address_snapshot || order.address_id || {};
       setOrder({
-        _id: orderId as string,
-        orderCode: 'ORD001',
-        status: 'pending',
-        totalAmount: 23000,
-        subtotal: 23000,
-        shippingFee: 0,
-        items: [
-          {
-            book: {
-              _id: 'book1',
-              title: 'Sách không xác định',
-              author: 'Tác giả không xác định',
-              price: 23000,
-            },
-            quantity: 1,
-            price: 23000,
-          }
-        ],
-        paymentMethod: 'COD',
-        paymentStatus: 'pending',
+        _id: order._id,
+        orderCode: order.order_id || order._id,
+        status: order.order_status || order.status,
+        totalAmount: order.total_amount,
+        subtotal: order.subtotal || order.total_amount,
+        shippingFee: order.ship_amount || order.shipping_fee || 0,
+        items: (order.order_items || []).map((oi: any) => ({
+          book: oi.book_id,
+          quantity: oi.quantity,
+          price: oi.price
+        })),
+        paymentMethod: order.payment_method || 'COD',
+        paymentStatus: order.payment_status || 'pending',
         shippingAddress: {
-          receiverName: 'Nguyễn Văn A',
-          phoneNumber: '0123456789',
-          addressDetail: '123 Đường ABC',
-          ward: 'Phường XYZ',
-          district: 'Quận 1',
-          province: 'TP.HCM',
+          receiverName: shippingAddressRaw.full_name || shippingAddressRaw.receiver_name || '',
+          phoneNumber: shippingAddressRaw.phone || shippingAddressRaw.phone_number || '',
+          addressDetail: shippingAddressRaw.address || shippingAddressRaw.address_detail || '',
+          street: shippingAddressRaw.street || '',
+          ward: shippingAddressRaw.ward || '',
+          district: shippingAddressRaw.district || '',
+          province: shippingAddressRaw.province || ''
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        orderHistory: [
-          {
-            status: 'created',
-            timestamp: new Date().toISOString(),
-            description: 'Đơn hàng đã được tạo',
-          }
-        ],
+        createdAt: order.order_date || order.createdAt,
+        updatedAt: order.updatedAt,
+        orderHistory: order.order_history || [],
       });
     } catch (error) {
       console.error('Error loading order detail:', error);
@@ -114,26 +104,45 @@ const OrderDetailScreen = () => {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!token || !orderId) return;
+    Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
+      { text: 'Không', style: 'cancel' },
+      { text: 'Hủy đơn', style: 'destructive', onPress: async () => {
+        setCancelling(true);
+        try {
+          await cancelOrder(token, orderId as string, 'Khách tự hủy');
+          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
+          loadOrderDetail();
+        } catch (e) {
+          Alert.alert('Lỗi', 'Không thể hủy đơn hàng.');
+        } finally {
+          setCancelling(false);
+        }
+      }}
+    ]);
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'confirmed': return '#3498db';
-      case 'shipping': return '#9b59b6';
+      case 'processing': return '#3498db';
+      case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
       case 'cancelled': return '#4A90E2';
-      case 'completed': return '#2ecc71';
       default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
       case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
       default: return 'Không xác định';
     }
   };
@@ -307,10 +316,22 @@ const OrderDetailScreen = () => {
           <View style={styles.addressContainer}>
             <Ionicons name="location-outline" size={20} color="#667eea" />
             <View style={styles.addressInfo}>
-              <Text style={styles.receiverName}>{order.shippingAddress.receiverName}</Text>
-              <Text style={styles.phoneNumber}>{order.shippingAddress.phoneNumber}</Text>
+              {/* Tên người nhận và số điện thoại */}
+              {(order.shippingAddress.receiverName || order.shippingAddress.phoneNumber) && (
+                <Text style={styles.receiverName}>
+                  {order.shippingAddress.receiverName}
+                  {order.shippingAddress.phoneNumber ? ` - ${order.shippingAddress.phoneNumber}` : ''}
+                </Text>
+              )}
+              {/* Địa chỉ đầy đủ */}
               <Text style={styles.addressDetail}>
-                {order.shippingAddress.addressDetail}, {order.shippingAddress.ward}, {order.shippingAddress.district}, {order.shippingAddress.province}
+                {[
+                  order.shippingAddress.addressDetail, // Số nhà, hẻm, v.v.
+                  order.shippingAddress.street,        // Đường
+                  order.shippingAddress.ward,          // Phường/Xã
+                  order.shippingAddress.district,      // Quận/Huyện
+                  order.shippingAddress.province       // Tỉnh/Thành phố
+                ].filter(Boolean).join(', ')}
               </Text>
             </View>
           </View>
@@ -366,6 +387,25 @@ const OrderDetailScreen = () => {
           ))}
         </View>
       </ScrollView>
+      {/* Nút hủy đơn hàng ở dưới cùng */}
+      {order.status !== 'cancelled' && order.status !== 'completed' && (
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#bbb',
+            padding: 16,
+            borderRadius: 8,
+            margin: 16,
+            alignItems: 'center',
+            opacity: cancelling ? 0.7 : 1
+          }}
+          onPress={handleCancelOrder}
+          disabled={cancelling}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>
+            {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };

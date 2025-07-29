@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -143,10 +143,17 @@ const CartScreen = () => {
   };
 
   const calculateTotal = () => {
-    return selectedItems.reduce((total, bookId) => {
+    // Log chi tiết các item được chọn và số lượng
+    const total = selectedItems.reduce((sum, bookId) => {
       const item = cart.find(cartItem => cartItem.book_id._id === bookId);
-      return total + (item ? item.book_id.price * item.quantity : 0);
+      if (item) {
+        console.log(`Tính tiền: ${item.book_id.title} x ${item.quantity} = ${item.book_id.price * item.quantity}`);
+        return sum + (item.book_id.price * item.quantity);
+      }
+      return sum;
     }, 0);
+    console.log('Tổng tiền các item được chọn:', total);
+    return total;
   };
 
   const handleCheckout = useCallback(async () => {

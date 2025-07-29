@@ -1,7 +1,7 @@
 // src/api/axiosInstance.ts
 import axios from 'axios';
 
-const BASE_URL = 'https://server-shelf-stacker.onrender.com/'; // Base URL của API của bạn
+const BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com/'; // Base URL của API của bạn
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,

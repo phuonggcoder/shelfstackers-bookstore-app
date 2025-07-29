@@ -1,10 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import { useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-const SearchBar = () => {
+interface SearchBarProps {
+  onApplySimpleFilter?: (filter: { price: number; sort: 'az' | 'za' | null }) => void;
+  onCategoryPress?: () => void;
+}
+
+const SearchBar = ({ onApplySimpleFilter, onCategoryPress }: SearchBarProps) => {
   const router = useRouter();
+  const [isFocused, setIsFocused] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [lastFilter, setLastFilter] = useState<{ price: number; sort: 'az' | 'za' | null }>({ price: 0, sort: null });
 
   const handleSearchPress = () => {
     // Navigate đến trang search và truyền param để tự động focus
@@ -13,12 +21,40 @@ const SearchBar = () => {
     router.push(`/(tabs)/search?autoFocus=true&t=${timestamp}`);
   };
 
+  const handleFocus = () => setIsFocused(true);
+  const handleBlur = () => setIsFocused(false);
+
+  const handleFilterPress = () => {
+    // Chuyển thẳng sang trang filtered-books.tsx
+    router.push('/filtered-books');
+  };
+
+  const handleApplyFilter = (filter: { price: number; sort: 'az' | 'za' | null }) => {
+    setLastFilter(filter);
+    setShowFilterModal(false);
+    setTimeout(() => {
+      router.push({ pathname: '/filtered-books', params: filter });
+    }, 300);
+  };
+
+  const handleAdvanced = () => {
+    setShowFilterModal(false);
+    setTimeout(() => {
+      router.push({ pathname: '/filtered-books', params: lastFilter });
+    }, 300);
+  };
+
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.categoryButton} onPress={onCategoryPress}>
+        <Ionicons name="grid-outline" size={22} color="#fff" />
+      </TouchableOpacity>
       <TouchableOpacity 
-        style={styles.searchSection}
+        style={[styles.searchSection, isFocused && styles.searchSectionFocused]}
         onPress={handleSearchPress}
         activeOpacity={0.8}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
       >
         <Ionicons name="search" size={22} color="#888" style={styles.searchIcon} />
         <TextInput
@@ -28,9 +64,10 @@ const SearchBar = () => {
           pointerEvents="none" // Disable pointer events cho input
         />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.filterButton}>
+      <TouchableOpacity style={styles.filterButton} onPress={handleFilterPress}>
         <Ionicons name="filter" size={22} color="#fff" />
       </TouchableOpacity>
+      {/* Đã bỏ SimpleFilterModal */}
     </View>
   );
 };
@@ -40,6 +77,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 10,
+  },
+  categoryButton: {
+    marginRight: 15,
+    backgroundColor: '#5E5CE6',
+    padding: 14,
+    borderRadius: 15,
   },
   searchSection: {
     flex: 1,
@@ -63,6 +106,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#5E5CE6',
     padding: 14,
     borderRadius: 15,
+  },
+  searchSectionFocused: {
+    borderColor: '#5E5CE6',
+    borderWidth: 2,
+    shadowColor: '#5E5CE6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
 });
 
