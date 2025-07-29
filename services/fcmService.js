@@ -18,7 +18,7 @@ export async function syncFcmToken(userId, deviceId, authToken) {
         'Authorization': `Bearer ${authToken}`
       };
       
-      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/register-device-token', {
+      const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/register-device-token', {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
@@ -44,7 +44,7 @@ export async function removeFcmToken(userId) {
   const token = await getFcmToken();
   if (userId && token) {
     try {
-      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/unregister-device-token', {
+      const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/unregister-device-token', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceToken: token }),
@@ -74,7 +74,7 @@ export async function createOrUpdateSession(userId, deviceId, loginTime, deviceI
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-    const res = await fetch('https://server-shelf-stacker.onrender.com/session', {
+    const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/session', {
       method: 'POST',
       headers,
       body: JSON.stringify({ user_id: userId, device_id: deviceId, login_time: loginTime, device_info: deviceInfo }),
@@ -93,7 +93,7 @@ export async function updateSessionFcmToken(userId, deviceId, fcmToken, authToke
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-    const res = await fetch('https://server-shelf-stacker.onrender.com/session/fcm', {
+    const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/session/fcm', {
       method: 'POST',
       headers,
       body: JSON.stringify({ user_id: userId, device_id: deviceId, fcm_token: fcmToken }),

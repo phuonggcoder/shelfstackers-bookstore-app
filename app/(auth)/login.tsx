@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
     ActivityIndicator,
@@ -73,7 +73,7 @@ export default function Login() {
       }
       // Gửi idToken lên backend
       console.log('🔍 Sending idToken to backend:', idToken.substring(0, 50) + '...');
-      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/google-signin', {
+      const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/google-signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_token: idToken }),

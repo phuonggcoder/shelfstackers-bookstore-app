@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Book, Category } from '../types';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth';
 
-const API_BASE_URL = 'https://server-shelf-stacker.onrender.com';
+const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 
 export const getCategories = async (): Promise<Category[]> => {
   const response = await fetch(`${API_BASE_URL}/api/categories`);

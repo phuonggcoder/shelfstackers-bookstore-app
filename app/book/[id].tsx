@@ -122,7 +122,7 @@ const BookDetailsScreen = () => {
     if (book && token) {
       const checkFavorite = async () => {
         try {
-          const res = await fetch('https://server-shelf-stacker.onrender.com/api/wishlist', {
+          const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/wishlist', {
             headers: { Authorization: `Bearer ${token}` }
           });
           const data = await res.json();

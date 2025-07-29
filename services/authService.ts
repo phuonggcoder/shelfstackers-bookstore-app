@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth';
 
-const API_URL = 'https://server-shelf-stacker.onrender.com/auth';
-const USER_URL = 'https://server-shelf-stacker.onrender.com/api/users';
+const API_URL = 'https://server-shelf-stacker-w1ds.onrender.com/auth';
+const USER_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api/users';
 
 const mapUserResponse = (serverResponse: any): AuthResponse => {
   if (!serverResponse || !serverResponse.token || !serverResponse.user) {
@@ -88,7 +88,7 @@ export const authService = {
     const token = await AsyncStorage.getItem('token');
     const userId = updateData._id || updateData.userId;
     if (!userId) throw new Error('Thiếu userId');
-    const response = await fetch(`https://server-shelf-stacker.onrender.com/api/auth/update/${userId}`, {
+    const response = await fetch(`https://server-shelf-stacker-w1ds.onrender.com/api/auth/update/${userId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ export const authService = {
       type: 'image/jpeg',
     } as any);
 
-    const response = await fetch('https://server-shelf-stacker.onrender.com/api/user-upload/avatar', {
+    const response = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/user-upload/avatar', {
       method: 'POST',
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -146,7 +146,7 @@ export const authService = {
   // Lấy thông tin user hiện tại dựa trên token
   getMe: async (token: string): Promise<any> => {
     if (!token) throw new Error('Missing token');
-    const response = await fetch('https://server-shelf-stacker.onrender.com/auth/me', {
+    const response = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/me', {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://server-shelf-stacker.onrender.com/api';
+const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api';
 
 export type LocationItem = {
   id: string;
