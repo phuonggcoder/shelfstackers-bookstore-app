@@ -471,5 +471,18 @@
     "outOfStock": "Hết hàng",
     "someProductsInsufficient": "Một số sản phẩm không đủ số lượng",
     "productOutOfStock": "Sản phẩm này hiện đã hết hàng"
+  },
+  "myReviews": {
+    "myReviews": "Đánh giá của tôi",
+    "myReviewsWithCount": "Đánh giá của tôi ({{count}})",
+    "noReviewsYet": "Bạn chưa có đánh giá nào",
+    "noReviewsMessage": "Hãy mua sản phẩm và đánh giá để chia sẻ trải nghiệm",
+    "loadingReviews": "Đang tải đánh giá...",
+    "loadingMore": "Đang tải thêm...",
+    "confirmDelete": "Xác nhận xóa",
+    "confirmDeleteMessage": "Bạn có chắc chắn muốn xóa đánh giá này?",
+    "reviewDeleted": "Đánh giá đã được xóa",
+    "cannotDeleteReview": "Không thể xóa đánh giá",
+    "cannotLoadReviews": "Không thể tải danh sách đánh giá"
   }
 } 

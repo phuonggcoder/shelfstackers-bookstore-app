@@ -189,7 +189,7 @@ const SettingsScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/my-reviews' as any)}>
             <Ionicons name="star-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đánh giá của tôi</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('myReviews.myReviews')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>
