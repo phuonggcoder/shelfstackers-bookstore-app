@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import CustomLoginDialog from '../../components/BottomAlert';
@@ -13,6 +13,7 @@ import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
+import ReviewService, { ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
 
@@ -69,6 +70,10 @@ const BookDetailsScreen = () => {
   const [qtyError, setQtyError] = useState('');
   const inputQtyRef = useRef<TextInput>(null);
   const maxQty = book?.stock || 99;
+  
+  // Review summary state
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
 
   // Memoize values to prevent unnecessary re-renders
   const tagsStyles = useMemo(() => ({
@@ -156,6 +161,24 @@ const BookDetailsScreen = () => {
       fetchRelated();
     }
   }, [book]);
+
+  // Fetch review summary when book is loaded
+  useEffect(() => {
+    if (book && token) {
+      const fetchReviewSummary = async () => {
+        try {
+          setLoadingReviewSummary(true);
+          const summary = await ReviewService.getProductReviewSummary(book._id, token);
+          setReviewSummary(summary);
+        } catch (error) {
+          console.error('Error fetching review summary:', error);
+        } finally {
+          setLoadingReviewSummary(false);
+        }
+      };
+      fetchReviewSummary();
+    }
+  }, [book, token]);
 
   // Show/hide overlay with animation when alert changes
   useEffect(() => {
@@ -593,6 +616,81 @@ const BookDetailsScreen = () => {
         </View>
 
         <View style={{ height: 10 }} />
+        
+        {/* Review Section */}
+        <View style={styles.reviewSection}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewTitle}>Đánh giá sản phẩm</Text>
+            <TouchableOpacity 
+              style={styles.viewAllReviewsButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Text style={styles.viewAllReviewsText}>Xem tất cả</Text>
+              <Ionicons name="chevron-forward" size={16} color="#3255FB" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Review Summary */}
+          {loadingReviewSummary ? (
+            <View style={styles.reviewPlaceholder}>
+              <ActivityIndicator size="small" color="#3255FB" />
+              <Text style={styles.reviewPlaceholderText}>Đang tải đánh giá...</Text>
+            </View>
+          ) : reviewSummary && reviewSummary.totalReviews > 0 ? (
+            <View style={styles.reviewSummary}>
+              <View style={styles.reviewRating}>
+                <Text style={styles.reviewRatingText}>{reviewSummary.averageRating.toFixed(1)}</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= reviewSummary.averageRating ? "star" : "star-outline"}
+                      size={16}
+                      color={star <= reviewSummary.averageRating ? "#FFD700" : "#CCC"}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.reviewCountText}>
+                  {reviewSummary.totalReviews} đánh giá
+                </Text>
+              </View>
+              <View style={styles.reviewDistribution}>
+                {[5, 4, 3, 2, 1].map((rating) => {
+                  const count = reviewSummary.ratingCounts[rating as keyof typeof reviewSummary.ratingCounts] || 0;
+                  const percentage = reviewSummary.totalReviews > 0 
+                    ? (count / reviewSummary.totalReviews) * 100 
+                    : 0;
+                  return (
+                    <View key={rating} style={styles.ratingBar}>
+                      <Text style={styles.ratingLabel}>{rating}★</Text>
+                      <View style={styles.ratingBarContainer}>
+                        <View 
+                          style={[
+                            styles.ratingBarFill, 
+                            { width: `${percentage}%` }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={styles.ratingCount}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.reviewPlaceholder}>
+              <Ionicons name="star-outline" size={48} color="#CCC" />
+              <Text style={styles.reviewPlaceholderText}>Chưa có đánh giá nào</Text>
+              <Text style={styles.reviewPlaceholderSubtext}>
+                Hãy là người đầu tiên đánh giá sản phẩm này
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
@@ -1190,6 +1288,105 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  reviewSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  viewAllReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllReviewsText: {
+    fontSize: 14,
+    color: '#3255FB',
+    fontWeight: '500',
+  },
+  reviewPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+  },
+  reviewPlaceholderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  reviewPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // Review Summary Styles
+  reviewSummary: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+  },
+  reviewRating: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewRatingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  reviewCountText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  reviewDistribution: {
+    gap: 8,
+  },
+  ratingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingLabel: {
+    fontSize: 12,
+    color: '#666',
+    width: 20,
+  },
+  ratingBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  ratingBarFill: {
+    height: '100%',
+    backgroundColor: '#FFD700',
+  },
+  ratingCount: {
+    fontSize: 12,
+    color: '#666',
+    width: 30,
+    textAlign: 'right',
   },
 });
 

@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 // ... trong component
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -115,6 +115,7 @@ const SettingsScreen = () => {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const navigation = useNavigation();
+  const router = useRouter();
   const { avatarUri } = useAvatar();
   const [localDetail, setLocalDetail] = React.useState<any>(null);
   const [displayName, setDisplayName] = useState('');
@@ -184,6 +185,11 @@ const SettingsScreen = () => {
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('order-history' as never)}>
             <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('orderHistory')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/my-reviews' as any)}>
+            <Ionicons name="star-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đánh giá của tôi</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>

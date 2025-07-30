@@ -5,8 +5,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReviewForm from '../components/ReviewForm';
+import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
 import { cancelOrder, getOrderDetail } from '../services/orderService';
+import ReviewService from '../services/reviewService';
 
 interface OrderItem {
   book: {
@@ -38,7 +41,7 @@ interface OrderDetail {
     ward: string;
     district: string;
     province: string;
-    street?: string; // Added for new mapping
+    street?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -57,6 +60,12 @@ const OrderDetailScreen = () => {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [isUpdateReview, setIsUpdateReview] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<OrderItem | null>(null);
+  const [existingReview, setExistingReview] = useState<any>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     loadOrderDetail();
@@ -123,6 +132,93 @@ const OrderDetailScreen = () => {
         }
       }}
     ]);
+  };
+
+  const handleReviewProduct = async (product: OrderItem) => {
+    if (!token) return;
+    
+    setSelectedProduct(product);
+    setReviewLoading(true);
+    
+    try {
+      // Check if user already reviewed this product from this order
+      const userReview = await ReviewService.checkUserReview(
+        product.book._id, 
+        orderId as string, 
+        token
+      );
+      setExistingReview(userReview);
+    } catch (error) {
+      console.error('Error checking existing review:', error);
+      setExistingReview(null);
+    } finally {
+      setReviewLoading(false);
+      setShowReviewForm(true);
+    }
+  };
+
+  const handleReviewSubmit = async (reviewData: any) => {
+    if (!token || !selectedProduct || !orderId) return;
+    
+    try {
+      if (existingReview) {
+        await ReviewService.updateReview(
+          existingReview._id,
+          reviewData,
+          token
+        );
+        setIsUpdateReview(true);
+      } else {
+        await ReviewService.createReview({
+          productId: selectedProduct.book._id,
+          orderId: orderId as string,
+          rating: reviewData.rating,
+          comment: reviewData.comment,
+          media: reviewData.mediaUrls || []
+        }, token);
+        setIsUpdateReview(false);
+      }
+      setShowReviewForm(false);
+      setShowThankYouModal(true);
+      setSelectedProduct(null);
+      setExistingReview(null);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+    }
+  };
+
+  const handleGoHome = () => {
+    setShowThankYouModal(false);
+    router.push('/');
+  };
+
+  const handleCloseThankYouModal = () => {
+    setShowThankYouModal(false);
+  };
+
+  const handleReviewCancel = () => {
+    setShowReviewForm(false);
+    setSelectedProduct(null);
+    setExistingReview(null);
+  };
+
+  const handleReviewOrder = () => {
+    if (!order) return;
+    
+    // Navigate to product-reviews with order information
+    router.push({
+      pathname: '/product-reviews',
+      params: {
+        orderId: order._id,
+        orderCode: order.orderCode,
+        items: JSON.stringify(order.items)
+      }
+    });
+  };
+
+  const isOrderCompleted = () => {
+    return order?.status?.toLowerCase() === 'delivered';
   };
 
   const getStatusColor = (status: string) => {
@@ -265,7 +361,10 @@ const OrderDetailScreen = () => {
             <View style={styles.statusInfo}>
               <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
               <Text style={styles.statusDescription}>
-                {t('orderProcessing')}
+                {isOrderCompleted() 
+                  ? t('orderDeliveredSuccessfully')
+                  : t('orderProcessing')
+                }
               </Text>
             </View>
           </View>
@@ -307,6 +406,19 @@ const OrderDetailScreen = () => {
                 <Text style={styles.itemPrice}>
                   {formatPrice(item.price)} x {item.quantity}
                 </Text>
+                {/* Review button for completed orders */}
+                {isOrderCompleted() && (
+                  <TouchableOpacity
+                    style={styles.productReviewButton}
+                    onPress={() => handleReviewProduct(item)}
+                    disabled={reviewLoading}
+                  >
+                    <Ionicons name="star-outline" size={16} color="#667eea" />
+                    <Text style={styles.productReviewButtonText}>
+                      {reviewLoading ? 'Đang tải...' : 'Đánh giá sản phẩm'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -328,11 +440,11 @@ const OrderDetailScreen = () => {
               {/* Địa chỉ đầy đủ */}
               <Text style={styles.addressDetail}>
                 {[
-                  order.shippingAddress.addressDetail, // Số nhà, hẻm, v.v.
-                  order.shippingAddress.street,        // Đường
-                  order.shippingAddress.ward,          // Phường/Xã
-                  order.shippingAddress.district,      // Quận/Huyện
-                  order.shippingAddress.province       // Tỉnh/Thành phố
+                  order.shippingAddress.addressDetail,
+                  order.shippingAddress.street,
+                  order.shippingAddress.ward,
+                  order.shippingAddress.district,
+                  order.shippingAddress.province
                 ].filter(Boolean).join(', ')}
               </Text>
             </View>
@@ -389,25 +501,49 @@ const OrderDetailScreen = () => {
           ))}
         </View>
       </ScrollView>
-      {/* Nút hủy đơn hàng ở dưới cùng */}
-      {order.status !== 'cancelled' && order.status !== 'completed' && (
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#bbb',
-            padding: 16,
-            borderRadius: 8,
-            margin: 16,
-            alignItems: 'center',
-            opacity: cancelling ? 0.7 : 1
-          }}
-          onPress={handleCancelOrder}
-          disabled={cancelling}
-        >
-          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>
-            {cancelling ? t('cancelling') : t('cancelOrder')}
-          </Text>
-        </TouchableOpacity>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtonsContainer}>
+        {isOrderCompleted() ? (
+          <TouchableOpacity
+            style={styles.reviewButton}
+            onPress={handleReviewOrder}
+          >
+            <Ionicons name="star-outline" size={20} color="white" />
+            <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
+          </TouchableOpacity>
+        ) : order.status !== 'cancelled' && order.status !== 'delivered' ? (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancelOrder}
+            disabled={cancelling}
+          >
+            <Text style={styles.cancelButtonText}>
+              {cancelling ? t('cancelling') : t('cancelOrder')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Review Form Modal */}
+      {showReviewForm && selectedProduct && (
+        <ReviewForm
+          productId={selectedProduct.book._id}
+          orderId={orderId as string}
+          existingReview={existingReview}
+          onSubmit={handleReviewSubmit}
+          onCancel={handleReviewCancel}
+          isLoading={false}
+        />
       )}
+
+      {/* Thank You Modal */}
+      <ThankYouModal
+        visible={showThankYouModal}
+        onClose={handleCloseThankYouModal}
+        onGoHome={handleGoHome}
+        isUpdate={isUpdateReview}
+      />
     </SafeAreaView>
   );
 };
@@ -515,38 +651,27 @@ const styles = StyleSheet.create({
   },
   productItem: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f4',
   },
   productImageContainer: {
+    marginRight: 12,
+  },
+  productImage: {
     width: 60,
     height: 80,
     borderRadius: 8,
-    overflow: 'hidden',
-    marginRight: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
   },
   productInfo: {
     flex: 1,
-    justifyContent: 'center',
   },
   productTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 4,
-    lineHeight: 20,
   },
   productAuthor: {
     fontSize: 14,
@@ -554,8 +679,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#4A90E2',
   },
   addressContainer: {
@@ -568,13 +693,8 @@ const styles = StyleSheet.create({
   },
   receiverName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 4,
-  },
-  phoneNumber: {
-    fontSize: 14,
-    color: '#7f8c8d',
     marginBottom: 4,
   },
   addressDetail: {
@@ -638,6 +758,54 @@ const styles = StyleSheet.create({
   historyTime: {
     fontSize: 14,
     color: '#7f8c8d',
+  },
+  // Review button styles for product items
+  productReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  productReviewButtonText: {
+    color: '#667eea',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  // Action buttons container and styles
+  actionButtonsContainer: {
+    padding: 16,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#667eea',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  reviewButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#bbb',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    opacity: 1,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
