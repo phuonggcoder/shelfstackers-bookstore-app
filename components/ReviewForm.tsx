@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreateReviewData, Review, UpdateReviewData } from '../services/reviewService';
@@ -292,7 +292,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         {/* Cancel Button */}
         <TouchableOpacity
           style={styles.cancelButton}
-          onPress={handleCancel}
+          onPress={onCancel}
         >
           <Text style={styles.cancelButtonText}>Hủy</Text>
         </TouchableOpacity>
