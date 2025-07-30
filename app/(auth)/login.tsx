@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Alert,
@@ -21,6 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 
 export default function Login() {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +37,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      Alert.alert(t('error'), t('pleaseEnterCompleteInformation'));
       return;
     }
 
@@ -43,11 +45,11 @@ export default function Login() {
       setIsLoading(true);
       const response = await authService.login({ username: email, password });
       await signIn(response);
-      Alert.alert('Thành công', 'Đăng nhập thành công!', [
+      Alert.alert(t('success'), t('loginSuccess'), [
         { text: 'OK', onPress: () => router.replace('/(tabs)') }
       ]);
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.message || 'Lỗi đăng nhập');
+      Alert.alert(t('loginFailed'), error.message || t('loginError'));
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +70,7 @@ export default function Login() {
       const idToken = userInfo.data?.idToken;
       console.log('🔍 ID Token:', idToken ? 'Found' : 'Not found');
       if (!idToken) {
-        Alert.alert('Không lấy được idToken từ Google');
+        Alert.alert(t('cannotGetIdTokenFromGoogle'));
         return;
       }
       // Gửi idToken lên backend
@@ -85,17 +87,17 @@ export default function Login() {
         // Lưu JWT vào AsyncStorage hoặc context
         await AsyncStorage.setItem('jwt', data.token);
         await signIn(data); // data phải trả về { user, token }
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!');
+        Alert.alert(t('loginSuccess'), t('welcome'));
         router.replace('/(tabs)');
       } else {
         // Xử lý lỗi EMAIL_NOT_VERIFIED
         if (data.code === 'EMAIL_NOT_VERIFIED') {
           Alert.alert(
-            'Email Google chưa xác thực',
-            'Tài khoản Google của bạn chưa xác thực email. Vui lòng vào Gmail xác thực email trước khi đăng nhập.'
+            t('googleEmailNotVerified'),
+            t('googleEmailNotVerifiedMessage')
           );
         } else {
-          Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+          Alert.alert(t('loginError'), data.message || t('anErrorOccurred'));
         }
       }
     } catch (error: any) {
@@ -104,9 +106,9 @@ export default function Login() {
       console.log('❌ Error message:', error.message);
       
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        Alert.alert('Đã hủy đăng nhập');
+        Alert.alert(t('loginCancelled'));
       } else {
-        Alert.alert('Lỗi', error.message);
+        Alert.alert(t('error'), error.message);
       }
     }
   };
@@ -122,8 +124,8 @@ export default function Login() {
           style={styles.logo}
           contentFit="contain"
         />
-        <Text style={styles.title}>Đăng nhập tài khoản</Text>
-        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+        <Text style={styles.title}>{t('loginAccount')}</Text>
+        <Text style={styles.subtitle}>{t('enterYourInformationBelow')}</Text>
       </View>
 
       <View style={styles.socialContainer}>
@@ -139,14 +141,14 @@ export default function Login() {
 
       <View style={styles.dividerContainer}>
         <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
+        <Text style={styles.dividerText}>{t('orLoginWith')}</Text>
         <View style={styles.dividerLine} />
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('email')}</Text>
         <TextInput
-          placeholder="Nhập email"
+          placeholder={t('enterEmail')}
           style={styles.input}
           value={email}
           onChangeText={setEmail}
@@ -155,10 +157,10 @@ export default function Login() {
           editable={!isLoading}
         />
 
-        <Text style={styles.label}>Mật khẩu</Text>
+        <Text style={styles.label}>{t('password')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Nhập mật khẩu"
+          placeholder={t('enterPassword')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -180,10 +182,10 @@ export default function Login() {
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
               {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
             </View>
-            <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+            <Text style={styles.rememberText}>{t('rememberLogin')}</Text>
           </TouchableOpacity>
           <TouchableOpacity>
-            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+            <Text style={styles.forgotText}>{t('forgotPassword')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -198,20 +200,20 @@ export default function Login() {
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            <Text style={styles.loginButtonText}>{t('login')}</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Chưa có tài khoản?</Text>
+          <Text style={styles.registerText}>{t('dontHaveAccount')}</Text>
           <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.registerLink}> Đăng ký ngay</Text>
+            <Text style={styles.registerLink}> {t('registerNow')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.orContainer}>
           <View style={styles.orLine} />
-          <Text style={styles.orText}>hoặc</Text>
+          <Text style={styles.orText}>{t('or')}</Text>
           <View style={styles.orLine} />
         </View>
 
@@ -220,7 +222,7 @@ export default function Login() {
           onPress={() => router.replace('/(tabs)')}
         >
           <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
-          <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
+          <Text style={styles.skipLoginText}>{t('loginLater')}</Text>
         </TouchableOpacity>
       </View>
      

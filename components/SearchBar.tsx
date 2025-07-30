@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface SearchBarProps {
@@ -9,6 +10,7 @@ interface SearchBarProps {
 }
 
 const SearchBar = ({ onApplySimpleFilter, onCategoryPress }: SearchBarProps) => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [isFocused, setIsFocused] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -58,7 +60,7 @@ const SearchBar = ({ onApplySimpleFilter, onCategoryPress }: SearchBarProps) => 
       >
         <Ionicons name="search" size={22} color="#888" style={styles.searchIcon} />
         <TextInput
-          placeholder="Tìm kiếm sách, tác giả..."
+          placeholder={t('searchPlaceholder')}
           style={styles.input}
           editable={false} // Disable input để chỉ cho phép click
           pointerEvents="none" // Disable pointer events cho input

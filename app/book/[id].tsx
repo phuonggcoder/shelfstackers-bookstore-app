@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
@@ -16,6 +17,7 @@ import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
 
 const BookDetailsScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -249,17 +251,17 @@ const BookDetailsScreen = () => {
       return;
     }
     if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
+      showToast(t('addedToWishlist'));
       return;
     }
     try {
       const res = await addToWishlist(token, bookId as string);
       console.log('Add to wishlist response:', res);
       setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      showToast(t('addedToWishlist'));
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      showToast(t('cannotAddToWishlist'));
     }
   };
 
@@ -301,7 +303,7 @@ const BookDetailsScreen = () => {
         });
       } catch (error) {
         console.error('Error adding book to cart for buy now:', error);
-        Alert.alert('Lỗi', 'Không thể thêm sản phẩm vào giỏ hàng.');
+        Alert.alert(t('error'), t('cannotAddProductToCart'));
       }
     };
     
@@ -323,11 +325,11 @@ const BookDetailsScreen = () => {
   const handleQtyConfirm = () => {
     const val = parseInt(inputQty, 10);
     if (isNaN(val) || val < 1) {
-      setQtyError('Số lượng phải lớn hơn 0');
+      setQtyError(t('quantityMustBeGreaterThanZero'));
       return;
     }
     if (val > maxQty) {
-      setQtyError('Chỉ còn ' + maxQty + ' sản phẩm');
+      setQtyError(t('onlyLeftProducts', { count: maxQty }));
       return;
     }
     setQuantity(val);
@@ -373,7 +375,7 @@ const BookDetailsScreen = () => {
           setShowLoginDialog(false);
           router.push('/(auth)/login');
         }}
-        message="Bạn cần đăng nhập để sử dụng tính năng này."
+        message={t('loginRequiredForFeature')}
       />
       <Stack.Screen
         options={{
@@ -546,16 +548,16 @@ const BookDetailsScreen = () => {
         <View style={styles.infoSectionBox}>
  
           <View style={styles.detailTable}>
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Thể loại:</Text><Text style={styles.detailValue}>{book.categories && book.categories.length > 0 ? book.categories.map((c: any) => c.name).join(', ') : '-'}</Text></View>
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('category')}:</Text><Text style={styles.detailValue}>{book.categories && book.categories.length > 0 ? book.categories.map((c: any) => c.name).join(', ') : '-'}</Text></View>
             <View style={styles.separator} />
-            {(book as any).supplier && <><View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà cung cấp:</Text><Text style={styles.detailValue}>{(book as any).supplier}</Text></View><View style={styles.separator} /></>}
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà xuất bản:</Text><Text style={styles.detailValue}>{book.publisher || '-'}</Text></View>
+            {(book as any).supplier && <><View style={styles.detailRow}><Text style={styles.detailLabel}>{t('supplier')}:</Text><Text style={styles.detailValue}>{(book as any).supplier}</Text></View><View style={styles.separator} /></>}
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('publisher')}:</Text><Text style={styles.detailValue}>{book.publisher || '-'}</Text></View>
             <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngày xuất bản:</Text><Text style={styles.detailValue}>{book.publication_date || '-'}</Text></View>
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('publicationDate')}:</Text><Text style={styles.detailValue}>{book.publication_date || '-'}</Text></View>
             <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngôn ngữ:</Text><Text style={styles.detailValue}>{book.language || '-'}</Text></View>
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('language')}:</Text><Text style={styles.detailValue}>{book.language || '-'}</Text></View>
             <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Tồn kho:</Text><Text style={styles.detailValue}>{book.stock}</Text></View>
+            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('stock')}:</Text><Text style={styles.detailValue}>{book.stock}</Text></View>
           </View>
           {/* Mô tả: chỉ show 6 dòng đầu, không ghi tiêu đề, cuối dòng 6 có nút xem thêm, căn giữa nút */}
           <View style={{ minHeight: 120 }}>
@@ -568,7 +570,7 @@ const BookDetailsScreen = () => {
                 <Text style={{ fontSize: 15, color: '#333', lineHeight: 22, textAlign: 'justify' }}>{preview}{isLong ? '...' : ''}</Text>
                 {isLong && (
                   <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}>
-                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>Xem thêm</Text>
+                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>{t('readMore')}</Text>
                   </TouchableOpacity>
                 )}
               </>;
@@ -577,7 +579,7 @@ const BookDetailsScreen = () => {
         </View>
 
         <View style={styles.authorContainer}>
-          <Text style={styles.sectionTitle}>Tác giả</Text>
+          <Text style={styles.sectionTitle}>{t('author')}</Text>
           <View style={styles.authorInfo}>
             {/* Xóa avatar tác giả */}
             {/* <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} /> */}
@@ -594,7 +596,7 @@ const BookDetailsScreen = () => {
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
-            <Text style={styles.relatedTitle}>Sách liên quan</Text>
+            <Text style={styles.relatedTitle}>{t('relatedBooks')}</Text>
             <FlatList
               data={relatedBooks}
               renderItem={({ item }) => <BookCard book={item} />}
@@ -649,7 +651,7 @@ const BookDetailsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
-            Thêm vào{"\n"}giỏ hàng
+            {t('addToCart')}{"\n"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -658,7 +660,7 @@ const BookDetailsScreen = () => {
           disabled={showLoginAlert || outOfStock}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Mua ngay</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{t('buyNow')}</Text>
         </TouchableOpacity>
       </Animated.View>
       {insets.bottom > 0 && (

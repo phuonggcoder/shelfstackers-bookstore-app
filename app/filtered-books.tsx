@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookGrid2Col from '../components/BookGrid2Col';
@@ -37,6 +38,7 @@ const PRICE_PRESETS = [
 type BookWithSupplier = Book & { supplier?: string };
 
 const FilteredBooksScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [books, setBooks] = useState<BookWithSupplier[]>([]);
@@ -190,9 +192,9 @@ const FilteredBooksScreen = () => {
   // Xử lý các sort chưa có API
   React.useEffect(() => {
     if (["week", "month", "year", "featured"].includes(sort)) {
-      console.log('Chức năng này chưa hỗ trợ API:', sort);
+      console.log(t('featureNotSupported'), sort);
     }
-  }, [sort]);
+  }, [sort, t]);
 
   // Xóa bộ lọc
   const clearFilters = () => {
@@ -228,7 +230,7 @@ const FilteredBooksScreen = () => {
       <View style={{width: 120}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowCategoryDropdown(!showCategoryDropdown)}>
           <Ionicons name="list" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Danh mục</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('categories')}</Text>
           <Ionicons name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showCategoryDropdown && (
@@ -243,7 +245,7 @@ const FilteredBooksScreen = () => {
                 </Pressable>
               ))}
               <Pressable style={{padding:12}} onPress={()=>{setSelectedCategories([]);setShowCategoryDropdown(false);}}>
-                <Text style={{color:'#888'}}>Tất cả danh mục</Text>
+                <Text style={{color:'#888'}}>{t('allCategories')}</Text>
               </Pressable>
             </ScrollView>
           </View>
@@ -253,7 +255,7 @@ const FilteredBooksScreen = () => {
       <View style={{width: 120}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowSortDropdown(!showSortDropdown)}>
           <Ionicons name="swap-vertical" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Sắp xếp</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('sort')}</Text>
           <Ionicons name={showSortDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showSortDropdown && (
@@ -275,7 +277,7 @@ const FilteredBooksScreen = () => {
       <View style={{flexDirection:'row',alignItems:'center'}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:16,paddingVertical:8, minWidth: 0}} onPress={()=>setShowFilterSidebar(true)}>
           <Ionicons name="filter" size={18} color="#fff" style={{marginRight:6}} />
-          <Text style={{color:'#fff',fontWeight:'bold',fontSize:13}}>Lọc</Text>
+          <Text style={{color:'#fff',fontWeight:'bold',fontSize:13}}>{t('filter')}</Text>
         </TouchableOpacity>
         {hasActiveFilter() && (
           <TouchableOpacity onPress={clearFilters} style={{marginLeft:4, padding:4}}>
@@ -292,14 +294,14 @@ const FilteredBooksScreen = () => {
       <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.18)',flexDirection:'row',justifyContent:'flex-end'}}>
         <View style={{width:'80%',backgroundColor:'#fff',height:'100%',padding:18,shadowColor:'#000',shadowOpacity:0.12,shadowRadius:12,elevation:4}}>
           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <Text style={{fontSize:18,fontWeight:'bold',color:'#1976D2'}}>Bộ Lọc</Text>
+            <Text style={{fontSize:18,fontWeight:'bold',color:'#1976D2'}}>{t('filters')}</Text>
             <TouchableOpacity onPress={()=>setShowFilterSidebar(false)}>
               <Ionicons name="close" size={26} color="#1976D2" />
             </TouchableOpacity>
           </View>
           <ScrollView>
       {/* Giá */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>Giá</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>{t('price')}</Text>
         <Slider
               style={{ width: '100%', height: 30 }}
           minimumValue={0}
@@ -322,7 +324,7 @@ const FilteredBooksScreen = () => {
             </View>
             {/* Giá theo khoảng tùy chỉnh */}
             <View style={{flexDirection:'row',alignItems:'center',gap:8,marginBottom:8}}>
-              <Text style={{color:'#1976D2'}}>Từ</Text>
+              <Text style={{color:'#1976D2'}}>{t('from')}</Text>
               <TextInput
                 style={{borderWidth:1,borderColor:'#1976D2',borderRadius:6,padding:4,minWidth:60,textAlign:'center',color:'#1976D2'}}
                 keyboardType="numeric"
@@ -330,7 +332,7 @@ const FilteredBooksScreen = () => {
                 onChangeText={v=>setMinPrice(Number(v.replace(/\D/g, '')))}
                 placeholder="0"
               />
-              <Text style={{color:'#1976D2'}}>đến</Text>
+              <Text style={{color:'#1976D2'}}>{t('to')}</Text>
               <TextInput
                 style={{borderWidth:1,borderColor:'#1976D2',borderRadius:6,padding:4,minWidth:60,textAlign:'center',color:'#1976D2'}}
                 keyboardType="numeric"
@@ -341,7 +343,7 @@ const FilteredBooksScreen = () => {
               <Text style={{color:'#1976D2'}}>đ</Text>
       </View>
             {/* Ngôn ngữ */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Ngôn ngữ</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('language')}</Text>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
               {languages.map(lang => (
                 <TouchableOpacity key={lang} style={{backgroundColor:selectedLanguages.includes(lang)?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:16,paddingHorizontal:12,paddingVertical:6,marginBottom:6}} onPress={()=>setSelectedLanguages(selectedLanguages.includes(lang)?selectedLanguages.filter(l=>l!==lang):[...selectedLanguages,lang])}>
@@ -350,7 +352,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
       {/* Số item/hàng */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Số item/hàng</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('itemsPerRow')}</Text>
             <View style={{flexDirection:'row',gap:8,marginBottom:8}}>
         {ITEM_PER_ROW_OPTIONS.map(opt => (
                 <TouchableOpacity key={opt} style={{backgroundColor:itemPerRow===opt?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:12,paddingVertical:6}} onPress={()=>setItemPerRow(opt)}>
@@ -359,7 +361,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
       {/* Số item/trang */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Số item/trang</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('itemsPerPage')}</Text>
             <View style={{flexDirection:'row',gap:8,marginBottom:8}}>
         {PAGE_SIZE_OPTIONS.map(opt => (
                 <TouchableOpacity key={opt} style={{backgroundColor:pageSize===opt?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:12,paddingVertical:6}} onPress={()=>setPageSize(opt)}>
@@ -368,7 +370,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
             {/* Nhà cung cấp động + Xem thêm */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>Nhà cung cấp</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>{t('supplier')}</Text>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:8}}>
               {(showAllSuppliers?supplierList:supplierList.slice(0,6)).map(sup => (
                 <TouchableOpacity key={sup} style={{backgroundColor:selectedSuppliers.includes(sup)?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:16,paddingHorizontal:12,paddingVertical:6,marginBottom:6}} onPress={()=>setSelectedSuppliers(selectedSuppliers.includes(sup)?selectedSuppliers.filter(l=>l!==sup):[...selectedSuppliers,sup])}>
@@ -377,22 +379,22 @@ const FilteredBooksScreen = () => {
               ))}
               {supplierList.length>6 && !showAllSuppliers && (
                 <TouchableOpacity onPress={()=>setShowAllSuppliers(true)} style={{alignSelf:'center',marginTop:6}}>
-                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>Xem thêm ▼</Text>
+                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>{t('showMore')} ▼</Text>
                 </TouchableOpacity>
               )}
               {supplierList.length>6 && showAllSuppliers && (
                 <TouchableOpacity onPress={()=>setShowAllSuppliers(false)} style={{alignSelf:'center',marginTop:6}}>
-                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>Ẩn bớt ▲</Text>
+                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>{t('showLess')} ▲</Text>
                 </TouchableOpacity>
               )}
             </View>
     </ScrollView>
           <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:18}}>
             <TouchableOpacity style={{backgroundColor:'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:18,paddingVertical:10}} onPress={clearFilters}>
-              <Text style={{color:'#1976D2',fontWeight:'bold'}}>Xóa Bộ Lọc</Text>
+              <Text style={{color:'#1976D2',fontWeight:'bold'}}>{t('clearFilters')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:18,paddingVertical:10}} onPress={()=>setShowFilterSidebar(false)}>
-              <Text style={{color:'#fff',fontWeight:'bold'}}>Đóng</Text>
+              <Text style={{color:'#fff',fontWeight:'bold'}}>{t('close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -433,7 +435,7 @@ const FilteredBooksScreen = () => {
           >
             <TouchableOpacity activeOpacity={1} onPress={() => setShowModalInputPage(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
               <TouchableOpacity activeOpacity={1} style={{ width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 28, alignItems: 'center', elevation: 6 }} onPress={e => e.stopPropagation()}>
-                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>Nhập số trang</Text>
+                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>{t('enterPageNumber')}</Text>
                 <TextInput
                   ref={inputPageRef}
                   style={{ borderWidth: 1, borderColor: '#1976D2', borderRadius: 12, padding: 16, minWidth: 120, textAlign: 'center', color: '#1976D2', fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}
@@ -488,7 +490,7 @@ const FilteredBooksScreen = () => {
           >
             <TouchableOpacity activeOpacity={1} onPress={() => setShowModalInputPage(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
               <TouchableOpacity activeOpacity={1} style={{ width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 28, alignItems: 'center', elevation: 6 }} onPress={e => e.stopPropagation()}>
-                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>Nhập số trang</Text>
+                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>{t('enterPageNumber')}</Text>
                 <TextInput
                   ref={inputPageRef}
                   style={{ borderWidth: 1, borderColor: '#1976D2', borderRadius: 12, padding: 16, minWidth: 120, textAlign: 'center', color: '#1976D2', fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}
@@ -573,7 +575,7 @@ const FilteredBooksScreen = () => {
             <Ionicons name="search" size={28} color="#888" style={{marginRight:10}} />
             <TextInput
               style={{flex:1, color:'#222', fontSize:20, height:56, paddingVertical:0, backgroundColor:'transparent'}}
-              placeholder="Tìm kiếm sách..."
+              placeholder={t('searchBooks')}
               placeholderTextColor="#888"
               value={searchText}
               onChangeText={setSearchText}
@@ -585,7 +587,7 @@ const FilteredBooksScreen = () => {
       {/* Hiển thị tên danh mục đã chọn hoặc kết quả tìm kiếm */}
       {searchText.trim() ? (
         <Text style={{fontSize:20, fontWeight:'bold', color:'#1976D2', textAlign:'center', marginTop:12, marginBottom:4}}>
-          Kết quả tìm kiếm cho '{searchText.trim()}'
+          {t('searchResultsFor', { query: searchText.trim() })}
         </Text>
       ) : selectedCategoryName ? (
         <View style={{flexDirection:'row', alignItems:'center', justifyContent:'center', marginTop:12, marginBottom:4}}>
@@ -601,7 +603,7 @@ const FilteredBooksScreen = () => {
       {loading && (
         <View style={{alignItems:'center', marginTop:32}}>
           <ActivityIndicator size="large" color="#1976D2" />
-          <Text style={{color:'#1976D2', marginTop:8}}>Đang tải dữ liệu...</Text>
+          <Text style={{color:'#1976D2', marginTop:8}}>{t('loadingData')}</Text>
         </View>
       )}
       {/* Danh sách sách dạng lưới */}
@@ -630,8 +632,8 @@ const FilteredBooksScreen = () => {
           ListEmptyComponent={
             <View style={{alignItems:'center', marginTop:48}}>
               <Ionicons name="book-outline" size={64} color="#bdc3c7" style={{marginBottom:8}} />
-              <Text style={{fontSize:16, color:'#888', fontWeight:'500'}}>Không có sách phù hợp</Text>
-              <Text style={{fontSize:13, color:'#aaa', marginTop:4}}>Hãy thử thay đổi bộ lọc hoặc tìm kiếm khác.</Text>
+              <Text style={{fontSize:16, color:'#888', fontWeight:'500'}}>{t('noBooksFound')}</Text>
+              <Text style={{fontSize:13, color:'#aaa', marginTop:4}}>{t('tryChangingFilters')}</Text>
           </View>
           }
         />

@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +15,7 @@ import { getAvailableVouchers, validateVoucher } from '../services/voucherServic
 import { formatVND, getBookImageUrl } from '../utils/format';
 
 export default function OrderReviewScreen() {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { bookId, ids, cartItems: cartItemsParam, totalAmount, itemCount } = useLocalSearchParams();
   const [book, setBook] = useState<any>(null);
@@ -122,13 +124,13 @@ export default function OrderReviewScreen() {
           } catch (parseError) {
             console.error('Error parsing cartItemsParam:', parseError);
             console.log('cartItemsParam value:', cartItemsParam);
-            setError('Không thể xử lý dữ liệu giỏ hàng');
+            setError(t('orderReview.cannotProcessCartData'));
           }
         } else if (ids) {
           // Multi-item checkout from cart - only load selected items
           if (!token) {
             console.error('No token available for cart fetch');
-            setError('Không có token xác thực');
+            setError(t('orderReview.noAuthToken'));
             return;
           }
           const cartData = await getCart(token);
@@ -189,12 +191,12 @@ export default function OrderReviewScreen() {
             }
           } catch (storageError) {
             console.error('Error loading from AsyncStorage:', storageError);
-            setError('Không thể tải dữ liệu từ bộ nhớ');
+            setError(t('orderReview.cannotLoadFromStorage'));
           }
         }
       } catch (error) {
         console.error('Error loading data:', error);
-        setError('Không thể tải dữ liệu đơn hàng');
+        setError(t('orderReview.cannotLoadOrderData'));
       } finally {
         setLoading(false);
       }
@@ -254,7 +256,7 @@ export default function OrderReviewScreen() {
       await addToCart(token, book._id, 1);
       router.replace('/cart');
     } catch {
-      Alert.alert('Lỗi', 'Không thể thêm vào giỏ hàng.');
+      Alert.alert(t('error'), t('orderReview.cannotAddToCart'));
     }
   };
 
@@ -270,23 +272,23 @@ export default function OrderReviewScreen() {
 
   const handleConfirm = async () => {
     if (!token) {
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      Alert.alert(t('error'), t('orderReview.pleaseLoginAgain'));
       return;
     }
 
     if (!address) {
-      Alert.alert('Lỗi', 'Vui lòng chọn địa chỉ giao hàng.');
+      Alert.alert(t('error'), t('orderReview.pleaseSelectShippingAddress'));
       return;
     }
 
     if (!selectedPaymentMethod) {
-      Alert.alert('Lỗi', 'Vui lòng chọn phương thức thanh toán.');
+      Alert.alert(t('error'), t('orderReview.pleaseSelectPaymentMethod'));
       return;
     }
 
     // Check if we have items to order (either cart items or single book)
     if ((!cartItems || cartItems.length === 0) && !book) {
-      Alert.alert('Lỗi', 'Không có sản phẩm để đặt hàng. Vui lòng thêm sản phẩm vào giỏ hàng.');
+      Alert.alert(t('error'), t('orderReview.noProductsToOrder'));
       return;
     }
 
@@ -294,7 +296,7 @@ export default function OrderReviewScreen() {
     if (cartItems.length > 0) {
       const invalidItems = cartItems.filter(item => !item.book || !item.book._id);
       if (invalidItems.length > 0) {
-        Alert.alert('Lỗi', 'Một số sản phẩm trong giỏ hàng không hợp lệ. Vui lòng thử lại.');
+        Alert.alert(t('error'), t('orderReview.invalidCartItems'));
         return;
       }
       
@@ -307,16 +309,16 @@ export default function OrderReviewScreen() {
       
       if (outOfStockItems.length > 0) {
         const outOfStockMessage = outOfStockItems.map(item => 
-          `${item.book.title}: Còn ${item.book.stock}, Yêu cầu ${item.quantity}`
+          `${item.book.title}: ${t('orderReview.stockLeft', { count: item.book.stock })}, ${t('orderReview.requested', { count: item.quantity })}`
         ).join('\n');
-        Alert.alert('Hết hàng', `Một số sản phẩm không đủ số lượng:\n${outOfStockMessage}`);
+        Alert.alert(t('orderReview.outOfStock'), `${t('orderReview.someProductsInsufficient')}:\n${outOfStockMessage}`);
         return;
       }
     }
     
     // For single book, check stock
     if (book && (!book.stock || book.stock < 1)) {
-      Alert.alert('Hết hàng', 'Sản phẩm này hiện đã hết hàng.');
+      Alert.alert(t('orderReview.outOfStock'), t('orderReview.productOutOfStock'));
       return;
     }
 
@@ -482,7 +484,7 @@ export default function OrderReviewScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#3255FB" />
-        <Text style={{ marginTop: 10 }}>Đang tải...</Text>
+        <Text style={{ marginTop: 10 }}>{t('orderReview.loading')}</Text>
       </View>
     </SafeAreaView>
   );
@@ -498,7 +500,7 @@ export default function OrderReviewScreen() {
           style={{ marginTop: 20, padding: 10, backgroundColor: '#3255FB', borderRadius: 8 }}
           onPress={() => router.back()}
         >
-          <Text style={{ color: 'white' }}>Quay lại</Text>
+          <Text style={{ color: 'white' }}>{t('orderReview.back')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -509,13 +511,13 @@ export default function OrderReviewScreen() {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Ionicons name="cart-outline" size={64} color="#bdc3c7" />
         <Text style={{ fontSize: 18, marginTop: 10, textAlign: 'center' }}>
-          Không tìm thấy sản phẩm hoặc dữ liệu lỗi.
+          {t('orderReview.noProductError')}
         </Text>
         <TouchableOpacity 
           style={{ marginTop: 20, padding: 10, backgroundColor: '#3255FB', borderRadius: 8 }}
           onPress={() => router.back()}
         >
-          <Text style={{ color: 'white' }}>Quay lại</Text>
+          <Text style={{ color: 'white' }}>{t('orderReview.back')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -526,13 +528,13 @@ export default function OrderReviewScreen() {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Ionicons name="book-outline" size={64} color="#bdc3c7" />
         <Text style={{ fontSize: 18, marginTop: 10, textAlign: 'center' }}>
-          Không tìm thấy sản phẩm hoặc dữ liệu lỗi.
+          {t('orderReview.noProductError')}
         </Text>
         <TouchableOpacity 
           style={{ marginTop: 20, padding: 10, backgroundColor: '#3255FB', borderRadius: 8 }}
           onPress={() => router.back()}
         >
-          <Text style={{ color: 'white' }}>Quay lại</Text>
+          <Text style={{ color: 'white' }}>{t('orderReview.back')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -544,15 +546,15 @@ export default function OrderReviewScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#222" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Xác nhận đơn hàng</Text>
+        <Text style={styles.headerTitle}>{t('orderReview.confirmOrder')}</Text>
         <TouchableOpacity onPress={handleEdit} style={styles.editHeaderBtn}>
-          <Text style={styles.editHeaderText}>Chỉnh sửa</Text>
+          <Text style={styles.editHeaderText}>{t('orderReview.edit')}</Text>
         </TouchableOpacity>
       </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Sản phẩm</Text>
+          <Text style={styles.sectionLabel}>{t('orderReview.product')}</Text>
         </View>
         
         {cartItems.length > 0 ? (
@@ -566,10 +568,10 @@ export default function OrderReviewScreen() {
                 transition={200}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.bookTitle}>{item.book?.title || 'Không có tên'}</Text>
-                <Text style={styles.bookAuthor}>Tác giả: {item.book?.author || ''}</Text>
+                <Text style={styles.bookTitle}>{item.book?.title || t('orderReview.noName')}</Text>
+                <Text style={styles.bookAuthor}>{t('orderReview.author')}: {item.book?.author || ''}</Text>
                 <Text style={styles.bookPrice}>{formatVND(item.book?.price || 0)}</Text>
-                <Text style={styles.qty}>Số lượng: {item.quantity || 1}</Text>
+                <Text style={styles.qty}>{t('orderReview.quantity')}: {item.quantity || 1}</Text>
               </View>
             </View>
           ))
@@ -583,16 +585,16 @@ export default function OrderReviewScreen() {
               transition={200}
             />
             <View style={{ flex: 1 }}>
-              <Text style={styles.bookTitle}>{book.title || 'Không có tên'}</Text>
-              <Text style={styles.bookAuthor}>Tác giả: {book.author || ''}</Text>
+              <Text style={styles.bookTitle}>{book.title || t('orderReview.noName')}</Text>
+              <Text style={styles.bookAuthor}>{t('orderReview.author')}: {book.author || ''}</Text>
               <Text style={styles.bookPrice}>{formatVND(book.price || 0)}</Text>
-              <Text style={styles.qty}>Số lượng: 1</Text>
+              <Text style={styles.qty}>{t('orderReview.quantity')}: 1</Text>
             </View>
           </View>
         )}
         
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Địa chỉ nhận hàng</Text>
+          <Text style={styles.sectionLabel}>{t('orderReview.shippingAddress')}</Text>
         </View>
         
         {address ? (
@@ -607,14 +609,14 @@ export default function OrderReviewScreen() {
         ) : (
           <TouchableOpacity style={styles.noAddressContainer} onPress={handleAddressSelect}>
             <Ionicons name="location-outline" size={24} color="#bdc3c7" />
-            <Text style={styles.noAddressText}>Không có địa chỉ giao hàng</Text>
+            <Text style={styles.noAddressText}>{t('orderReview.noShippingAddress')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
         )}
         
         {/* --- VOUCHER SELECT ROW (hiển thị trên màn chính, giống payment) --- */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Mã khuyến mãi</Text>
+          <Text style={styles.sectionLabel}>{t('orderReview.voucherCode')}</Text>
         </View>
         <TouchableOpacity
           style={styles.paymentSelectBtn}
@@ -625,21 +627,21 @@ export default function OrderReviewScreen() {
             <Text style={{ color: selectedOrderVoucher || selectedShippingVoucher ? '#FF5722' : '#888', fontWeight: 'bold' }}>
               {(selectedOrderVoucher || selectedShippingVoucher)
                 ? [selectedOrderVoucher?.title || selectedOrderVoucher?.voucher_id, selectedShippingVoucher?.title || selectedShippingVoucher?.voucher_id].filter(Boolean).join(' + ')
-                : 'Chọn mã khuyến mãi'}
+                : t('orderReview.selectVoucher')}
             </Text>
             {/* Hiển thị mô tả và mức giảm cho từng loại nếu có */}
             {selectedOrderVoucher && (
               <Text style={{ color: '#4CAF50', fontSize: 13, fontWeight: 'bold' }}>
                 {selectedOrderVoucher.voucher_type === 'percent'
-                  ? `Giảm ${selectedOrderVoucher.discount_value}%`
-                  : `Giảm ${formatVND(selectedOrderVoucher.discount_value)}`}
+                  ? `${t('orderReview.discountPercent', { value: selectedOrderVoucher.discount_value })}`
+                  : `${t('orderReview.discountAmount', { value: formatVND(selectedOrderVoucher.discount_value) })}`}
               </Text>
             )}
             {selectedShippingVoucher && (
               <Text style={{ color: '#2196F3', fontSize: 13, fontWeight: 'bold' }}>
                 {selectedShippingVoucher.voucher_type === 'percent'
-                  ? `Giảm ${selectedShippingVoucher.discount_value}% phí vận chuyển`
-                  : `Giảm ${formatVND(selectedShippingVoucher.discount_value)} phí vận chuyển`}
+                  ? `${t('orderReview.shippingDiscountPercent', { value: selectedShippingVoucher.discount_value })}`
+                  : `${t('orderReview.shippingDiscountAmount', { value: formatVND(selectedShippingVoucher.discount_value) })}`}
               </Text>
             )}
           </View>
@@ -647,7 +649,7 @@ export default function OrderReviewScreen() {
         </TouchableOpacity>
         {/* --- PHƯƠNG THỨC THANH TOÁN (GỌN GÀNG, DẠNG MODAL) --- */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Phương thức thanh toán</Text>
+          <Text style={styles.sectionLabel}>{t('orderReview.paymentMethod')}</Text>
         </View>
         <TouchableOpacity
           style={styles.paymentSelectBtn}
@@ -655,7 +657,7 @@ export default function OrderReviewScreen() {
         >
           <Ionicons name={selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY ? 'card-outline' : 'cash-outline'} size={20} color="#3255FB" style={{ marginRight: 8 }} />
           <Text style={{ color: '#3255FB', fontWeight: 'bold' }}>
-            {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY ? 'Thanh toán qua ZaloPay' : 'Thanh toán khi nhận hàng (COD)'}
+            {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY ? t('orderReview.payViaZaloPay') : t('orderReview.payOnDelivery')}
           </Text>
         </TouchableOpacity>
         {/* Thay thế Modal voucher và payment bằng bottom sheet custom đẹp */}
@@ -673,12 +675,12 @@ export default function OrderReviewScreen() {
           >
             <View style={styles.bottomSheet}>
               <View style={styles.bottomSheetHandle} />
-              <Text style={styles.bottomSheetTitle}>Chọn mã khuyến mãi</Text>
+              <Text style={styles.bottomSheetTitle}>{t('orderReview.selectVoucher')}</Text>
               <ScrollView style={{ maxHeight: 320 }}>
                 {/* Mã giảm giá */}
-                <Text style={styles.voucherGroupTitle}>Mã giảm giá</Text>
+                <Text style={styles.voucherGroupTitle}>{t('orderReview.discountVoucher')}</Text>
                 {vouchers.filter(v => v.discount_type === 'order').length === 0 && (
-                  <Text style={styles.noVouchersText}>Không có mã giảm giá khả dụng</Text>
+                  <Text style={styles.noVouchersText}>{t('orderReview.noDiscountVouchers')}</Text>
                 )}
                 {vouchers.filter(v => v.discount_type === 'order').map(v => {
                   const expired = new Date(v.end_date) <= new Date();
@@ -699,10 +701,10 @@ export default function OrderReviewScreen() {
                         <Text style={styles.voucherDescription}>{v.description || ''}</Text>
                         <Text style={{ color: '#4CAF50', fontSize: 13, fontWeight: 'bold' }}>
                           {v.voucher_type === 'percent'
-                            ? `Giảm ${v.discount_value}%`
-                            : `Giảm ${formatVND(v.discount_value)}`}
+                            ? `${t('orderReview.discountPercent', { value: v.discount_value })}`
+                            : `${t('orderReview.discountAmount', { value: formatVND(v.discount_value) })}`}
                         </Text>
-                        <Text style={styles.voucherExpiry}>HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+                        <Text style={styles.voucherExpiry}>{t('orderReview.voucherExpiry')}: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
                       </View>
                       {tempOrderVoucher?._id === v._id && (
                         <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
@@ -711,9 +713,9 @@ export default function OrderReviewScreen() {
                   );
                 })}
                 {/* Mã vận chuyển */}
-                <Text style={styles.voucherGroupTitle}>Mã vận chuyển</Text>
+                <Text style={styles.voucherGroupTitle}>{t('orderReview.shippingVoucher')}</Text>
                 {vouchers.filter(v => v.discount_type === 'shipping').length === 0 && (
-                  <Text style={styles.noVouchersText}>Không có mã vận chuyển khả dụng</Text>
+                  <Text style={styles.noVouchersText}>{t('orderReview.noShippingVouchers')}</Text>
                 )}
                 {vouchers.filter(v => v.discount_type === 'shipping').map(v => {
                   const expired = new Date(v.end_date) <= new Date();
@@ -734,10 +736,10 @@ export default function OrderReviewScreen() {
                         <Text style={styles.voucherDescription}>{v.description || ''}</Text>
                         <Text style={{ color: '#2196F3', fontSize: 13, fontWeight: 'bold' }}>
                           {v.voucher_type === 'percent'
-                            ? `Giảm ${v.discount_value}% phí vận chuyển`
-                            : `Giảm ${formatVND(v.discount_value)} phí vận chuyển`}
+                            ? `${t('orderReview.shippingDiscountPercent', { value: v.discount_value })}`
+                            : `${t('orderReview.shippingDiscountAmount', { value: formatVND(v.discount_value) })}`}
                         </Text>
-                        <Text style={styles.voucherExpiry}>HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+                        <Text style={styles.voucherExpiry}>{t('orderReview.voucherExpiry')}: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
                       </View>
                       {tempShippingVoucher?._id === v._id && (
                         <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
@@ -752,7 +754,7 @@ export default function OrderReviewScreen() {
                   setSelectedShippingVoucher(tempShippingVoucher);
                   setVoucherModalVisible(false);
                 }}>
-                  <Text style={styles.bottomSheetBtnText}>Xác nhận</Text>
+                  <Text style={styles.bottomSheetBtnText}>{t('orderReview.confirm')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -772,7 +774,7 @@ export default function OrderReviewScreen() {
           >
             <View style={styles.bottomSheet}>
               <View style={styles.bottomSheetHandle} />
-              <Text style={styles.bottomSheetTitle}>Chọn phương thức thanh toán</Text>
+              <Text style={styles.bottomSheetTitle}>{t('orderReview.selectPaymentMethod')}</Text>
               <TouchableOpacity
                 style={[
                   styles.bottomSheetItem,
@@ -782,8 +784,8 @@ export default function OrderReviewScreen() {
               >
                 <Ionicons name="cash-outline" size={24} color="#3255FB" style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.paymentText}>Thanh toán khi nhận hàng (COD)</Text>
-                  <Text style={styles.paymentDescription}>Thanh toán bằng tiền mặt khi nhận hàng</Text>
+                  <Text style={styles.paymentText}>{t('orderReview.payOnDelivery')}</Text>
+                  <Text style={styles.paymentDescription}>{t('orderReview.payOnDeliveryDescription')}</Text>
                 </View>
                 {selectedPaymentMethod === PAYMENT_METHODS.COD && (
                   <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
@@ -798,8 +800,8 @@ export default function OrderReviewScreen() {
               >
                 <Ionicons name="card-outline" size={24} color="#3255FB" style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.paymentText}>Thanh toán qua ZaloPay</Text>
-                  <Text style={styles.paymentDescription}>Thanh toán nhanh chóng và an toàn</Text>
+                  <Text style={styles.paymentText}>{t('orderReview.payViaZaloPay')}</Text>
+                  <Text style={styles.paymentDescription}>{t('orderReview.payViaZaloPayDescription')}</Text>
                 </View>
                 {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY && (
                   <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
@@ -807,7 +809,7 @@ export default function OrderReviewScreen() {
               </TouchableOpacity>
               <View style={styles.bottomSheetActions}>
                 <TouchableOpacity style={styles.bottomSheetBtn} onPress={() => setPaymentModalVisible(false)}>
-                  <Text style={styles.bottomSheetBtnText}>Xác nhận</Text>
+                  <Text style={styles.bottomSheetBtnText}>{t('orderReview.confirm')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -815,17 +817,17 @@ export default function OrderReviewScreen() {
         </Modal>
         
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Tóm tắt đơn hàng</Text>
+          <Text style={styles.sectionLabel}>{t('orderReview.orderSummary')}</Text>
         </View>
-        <View style={styles.summaryRow}><Text>Tạm tính</Text><Text>{formatVND(subtotal)}</Text></View>
-        <View style={styles.summaryRow}><Text>Giảm giá</Text><Text style={{ color: '#4CAF50' }}>- {formatVND(discount)}</Text></View>
-        <View style={styles.summaryRow}><Text>Phí vận chuyển</Text><Text style={{ color: '#3255FB' }}>{shippingFee === 0 ? 'Miễn phí' : formatVND(shippingFee)}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.grandTotal}>Tổng cộng</Text><Text style={styles.grandTotal}>{formatVND(total)}</Text></View>
+        <View style={styles.summaryRow}><Text>{t('orderReview.subtotal')}</Text><Text>{formatVND(subtotal)}</Text></View>
+        <View style={styles.summaryRow}><Text>{t('orderReview.discount')}</Text><Text style={{ color: '#4CAF50' }}>- {formatVND(discount)}</Text></View>
+        <View style={styles.summaryRow}><Text>{t('orderReview.shippingFee')}</Text><Text style={{ color: '#3255FB' }}>{shippingFee === 0 ? t('orderReview.freeShipping') : formatVND(shippingFee)}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.grandTotal}>{t('orderReview.total')}</Text><Text style={styles.grandTotal}>{formatVND(total)}</Text></View>
         
       </ScrollView>
       
       <TouchableOpacity style={styles.payButton} onPress={handleConfirm}>
-        <Text style={styles.payButtonText}>Xác nhận đặt hàng</Text>
+        <Text style={styles.payButtonText}>{t('orderReview.confirmOrder')}</Text>
       </TouchableOpacity>
 
 

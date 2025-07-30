@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Notification = {
@@ -65,9 +65,11 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
 };
 
 const NotificationsScreen = () => {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Thông báo</Text>
+      <Text style={styles.title}>{t('notifications')}</Text>
       {mockNotifications.length > 0 ? (
         <FlatList
           data={mockNotifications}
@@ -78,7 +80,7 @@ const NotificationsScreen = () => {
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
-          <Text style={styles.emptyText}>Chưa có thông báo nào</Text>
+          <Text style={styles.emptyText}>{t('noNotificationsYet')}</Text>
         </View>
       )}
     </View>

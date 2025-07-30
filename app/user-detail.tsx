@@ -6,7 +6,8 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -22,6 +23,7 @@ const GENDERS = [
 ];
 
 export default function UserDetailScreen() {
+  const { t } = useTranslation();
   const { user, updateUser, isLoading, setUser, token } = useAuth();
   const router = useRouter();
   const { firstName, lastName, setFirstName, setLastName } = useName();
@@ -124,19 +126,19 @@ export default function UserDetailScreen() {
         setBirthday(formatDate(result.user.birth_date));
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật ngày sinh thành công',
+          text1: t('birthdayUpdateSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
           bottomOffset: 80,
         });
       } else {
-        throw new Error(result.message || 'Cập nhật ngày sinh thất bại');
+        throw new Error(result.message || t('birthdayUpdateFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Cập nhật ngày sinh thất bại',
+        text1: e.message || t('birthdayUpdateFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -171,7 +173,7 @@ export default function UserDetailScreen() {
         await AsyncStorage.setItem('user', JSON.stringify(result.user));
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật ảnh đại diện thành công',
+          text1: t('avatarUpdateSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -179,12 +181,12 @@ export default function UserDetailScreen() {
         });
         return result.user.avatar;
       } else {
-        throw new Error(result.message || 'Upload ảnh thất bại');
+        throw new Error(result.message || t('avatarUploadFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Upload ảnh thất bại',
+        text1: e.message || t('avatarUploadFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -199,7 +201,7 @@ export default function UserDetailScreen() {
     if (!permissionResult.granted) {
       Toast.show({
         type: 'error',
-        text1: 'Bạn cần cho phép truy cập thư viện ảnh để đổi avatar!',
+        text1: t('needPhotoLibraryPermission'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -252,19 +254,19 @@ export default function UserDetailScreen() {
         setFirstName(result.user.full_name?.split(' ').slice(-1)[0] || '');
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật hồ sơ thành công',
+          text1: t('profileUpdateSuccess'),
           position: 'top',
           visibilityTime: 2000,
           autoHide: true,
           topOffset: 60,
         });
       } else {
-        throw new Error(result.message || 'Cập nhật hồ sơ thất bại');
+        throw new Error(result.message || t('profileUpdateFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Cập nhật hồ sơ thất bại',
+        text1: e.message || t('profileUpdateFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -292,7 +294,7 @@ export default function UserDetailScreen() {
       if (data.success) {
         Toast.show({
           type: 'info',
-          text1: 'Vui lòng kiểm tra email để xác thực!',
+          text1: t('checkEmailForVerification'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -300,12 +302,12 @@ export default function UserDetailScreen() {
         });
         setShowVerifyModal(true);
       } else {
-        throw new Error(data.message || 'Gửi mã xác thực thất bại');
+        throw new Error(data.message || t('sendVerificationFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Có lỗi khi gửi mã xác thực',
+        text1: e.message || t('errorSendingVerification'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -326,7 +328,7 @@ export default function UserDetailScreen() {
       if (data.success) {
         Toast.show({
           type: 'success',
-          text1: 'Xác thực email thành công!',
+          text1: t('emailVerificationSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -339,12 +341,12 @@ export default function UserDetailScreen() {
         await AsyncStorage.setItem('user', JSON.stringify({ ...user, email, _id: user?._id || '', username: user?.username || '', full_name: user?.full_name || '', roles: user?.roles || [] }));
         setEmail(user?.email || '');
       } else {
-        throw new Error(data.message || 'Mã xác thực không đúng');
+        throw new Error(data.message || t('verificationCodeIncorrect'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Có lỗi khi xác thực',
+        text1: e.message || t('errorDuringVerification'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -528,7 +530,7 @@ export default function UserDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <FontAwesome name="angle-left" size={28} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
+          <Text style={styles.headerTitle}>{t('personalInformation')}</Text>
         </View>
         <View style={styles.avatarSection}>
           <BlurView
@@ -558,34 +560,34 @@ export default function UserDetailScreen() {
           </View>
         </View>
         <View style={styles.form}>
-          <Text style={styles.label}>Họ và tên đệm</Text>
+          <Text style={styles.label}>{t('lastName')}</Text>
           <TextInput
             style={styles.input}
             value={lastName}
             onChangeText={(v) => { setLastName(v); handleLocalSave('full_name', (v + ' ' + firstName).trim()); }}
-            placeholder="Nhập họ và tên đệm"
+            placeholder={t('enterLastName')}
             placeholderTextColor="#bbb"
           />
-          <Text style={styles.label}>Tên</Text>
+          <Text style={styles.label}>{t('firstName')}</Text>
           <TextInput
             style={styles.input}
             value={firstName}
             onChangeText={(v) => { setFirstName(v); handleLocalSave('full_name', (lastName + ' ' + v).trim()); }}
-            placeholder="Nhập tên thật"
+            placeholder={t('enterFirstName')}
             placeholderTextColor="#bbb"
           />
-          <Text style={styles.label}>Tên người dùng</Text>
+          <Text style={styles.label}>{t('username')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: '#F3F4F6', color: '#888' }]}
             value={username}
             editable={false}
           />
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('email')}</Text>
           <TextInput
             style={styles.input}
             value={email}
             onChangeText={(v) => { setEmail(v); handleLocalSave('email', v); }}
-            placeholder="Email"
+            placeholder={t('email')}
             placeholderTextColor="#bbb"
             onBlur={async () => {
               if (email !== user?.email) {
@@ -601,11 +603,11 @@ export default function UserDetailScreen() {
           >
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
               <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '80%' }}>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Nhập mã xác thực email</Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>{t('enterVerificationCode')}</Text>
                 <TextInput
                   value={verifyCode}
                   onChangeText={setVerifyCode}
-                  placeholder="Nhập mã xác thực"
+                  placeholder={t('enterVerificationCode')}
                   keyboardType="number-pad"
                   style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 16 }}
                 />
@@ -614,15 +616,15 @@ export default function UserDetailScreen() {
                   onPress={verifyEmailCode}
                   disabled={verifying}
                 >
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{verifying ? 'Đang xác thực...' : 'Xác thực'}</Text>
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{verifying ? t('verifying') : t('verify')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowVerifyModal(false)}>
-                  <Text style={{ color: 'red', textAlign: 'center' }}>Đóng</Text>
+                  <Text style={{ color: 'red', textAlign: 'center' }}>{t('close')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </Modal>
-          <Text style={styles.label}>Số điện thoại</Text>
+          <Text style={styles.label}>{t('phoneNumber')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => setShowCountryModal(true)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 12, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 16, backgroundColor: '#F9FAFB', marginRight: 8 }}>
               <Text style={{ fontSize: 16 }}>{countryCode}</Text>
@@ -633,7 +635,7 @@ export default function UserDetailScreen() {
               style={[styles.input, { flex: 1 }]}
               value={phone}
               onChangeText={(v) => { setPhone(v); handleLocalSave('phone_number', v); }}
-              placeholder="Số điện thoại"
+              placeholder={t('phoneNumber')}
               placeholderTextColor="#bbb"
               keyboardType="phone-pad"
               onBlur={async () => {
@@ -645,7 +647,7 @@ export default function UserDetailScreen() {
                     setPhone(updatedUser.phone_number);
                     Toast.show({
                       type: 'success',
-                      text1: 'Cập nhật số điện thoại thành công',
+                      text1: t('phoneUpdateSuccess'),
                       position: 'bottom',
                       visibilityTime: 2000,
                       autoHide: true,
@@ -654,7 +656,7 @@ export default function UserDetailScreen() {
                   } catch (e: any) {
                     Toast.show({
                       type: 'error',
-                      text1: e.message || 'Cập nhật số điện thoại thất bại',
+                      text1: e.message || t('phoneUpdateFailed'),
                       position: 'bottom',
                       visibilityTime: 2000,
                       autoHide: true,
@@ -673,11 +675,11 @@ export default function UserDetailScreen() {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity onPress={() => setShowCountryModal(false)} style={{ padding: 16 }}>
-                <Text style={{ color: 'red', textAlign: 'center' }}>Đóng</Text>
+                <Text style={{ color: 'red', textAlign: 'center' }}>{t('close')}</Text>
               </TouchableOpacity>
             </View>
           )}
-          <Text style={styles.label}>Ngày/tháng/năm</Text>
+          <Text style={styles.label}>{t('birthday')}</Text>
           <TouchableOpacity onPress={() => setShowDatePicker(true)}>
             <TextInput
               style={styles.input}
@@ -704,10 +706,10 @@ export default function UserDetailScreen() {
               }}
             />
           )}
-          <Text style={styles.label}>Giới tính</Text>
+          <Text style={styles.label}>{t('gender')}</Text>
           <TouchableOpacity onPress={() => setShowGenderModal(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
             <Text style={{ color: gender ? '#222' : '#bbb', fontSize: 16 }}>
-              {gender ? GENDERS.find(g => g.value === gender)?.label : 'Chọn giới tính'}
+              {gender ? GENDERS.find(g => g.value === gender)?.label : t('selectGender')}
             </Text>
             <FontAwesome name="chevron-down" size={18} color="#bbb" />
           </TouchableOpacity>
@@ -727,12 +729,12 @@ export default function UserDetailScreen() {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity onPress={() => setShowGenderModal(false)} style={{ padding: 16 }}>
-                <Text style={{ color: 'red', textAlign: 'center' }}>Đóng</Text>
+                <Text style={{ color: 'red', textAlign: 'center' }}>{t('close')}</Text>
               </TouchableOpacity>
             </View>
           )}
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isLoading}>
-            <Text style={styles.saveBtnText}>{isLoading ? 'Đang lưu...' : 'Cập nhật hồ sơ'}</Text>
+            <Text style={styles.saveBtnText}>{isLoading ? t('saving') : t('updateProfile')}</Text>
           </TouchableOpacity>
         </View>
       </View>
