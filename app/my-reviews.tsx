@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../components/ReviewCard';
 import { useAuth } from '../context/AuthContext';
 import ReviewService, { Review } from '../services/reviewService';
-import { getOrderId, getProductId } from '../utils/reviewUtils';
+import { getProductId } from '../utils/reviewUtils';
 
 const MyReviewsScreen = () => {
   const { user, token } = useAuth();
@@ -101,13 +101,11 @@ const MyReviewsScreen = () => {
   const handleEditReview = (review: Review) => {
     // Navigate to product reviews screen with edit mode
     const productId = getProductId(review);
-    const orderId = getOrderId(review);
     
     router.push({
       pathname: '/product-reviews',
       params: { 
         productId,
-        orderId,
         editMode: 'true'
       }
     });

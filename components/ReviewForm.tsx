@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreateReviewData, Review, UpdateReviewData } from '../services/reviewService';
 import ConfirmModal from './ConfirmModal';
 import RatingStars from './RatingStars';
@@ -106,6 +107,13 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setPendingSubmitData(null);
   };
 
+  const handleCancel = () => {
+    // Use setTimeout to avoid setState during render
+    setTimeout(() => {
+      onCancel();
+    }, 0);
+  };
+
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -178,14 +186,24 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
+    <SafeAreaView style={styles.container}>
+      {/* Swipe down indicator */}
+      <View style={styles.swipeIndicator}>
+        <View style={styles.swipeBar} />
+      </View>
+      
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>
             {existingReview ? 'Chỉnh sửa đánh giá' : 'Viết đánh giá'}
           </Text>
-          <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
+          <TouchableOpacity 
+            onPress={handleCancel} 
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons name="close" size={24} color="#666" />
           </TouchableOpacity>
         </View>
@@ -269,28 +287,51 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               {existingReview ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
             </Text>
           )}
-                 </TouchableOpacity>
-       </View>
+        </TouchableOpacity>
 
-       {/* Confirmation Modal */}
-       <ConfirmModal
-         visible={showConfirmModal}
-         title="Xác nhận cập nhật"
-         message="Bạn có chắc muốn cập nhật đánh giá của mình?"
-         confirmText="Cập nhật"
-         cancelText="Hủy"
-         onConfirm={handleConfirmSubmit}
-         onCancel={handleCancelSubmit}
-         type="warning"
-       />
-     </ScrollView>
-   );
- };
+        {/* Cancel Button */}
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={handleCancel}
+        >
+          <Text style={styles.cancelButtonText}>Hủy</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+
+    {/* Confirmation Modal */}
+    <ConfirmModal
+      visible={showConfirmModal}
+      title="Xác nhận cập nhật"
+      message="Bạn có chắc muốn cập nhật đánh giá của mình?"
+      confirmText="Cập nhật"
+      cancelText="Hủy"
+      onConfirm={handleConfirmSubmit}
+      onCancel={handleCancelSubmit}
+      type="warning"
+    />
+  </SafeAreaView>
+);
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  swipeIndicator: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  swipeBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 20,
@@ -394,6 +435,20 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  cancelButton: {
+    marginTop: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: 'white',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

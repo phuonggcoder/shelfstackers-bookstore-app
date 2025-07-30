@@ -5,6 +5,43 @@ import { Review } from '../services/reviewService';
 import { getUserAvatar, getUserName } from '../utils/reviewUtils';
 import RatingStars from './RatingStars';
 
+const getTimeAgo = (date: Date): string => {
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) {
+    return 'vừa xong';
+  }
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} phút trước`;
+  }
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} giờ trước`;
+  }
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return `${diffInDays} ngày trước`;
+  }
+  
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) {
+    return `${diffInWeeks} tuần trước`;
+  }
+  
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) {
+    return `${diffInMonths} tháng trước`;
+  }
+  
+  const diffInYears = Math.floor(diffInDays / 365);
+  return `${diffInYears} năm trước`;
+};
+
 interface ReviewCardProps {
   review: Review;
   onVoteHelpful?: (reviewId: string) => void;
@@ -129,7 +166,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
             <Ionicons name="time-outline" size={14} color="#999" />
             <Text style={styles.editedText}>
               Đã chỉnh sửa {review.edited_at ? 
-                new Date(review.edited_at).toLocaleDateString('vi-VN') : 
+                getTimeAgo(new Date(review.edited_at)) : 
                 'gần đây'
               }
             </Text>

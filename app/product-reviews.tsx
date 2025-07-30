@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -61,13 +61,17 @@ const ProductReviewsScreen = () => {
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
+    console.log('ProductReviews - useEffect - productId:', productId, 'orderId:', orderId, 'user:', !!user);
+    
     // If coming from order, show order items selection first
     if (orderId && orderItems.length > 0 && !productId) {
+      console.log('ProductReviews - Showing order items selection');
       // Show order items selection
       return;
     }
     
     if (productId) {
+      console.log('ProductReviews - Loading reviews for productId:', productId);
       setLoading(true);
       loadReviews();
       loadSummary();
@@ -77,7 +81,10 @@ const ProductReviewsScreen = () => {
   // Auto-show review form if in edit mode and user review is loaded
   useEffect(() => {
     if (editMode === 'true' && userReview && !showReviewForm) {
-      setShowReviewForm(true);
+      // Use setTimeout to avoid setState during render
+      setTimeout(() => {
+        setShowReviewForm(true);
+      }, 0);
     }
   }, [editMode, userReview, showReviewForm]);
 
@@ -90,16 +97,18 @@ const ProductReviewsScreen = () => {
       
       const response = await ReviewService.getProductReviews(productId!, pageNum, 10, token || undefined);
       console.log('ProductReviews - loadReviews - Response:', response);
+      console.log('ProductReviews - loadReviews - Reviews array:', response.reviews);
+      console.log('ProductReviews - loadReviews - Reviews length:', response.reviews?.length || 0);
       
       if (refresh || pageNum === 1) {
-        setReviews(response.reviews);
+        setReviews(response.reviews || []);
       } else {
-        setReviews(prev => [...prev, ...response.reviews]);
+        setReviews(prev => [...prev, ...(response.reviews || [])]);
       }
       
-      setHasMore(response.reviews.length === 10); // Assuming limit is 10
+      setHasMore((response.reviews?.length || 0) === 10); // Assuming limit is 10
       setPage(pageNum);
-      console.log('ProductReviews - loadReviews - Set reviews count:', response.reviews.length);
+      console.log('ProductReviews - loadReviews - Set reviews count:', response.reviews?.length || 0);
     } catch (error) {
       console.error('ProductReviews - Error loading reviews:', error);
       Alert.alert('Lỗi', 'Không thể tải danh sách đánh giá');
@@ -163,6 +172,13 @@ const ProductReviewsScreen = () => {
 
   const handleCloseThankYouModal = () => {
     setShowThankYouModal(false);
+  };
+
+  const handleCloseReviewForm = () => {
+    // Use setTimeout to avoid setState during render
+    setTimeout(() => {
+      setShowReviewForm(false);
+    }, 0);
   };
 
   const handleVoteHelpful = async (reviewId: string) => {
@@ -257,16 +273,26 @@ const ProductReviewsScreen = () => {
   if (orderId && orderItems.length > 0 && !productId) {
     // If only one item, automatically navigate to it
     if (orderItems.length === 1) {
-      const singleItem = orderItems[0];
-      router.replace({
-        pathname: '/product-reviews',
-        params: {
-          productId: singleItem.book._id,
-          orderId: orderId,
-          orderCode: orderCode
-        }
-      });
-      return null; // Return null while redirecting
+      // Use useEffect to handle navigation instead of doing it in render
+      React.useEffect(() => {
+        const singleItem = orderItems[0];
+        router.replace({
+          pathname: '/product-reviews',
+          params: {
+            productId: singleItem.book._id,
+            orderId: orderId,
+            orderCode: orderCode
+          }
+        });
+      }, []);
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3255FB" />
+            <Text style={styles.loadingText}>Đang chuyển hướng...</Text>
+          </View>
+        </SafeAreaView>
+      );
     }
     return (
       <SafeAreaView style={styles.container}>
@@ -357,6 +383,13 @@ const ProductReviewsScreen = () => {
     );
   }
 
+  console.log('ProductReviews - Render - reviews length:', reviews.length);
+  console.log('ProductReviews - Render - reviews:', reviews);
+  console.log('ProductReviews - Render - summary:', summary);
+  console.log('ProductReviews - Render - userReview:', userReview);
+  console.log('ProductReviews - Render - user:', !!user);
+  console.log('ProductReviews - Render - orderId:', orderId);
+
   return (
     <SafeAreaView style={styles.container}>
       {renderHeader()}
@@ -415,20 +448,21 @@ const ProductReviewsScreen = () => {
         ListFooterComponent={renderFooter()}
       />
 
-      <Modal
-        visible={showReviewForm}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <ReviewForm
-          productId={productId!}
-          orderId={orderId!}
-          existingReview={userReview || undefined}
-          onSubmit={handleSubmitReview}
-          onCancel={() => setShowReviewForm(false)}
-          isLoading={submitting}
-        />
-      </Modal>
+             <Modal
+         visible={showReviewForm}
+         animationType="slide"
+         presentationStyle="pageSheet"
+         onRequestClose={handleCloseReviewForm}
+       >
+         <ReviewForm
+           productId={productId!}
+           orderId={orderId!}
+           existingReview={userReview || undefined}
+           onSubmit={handleSubmitReview}
+           onCancel={handleCloseReviewForm}
+           isLoading={submitting}
+         />
+       </Modal>
 
       <ThankYouModal
         visible={showThankYouModal}
