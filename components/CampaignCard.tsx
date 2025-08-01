@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { Campaign } from '../types';
@@ -21,6 +20,10 @@ const CampaignCard = ({ campaign }: Props) => {
   };
 
   const getCampaignImage = () => {
+    // Ưu tiên ảnh cover của campaign nếu có
+    if (campaign.image && Array.isArray(campaign.image) && campaign.image[0]) {
+      return campaign.image[0];
+    }
     // Use first book's image as campaign image, or default
     if (campaign.books && campaign.books.length > 0) {
       const firstBook = campaign.books[0];

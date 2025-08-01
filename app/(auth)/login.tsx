@@ -1,23 +1,24 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
+import GoogleSignInWithAccountPicker from '@/components/GoogleSignInWithAccountPicker';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+import { convertGoogleSignInResponse } from '../../utils/authUtils';
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -52,54 +53,32 @@ export default function Login() {
     }
   };
 
-  // Hàm đăng nhập Google
-  const handleGoogleLogin = async () => {
+  // Hàm xử lý thành công Google Sign-In
+  const handleGoogleSignInSuccess = async (result: any) => {
     try {
-      console.log('🔍 Checking Google Play Services...');
-      await GoogleSignin.hasPlayServices();
-      console.log('✅ Google Play Services OK');
+      console.log('✅ Google Sign-In successful:', result);
       
-      console.log('🔍 Starting Google Sign-In...');
-      const userInfo = await GoogleSignin.signIn();
-      console.log('✅ Google Sign-In successful:', userInfo);
-      
-      // Lấy idToken từ userInfo.data
-      const idToken = userInfo.data?.idToken;
-      console.log('🔍 ID Token:', idToken ? 'Found' : 'Not found');
-      if (!idToken) {
-        Alert.alert('Không lấy được idToken từ Google');
-        return;
-      }
-      // Gửi idToken lên backend
-      console.log('🔍 Sending idToken to backend:', idToken.substring(0, 50) + '...');
-      const res = await fetch('https://server-shelf-stacker.onrender.com/auth/google-signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token: idToken }),
-      });
-      const data = await res.json();
-      console.log('🔍 Backend response:', data);
-      console.log('🔍 Response status:', res.status);
-      if (res.ok) {
-        // Lưu JWT vào AsyncStorage hoặc context
-        await AsyncStorage.setItem('jwt', data.token);
-        await signIn(data); // data phải trả về { user, token }
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!');
-        router.replace('/(tabs)');
+      if (result.success && result.user) {
+        // Sử dụng utility function để convert format
+        const authResponse = convertGoogleSignInResponse(result);
+        
+        await signIn(authResponse);
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
       } else {
-        Alert.alert('Lỗi đăng nhập', data.message || 'Có lỗi xảy ra');
+        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
       }
     } catch (error: any) {
-      console.log('❌ Google Sign-In error:', error);
-      console.log('❌ Error code:', error.code);
-      console.log('❌ Error message:', error.message);
-      
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        Alert.alert('Đã hủy đăng nhập');
-      } else {
-        Alert.alert('Lỗi', error.message);
-      }
+      console.error('❌ Error after Google Sign-In:', error);
+      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
     }
+  };
+
+  // Hàm xử lý lỗi Google Sign-In
+  const handleGoogleSignInError = (error: any) => {
+    console.error('❌ Google Sign-In error:', error);
+    // Error handling đã được xử lý trong component
   };
 
   return (
@@ -118,10 +97,12 @@ export default function Login() {
       </View>
 
       <View style={styles.socialContainer}>
-        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
-          <Image source={require('../../assets/images/google.png')} style={styles.icon} />
-          <Text style={styles.socialText}>Google</Text>
-        </TouchableOpacity>
+        <GoogleSignInWithAccountPicker
+          onSuccess={handleGoogleSignInSuccess}
+          onError={handleGoogleSignInError}
+          disabled={isLoading}
+          style={styles.googleButton}
+        />
         <TouchableOpacity style={styles.socialButton}>
           <Image source={require('../../assets/images/applelogo.png')} style={styles.icon} />
           <Text style={styles.socialText}>Apple</Text>
@@ -271,6 +252,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ddd',
+    width: '48%',
+  },
+  googleButton: {
     width: '48%',
   },
   icon: {

@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface SearchBarProps {
   onApplySimpleFilter?: (filter: { price: number; sort: 'az' | 'za' | null }) => void;
+  onCategoryPress?: () => void;
 }
 
-const SearchBar = ({ onApplySimpleFilter }: SearchBarProps) => {
+const SearchBar = ({ onApplySimpleFilter, onCategoryPress }: SearchBarProps) => {
   const router = useRouter();
   const [isFocused, setIsFocused] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -45,6 +46,9 @@ const SearchBar = ({ onApplySimpleFilter }: SearchBarProps) => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.categoryButton} onPress={onCategoryPress}>
+        <Ionicons name="grid-outline" size={22} color="#fff" />
+      </TouchableOpacity>
       <TouchableOpacity 
         style={[styles.searchSection, isFocused && styles.searchSectionFocused]}
         onPress={handleSearchPress}
@@ -73,6 +77,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 10,
+  },
+  categoryButton: {
+    marginRight: 15,
+    backgroundColor: '#5E5CE6',
+    padding: 14,
+    borderRadius: 15,
   },
   searchSection: {
     flex: 1,

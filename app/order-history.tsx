@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { getMyOrders } from '../services/orderService';
 
 interface OrderItem {
   _id: string;
@@ -37,11 +38,10 @@ const OrderHistoryScreen = () => {
   const tabs = [
     { key: 'all', label: 'Tất cả' },
     { key: 'pending', label: 'Chờ xác nhận' },
-    { key: 'confirmed', label: 'Chờ lấy hàng' },
-    { key: 'shipping', label: 'Chờ giao hàng' },
+    { key: 'processing', label: 'Đang xử lý' },
+    { key: 'shipped', label: 'Đang giao hàng' },
     { key: 'delivered', label: 'Đã giao' },
     { key: 'cancelled', label: 'Đã huỷ' },
-    { key: 'completed', label: 'Hoàn thành' },
   ];
 
   useEffect(() => {
@@ -50,35 +50,25 @@ const OrderHistoryScreen = () => {
 
   const loadOrders = async () => {
     if (!token) return;
-    
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await getOrders(token);
-      // setOrders(response);
-      
-      // Mock data for now
-      setOrders([
-        {
-          _id: '1',
-          orderCode: 'ORD001',
-          status: 'pending',
-          totalAmount: 23000,
-          items: [
-            {
-              book: {
-                _id: 'book1',
-                title: 'Sách không xác định',
-                author: 'Tác giả không xác định',
-              },
-              quantity: 1,
-              price: 23000,
-            }
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      ]);
+      const response = await getMyOrders(token);
+      setOrders((response.orders || []).map((order: any) => ({
+        _id: order._id,
+        order_id: order.order_id, // Lưu cả hai trường
+        orderCode: order.order_id || order._id,
+        status: order.order_status || order.status,
+        totalAmount: order.total_amount,
+        // Map lại items đúng chuẩn: [{book, quantity, price}]
+        items: (order.order_items || []).map((oi: any) => ({
+          book: oi.book_id, // BE trả về book_id là object
+          quantity: oi.quantity,
+          price: oi.price
+        })),
+        address: order.address_id, // BE trả về address_id là object
+        createdAt: order.order_date || order.createdAt,
+        updatedAt: order.updatedAt,
+      })));
     } catch (error) {
       console.error('Error loading orders:', error);
     } finally {
@@ -93,25 +83,25 @@ const OrderHistoryScreen = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'confirmed': return '#3498db';
-      case 'shipping': return '#9b59b6';
+      case 'processing': return '#3498db';
+      case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
       case 'cancelled': return '#4A90E2';
-      case 'completed': return '#2ecc71';
       default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
       case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
       default: return 'Không xác định';
     }
   };
@@ -163,52 +153,69 @@ const OrderHistoryScreen = () => {
 
   const filteredOrders = selectedTab === 'all' 
     ? orders 
-    : orders.filter(order => order.status === selectedTab);
+    : orders.filter(order => (order.status || '').toLowerCase() === selectedTab);
 
-  const renderOrderItem = ({ item }: { item: OrderItem }) => {
-    const firstBook = item.items[0]?.book;
-    
+  const renderOrderItem = ({ item }: { item: any }) => {
+    // Lấy thông tin địa chỉ nếu có
+    const address = item.address || {};
+    const receiverName = address.full_name || address.receiver_name || '';
+    const phoneNumber = address.phone || address.phone_number || '';
+    const addressDetail = address.address || address.address_detail || '';
+    const street = address.street || '';
+    const ward = address.ward || '';
+    const district = address.district || '';
+    const province = address.province || '';
+    const fullAddress = [addressDetail, street, ward, district].filter(Boolean).join(', '); // chỉ đến phường/xã
     return (
       <TouchableOpacity
         style={styles.orderCard}
         onPress={() => router.push({
           pathname: '/order-detail',
-          params: { orderId: item._id }
+          params: { orderId: item.order_id || item._id }
         })}
         activeOpacity={0.8}
       >
+        {/* Mã đơn lên đầu */}
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderCode}>Mã đơn: {item.orderCode}</Text>
+            <Text style={styles.orderCode}>Mã đơn: {item.order_id || item._id}</Text>
             <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}> 
             <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
           </View>
         </View>
-
-        <View style={styles.orderContent}>
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: getBookImage(firstBook) }}
-              style={styles.bookImage}
-              contentFit="cover"
-              transition={300}
-            />
+        {/* Danh sách sách trong đơn */}
+        {item.items && item.items.length > 0 && (
+          <View style={{ marginBottom: 8, alignItems: 'flex-start', width: '100%' }}>
+            {item.items.map((it: any, idx: number) => (
+              <View
+                key={idx}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  marginBottom: 6,
+                  alignSelf: 'stretch',
+                  width: '100%',
+                }}
+              >
+                <Image
+                  source={{ uri: getBookImage(it.book) }}
+                  style={{ width: 48, height: 64, borderRadius: 6, marginRight: 10 }}
+                  contentFit="cover"
+                  transition={200}
+                />
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Text style={[styles.bookTitle, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">{it.book?.title || 'Không có tên'}</Text>
+                  <Text style={[styles.bookAuthor, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">Tác giả: {it.book?.author || ''}</Text>
+                  <Text style={styles.itemCount}>Số lượng: {it.quantity || 1}</Text>
+                  <Text style={styles.totalAmount}>{formatPrice(it.price)}</Text>
+                </View>
+              </View>
+            ))}
           </View>
-          <View style={styles.bookInfo}>
-            <Text style={styles.bookTitle} numberOfLines={2}>
-              {firstBook?.title || 'Sách không xác định'}
-            </Text>
-            <Text style={styles.bookAuthor}>
-              {firstBook?.author || 'Tác giả không xác định'}
-            </Text>
-            <Text style={styles.itemCount}>
-              x{item.items[0]?.quantity || 1}
-            </Text>
-          </View>
-        </View>
-
+        )}
+        {/* Thông tin đơn hàng */}
         <View style={styles.orderFooter}>
           <View style={styles.totalInfo}>
             <Text style={styles.totalLabel}>
@@ -218,9 +225,21 @@ const OrderHistoryScreen = () => {
               {formatPrice(item.totalAmount)}
             </Text>
           </View>
-          <TouchableOpacity style={styles.detailButton}>
-            <Text style={styles.detailButtonText}>Chi tiết</Text>
-          </TouchableOpacity>
+          <View style={styles.orderActions}>
+            <TouchableOpacity style={styles.detailButton} onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}>
+              <Text style={styles.detailButtonText}>Chi tiết</Text>
+            </TouchableOpacity>
+            {/* Review button for completed orders */}
+            {item.status.toLowerCase() === 'delivered' && (
+              <TouchableOpacity 
+                style={styles.reviewButton}
+                onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}
+              >
+                <Ionicons name="star-outline" size={16} color="#667eea" />
+                <Text style={styles.reviewButtonText}>Đánh giá</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -254,28 +273,11 @@ const OrderHistoryScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <FlatList
-        horizontal
-        data={tabs}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === item.key && styles.tabActive
-            ]}
-            onPress={() => setSelectedTab(item.key)}
-          >
-            <Text style={[
-              styles.tabText,
-              selectedTab === item.key && styles.tabTextActive
-            ]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabContainer}
+      {/* Tab bar độc lập */}
+      <OrderTabBar
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabPress={setSelectedTab}
       />
 
       {filteredOrders.length === 0 ? (
@@ -294,7 +296,11 @@ const OrderHistoryScreen = () => {
           data={filteredOrders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.orderList}
+          contentContainerStyle={{
+            ...styles.orderList,
+            paddingTop: 0,
+            marginTop: 0,
+          }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -309,6 +315,37 @@ const OrderHistoryScreen = () => {
     </SafeAreaView>
   );
 };
+
+// Component tab bar độc lập
+const OrderTabBar = ({ tabs, selectedTab, onTabPress }: {
+  tabs: { key: string, label: string }[],
+  selectedTab: string,
+  onTabPress: (key: string) => void
+}) => (
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.tabContainer}
+  >
+    {tabs.map((item) => (
+      <TouchableOpacity
+        key={item.key}
+        style={[
+          styles.tab,
+          selectedTab === item.key && styles.tabActive
+        ]}
+        onPress={() => onTabPress(item.key)}
+      >
+        <Text style={[
+          styles.tabText,
+          selectedTab === item.key && styles.tabTextActive
+        ]}>
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -341,11 +378,13 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4, // Giảm padding để tab bar gọn lại
   },
   tab: {
+    height: 36, // Giảm chiều cao cho tab
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
     marginRight: 12,
     borderRadius: 20,
     backgroundColor: 'white',
@@ -384,7 +423,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   orderList: {
-    padding: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingBottom: 16,
+    paddingTop: 0, // Đảm bảo không có padding top
   },
   orderCard: {
     backgroundColor: 'white',
@@ -396,6 +438,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    alignItems: 'flex-start',
+    // borderWidth: 1, borderColor: 'blue', // debug nếu cần
   },
   orderHeader: {
     flexDirection: 'row',
@@ -496,6 +540,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  orderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#667eea',
+  },
+  reviewButtonText: {
+    color: '#667eea',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

@@ -7,8 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BookGrid2Col from '../components/BookGrid2Col';
 import BookGrid3Col from '../components/BookGrid3Col';
 import BookGrid4Col from '../components/BookGrid4Col';
-import CampaignCarousel from '../components/CampaignCarousel';
-import EventCampaignGrid from '../components/EventCampaignGrid';
 import api from '../services/api';
 import { Book, Category } from '../types';
 
@@ -101,6 +99,28 @@ const FilteredBooksScreen = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (params.searchText) setSearchText(params.searchText as string);
+  }, [params.searchText]);
+
+  // Khi nhận categoryId từ params, tự động setSelectedCategories
+  useEffect(() => {
+    if (params.categoryId) {
+      setSelectedCategories([params.categoryId as string]);
+      setSelectedCategoryName(params.categoryName as string | undefined);
+    }
+  }, [params.categoryId, params.categoryName]);
+
+  // Khi user chọn lại danh mục trong filter bar, cập nhật lại tên danh mục
+  useEffect(() => {
+    if (selectedCategories.length === 1 && categories.length > 0) {
+      const cat = categories.find(c => c._id === selectedCategories[0]);
+      if (cat) setSelectedCategoryName(cat.name);
+    } else if (selectedCategories.length === 0) {
+      setSelectedCategoryName(undefined);
+    }
+  }, [selectedCategories, categories]);
+
   // Lọc và sắp xếp toàn bộ sách
   const filteredBooks = useMemo(() => {
     let result = books;
@@ -182,16 +202,33 @@ const FilteredBooksScreen = () => {
     setSort('newest');
     setItemPerRow(2);
     setPageSize(24);
+    setMinPrice(0);
+    setMaxPriceInput(MAX_PRICE);
+    setSelectedSuppliers([]);
+    setSelectedPricePreset(null);
+  };
+
+  // Hàm kiểm tra có filter nào đang được áp dụng không
+  const hasActiveFilter = () => {
+    return (
+      selectedCategories.length > 0 ||
+      selectedLanguages.length > 0 ||
+      selectedSuppliers.length > 0 ||
+      minPrice > 0 ||
+      maxPriceInput < MAX_PRICE ||
+      price < MAX_PRICE ||
+      selectedPricePreset !== null
+    );
   };
 
   // Thanh filter ngang mới
   const renderFilterBar = () => (
     <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',gap:8}}>
       {/* Danh mục */}
-      <View style={{flex:1}}>
-        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:12,paddingVertical:8}} onPress={()=>setShowCategoryDropdown(!showCategoryDropdown)}>
+      <View style={{width: 120}}>
+        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowCategoryDropdown(!showCategoryDropdown)}>
           <Ionicons name="list" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold'}}>Danh mục</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Danh mục</Text>
           <Ionicons name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showCategoryDropdown && (
@@ -213,10 +250,10 @@ const FilteredBooksScreen = () => {
         )}
       </View>
       {/* Sắp xếp */}
-      <View style={{flex:1}}>
-        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:12,paddingVertical:8}} onPress={()=>setShowSortDropdown(!showSortDropdown)}>
+      <View style={{width: 120}}>
+        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowSortDropdown(!showSortDropdown)}>
           <Ionicons name="swap-vertical" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold'}}>Sắp xếp</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Sắp xếp</Text>
           <Ionicons name={showSortDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showSortDropdown && (
@@ -234,11 +271,18 @@ const FilteredBooksScreen = () => {
           </View>
         )}
       </View>
-      {/* Lọc nâng cao */}
-      <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:16,paddingVertical:8}} onPress={()=>setShowFilterSidebar(true)}>
-        <Ionicons name="filter" size={18} color="#fff" style={{marginRight:6}} />
-        <Text style={{color:'#fff',fontWeight:'bold'}}>Lọc</Text>
-      </TouchableOpacity>
+      {/* Lọc nâng cao + X */}
+      <View style={{flexDirection:'row',alignItems:'center'}}>
+        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:16,paddingVertical:8, minWidth: 0}} onPress={()=>setShowFilterSidebar(true)}>
+          <Ionicons name="filter" size={18} color="#fff" style={{marginRight:6}} />
+          <Text style={{color:'#fff',fontWeight:'bold',fontSize:13}}>Lọc</Text>
+        </TouchableOpacity>
+        {hasActiveFilter() && (
+          <TouchableOpacity onPress={clearFilters} style={{marginLeft:4, padding:4}}>
+            <Ionicons name="close-circle" size={22} color="#FF5252" />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 
@@ -499,41 +543,31 @@ const FilteredBooksScreen = () => {
   }, [searchText]);
 
   const insets = useSafeAreaInsets();
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | undefined>(params.categoryName as string | undefined);
+
+  // Handler hủy chọn danh mục
+  const handleClearCategory = () => {
+    setSelectedCategories([]);
+    setSelectedCategoryName(undefined);
+  };
 
   // Thêm log kiểm tra eventCampaigns
   console.log('eventCampaigns:', eventCampaigns);
   try {
     console.log('eventCampaigns JSON:', JSON.stringify(eventCampaigns));
   } catch (e) {}
-  // Nếu không có event, render event test để xác nhận UI
-  const campaignsToShow = eventCampaigns.length > 0 ? eventCampaigns : [
-    {
-      _id: 'test-event',
-      name: 'Sự kiện test',
-      books: [
-        { cover_image: ['https://i.imgur.com/gTzT0hA.jpeg'], thumbnail: '' }
-      ],
-      type: 'event'
-    }
-  ];
+
+  // Hàm chuyển sang trang chi tiết sách
+  const handleBookPress = (book: Book) => {
+    router.push({ pathname: '/book/[id]', params: { id: book._id } });
+  };
   return (
     <SafeAreaView style={[styles.container, { paddingTop: 0, paddingBottom: 0 }]}> 
-      {/* Banner promotion (carousel) */}
-      <CampaignCarousel title="Khuyến mãi hot" campaigns={promotionCampaigns} />
-      {/* Event Campaign Grid */}
-      {eventCampaigns.length === 0 && (
-        <Text style={{textAlign: 'center', color: '#888', marginVertical: 8}}>Không có sự kiện nào (hiện event test)</Text>
-      )}
-      <EventCampaignGrid
-        campaigns={campaignsToShow}
-        onShowAll={() => router.push('/allcampaigns')}
-      />
-      {/* Header */}
+      {/* Header: nút back + thanh tìm kiếm */}
       <View style={[styles.headerRow,{backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',paddingBottom:6, paddingTop: insets.top - 20, flexDirection:'row', alignItems:'center'}]}> 
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#1976D2" style={{marginRight:4}} />
         </TouchableOpacity>
-      
         <View style={{flex:1, marginLeft: 4, justifyContent:'center'}}>
           <View style={{flexDirection:'row', alignItems:'center', backgroundColor:'#f2f2f2', borderRadius:18, paddingHorizontal:18, height:56}}>
             <Ionicons name="search" size={28} color="#888" style={{marginRight:10}} />
@@ -548,6 +582,19 @@ const FilteredBooksScreen = () => {
           </View>
         </View>
       </View>
+      {/* Hiển thị tên danh mục đã chọn hoặc kết quả tìm kiếm */}
+      {searchText.trim() ? (
+        <Text style={{fontSize:20, fontWeight:'bold', color:'#1976D2', textAlign:'center', marginTop:12, marginBottom:4}}>
+          Kết quả tìm kiếm cho '{searchText.trim()}'
+        </Text>
+      ) : selectedCategoryName ? (
+        <View style={{flexDirection:'row', alignItems:'center', justifyContent:'center', marginTop:12, marginBottom:4}}>
+          <Text style={{fontSize:22, fontWeight:'bold', color:'#1976D2', textAlign:'center'}}>{selectedCategoryName}</Text>
+          <TouchableOpacity onPress={handleClearCategory} style={{marginLeft:8, padding:4}}>
+            <Ionicons name="close-circle" size={26} color="#1976D2" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
       {renderFilterBar()}
       {renderFilterSidebar()}
       {/* Loading indicator */}
@@ -568,13 +615,13 @@ const FilteredBooksScreen = () => {
           contentContainerStyle={{ ...styles.listContent, paddingBottom: 24 + insets.bottom + 50 }}
           columnWrapperStyle={{ justifyContent: 'center', marginHorizontal: 4 }}
           renderItem={({ item }) => {
-            let Comp: React.ComponentType<{ book: Book }> = BookGrid2Col;
-            if (itemPerRow === 3) Comp = BookGrid3Col;
-            else if (itemPerRow === 4) Comp = BookGrid4Col;
-            // default 2 col
+            let Comp: React.ComponentType<{ book: Book; onPress?: (book: Book) => void }> = BookGrid2Col;
+            let fixedHeight = 300;
+            if (itemPerRow === 3) { Comp = BookGrid3Col; fixedHeight = 210; }
+            else if (itemPerRow === 4) { Comp = BookGrid4Col; fixedHeight = 170; }
             return (
-              <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4 }}>
-                <Comp book={item} />
+              <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4, height: fixedHeight }}>
+                <Comp book={item} onPress={handleBookPress} />
               </View>
             );
           }}

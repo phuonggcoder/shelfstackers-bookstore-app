@@ -1,10 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReviewForm from '../components/ReviewForm';
+import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
+import { cancelOrder, getOrderDetail } from '../services/orderService';
+import ReviewService from '../services/reviewService';
 
 interface OrderItem {
   book: {
@@ -36,6 +40,7 @@ interface OrderDetail {
     ward: string;
     district: string;
     province: string;
+    street?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -52,6 +57,13 @@ const OrderDetailScreen = () => {
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [isUpdateReview, setIsUpdateReview] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<OrderItem | null>(null);
+  const [existingReview, setExistingReview] = useState<any>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     loadOrderDetail();
@@ -59,52 +71,39 @@ const OrderDetailScreen = () => {
 
   const loadOrderDetail = async () => {
     if (!token || !orderId) return;
-    
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await getOrderDetail(token, orderId as string);
-      // setOrder(response);
-      
-      // Mock data for now
+      const response = await getOrderDetail(token, orderId as string);
+      // Map lại dữ liệu từ BE
+      const order = response.order || response;
+      // Ưu tiên lấy snapshot địa chỉ giao hàng
+      const shippingAddressRaw = order.shipping_address_snapshot || order.address_id || {};
       setOrder({
-        _id: orderId as string,
-        orderCode: 'ORD001',
-        status: 'pending',
-        totalAmount: 23000,
-        subtotal: 23000,
-        shippingFee: 0,
-        items: [
-          {
-            book: {
-              _id: 'book1',
-              title: 'Sách không xác định',
-              author: 'Tác giả không xác định',
-              price: 23000,
-            },
-            quantity: 1,
-            price: 23000,
-          }
-        ],
-        paymentMethod: 'COD',
-        paymentStatus: 'pending',
+        _id: order._id,
+        orderCode: order.order_id || order._id,
+        status: order.order_status || order.status,
+        totalAmount: order.total_amount,
+        subtotal: order.subtotal || order.total_amount,
+        shippingFee: order.ship_amount || order.shipping_fee || 0,
+        items: (order.order_items || []).map((oi: any) => ({
+          book: oi.book_id,
+          quantity: oi.quantity,
+          price: oi.price
+        })),
+        paymentMethod: order.payment_method || 'COD',
+        paymentStatus: order.payment_status || 'pending',
         shippingAddress: {
-          receiverName: 'Nguyễn Văn A',
-          phoneNumber: '0123456789',
-          addressDetail: '123 Đường ABC',
-          ward: 'Phường XYZ',
-          district: 'Quận 1',
-          province: 'TP.HCM',
+          receiverName: shippingAddressRaw.full_name || shippingAddressRaw.receiver_name || '',
+          phoneNumber: shippingAddressRaw.phone || shippingAddressRaw.phone_number || '',
+          addressDetail: shippingAddressRaw.address || shippingAddressRaw.address_detail || '',
+          street: shippingAddressRaw.street || '',
+          ward: shippingAddressRaw.ward || '',
+          district: shippingAddressRaw.district || '',
+          province: shippingAddressRaw.province || ''
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        orderHistory: [
-          {
-            status: 'created',
-            timestamp: new Date().toISOString(),
-            description: 'Đơn hàng đã được tạo',
-          }
-        ],
+        createdAt: order.order_date || order.createdAt,
+        updatedAt: order.updatedAt,
+        orderHistory: order.order_history || [],
       });
     } catch (error) {
       console.error('Error loading order detail:', error);
@@ -114,26 +113,132 @@ const OrderDetailScreen = () => {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!token || !orderId) return;
+    Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
+      { text: 'Không', style: 'cancel' },
+      { text: 'Hủy đơn', style: 'destructive', onPress: async () => {
+        setCancelling(true);
+        try {
+          await cancelOrder(token, orderId as string, 'Khách tự hủy');
+          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
+          loadOrderDetail();
+        } catch (e) {
+          Alert.alert('Lỗi', 'Không thể hủy đơn hàng.');
+        } finally {
+          setCancelling(false);
+        }
+      }}
+    ]);
+  };
+
+  const handleReviewProduct = async (product: OrderItem) => {
+    if (!token) return;
+    
+    setSelectedProduct(product);
+    setReviewLoading(true);
+    
+    try {
+      // Check if user already reviewed this product from this order
+      const userReview = await ReviewService.checkUserReview(
+        product.book._id, 
+        orderId as string, 
+        token
+      );
+      setExistingReview(userReview);
+    } catch (error) {
+      console.error('Error checking existing review:', error);
+      setExistingReview(null);
+    } finally {
+      setReviewLoading(false);
+      setShowReviewForm(true);
+    }
+  };
+
+  const handleReviewSubmit = async (reviewData: any) => {
+    if (!token || !selectedProduct || !orderId) return;
+    
+    try {
+      if (existingReview) {
+        await ReviewService.updateReview(
+          existingReview._id,
+          reviewData,
+          token
+        );
+        setIsUpdateReview(true);
+      } else {
+        await ReviewService.createReview({
+          productId: selectedProduct.book._id,
+          orderId: orderId as string,
+          rating: reviewData.rating,
+          comment: reviewData.comment,
+          media: reviewData.mediaUrls || []
+        }, token);
+        setIsUpdateReview(false);
+      }
+      setShowReviewForm(false);
+      setShowThankYouModal(true);
+      setSelectedProduct(null);
+      setExistingReview(null);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+    }
+  };
+
+  const handleGoHome = () => {
+    setShowThankYouModal(false);
+    router.push('/');
+  };
+
+  const handleCloseThankYouModal = () => {
+    setShowThankYouModal(false);
+  };
+
+  const handleReviewCancel = () => {
+    setShowReviewForm(false);
+    setSelectedProduct(null);
+    setExistingReview(null);
+  };
+
+  const handleReviewOrder = () => {
+    if (!order) return;
+    
+    // Navigate to product-reviews with order information
+    router.push({
+      pathname: '/product-reviews',
+      params: {
+        orderId: order._id,
+        orderCode: order.orderCode,
+        items: JSON.stringify(order.items)
+      }
+    });
+  };
+
+  const isOrderCompleted = () => {
+    return order?.status?.toLowerCase() === 'delivered';
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'confirmed': return '#3498db';
-      case 'shipping': return '#9b59b6';
+      case 'processing': return '#3498db';
+      case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
       case 'cancelled': return '#4A90E2';
-      case 'completed': return '#2ecc71';
       default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
       case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Chờ giao hàng';
+      case 'processing': return 'Đang xử lý';
+      case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
       case 'cancelled': return 'Đã huỷ';
-      case 'completed': return 'Hoàn thành';
       default: return 'Không xác định';
     }
   };
@@ -201,16 +306,8 @@ const OrderDetailScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
-          <View style={{ width: 24 }} />
-        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải thông tin...</Text>
+          <Text style={styles.loadingText}>Đang tải thông tin đơn hàng...</Text>
         </View>
       </SafeAreaView>
     );
@@ -219,15 +316,7 @@ const OrderDetailScreen = () => {
   if (!order) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
-          <View style={{ width: 24 }} />
-        </View>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color="#4A90E2" />
           <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
         </View>
       </SafeAreaView>
@@ -254,7 +343,10 @@ const OrderDetailScreen = () => {
             <View style={styles.statusInfo}>
               <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
               <Text style={styles.statusDescription}>
-                Đơn hàng của bạn đang được xử lý
+                {isOrderCompleted() 
+                  ? 'Đơn hàng đã được giao thành công. Hãy đánh giá sản phẩm để giúp chúng tôi cải thiện dịch vụ!'
+                  : 'Đơn hàng của bạn đang được xử lý'
+                }
               </Text>
             </View>
           </View>
@@ -296,6 +388,19 @@ const OrderDetailScreen = () => {
                 <Text style={styles.itemPrice}>
                   {formatPrice(item.price)} x {item.quantity}
                 </Text>
+                {/* Review button for completed orders */}
+                {isOrderCompleted() && (
+                  <TouchableOpacity
+                    style={styles.productReviewButton}
+                    onPress={() => handleReviewProduct(item)}
+                    disabled={reviewLoading}
+                  >
+                    <Ionicons name="star-outline" size={16} color="#667eea" />
+                    <Text style={styles.productReviewButtonText}>
+                      {reviewLoading ? 'Đang tải...' : 'Đánh giá sản phẩm'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -307,10 +412,22 @@ const OrderDetailScreen = () => {
           <View style={styles.addressContainer}>
             <Ionicons name="location-outline" size={20} color="#667eea" />
             <View style={styles.addressInfo}>
-              <Text style={styles.receiverName}>{order.shippingAddress.receiverName}</Text>
-              <Text style={styles.phoneNumber}>{order.shippingAddress.phoneNumber}</Text>
+              {/* Tên người nhận và số điện thoại */}
+              {(order.shippingAddress.receiverName || order.shippingAddress.phoneNumber) && (
+                <Text style={styles.receiverName}>
+                  {order.shippingAddress.receiverName}
+                  {order.shippingAddress.phoneNumber ? ` - ${order.shippingAddress.phoneNumber}` : ''}
+                </Text>
+              )}
+              {/* Địa chỉ đầy đủ */}
               <Text style={styles.addressDetail}>
-                {order.shippingAddress.addressDetail}, {order.shippingAddress.ward}, {order.shippingAddress.district}, {order.shippingAddress.province}
+                {[
+                  order.shippingAddress.addressDetail,
+                  order.shippingAddress.street,
+                  order.shippingAddress.ward,
+                  order.shippingAddress.district,
+                  order.shippingAddress.province
+                ].filter(Boolean).join(', ')}
               </Text>
             </View>
           </View>
@@ -366,6 +483,49 @@ const OrderDetailScreen = () => {
           ))}
         </View>
       </ScrollView>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtonsContainer}>
+        {isOrderCompleted() ? (
+          <TouchableOpacity
+            style={styles.reviewButton}
+            onPress={handleReviewOrder}
+          >
+            <Ionicons name="star-outline" size={20} color="white" />
+            <Text style={styles.reviewButtonText}>Đánh giá đơn hàng</Text>
+          </TouchableOpacity>
+        ) : order.status !== 'cancelled' && order.status !== 'delivered' ? (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancelOrder}
+            disabled={cancelling}
+          >
+            <Text style={styles.cancelButtonText}>
+              {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Review Form Modal */}
+      {showReviewForm && selectedProduct && (
+        <ReviewForm
+          productId={selectedProduct.book._id}
+          orderId={orderId as string}
+          existingReview={existingReview}
+          onSubmit={handleReviewSubmit}
+          onCancel={handleReviewCancel}
+          isLoading={false}
+        />
+      )}
+
+      {/* Thank You Modal */}
+      <ThankYouModal
+        visible={showThankYouModal}
+        onClose={handleCloseThankYouModal}
+        onGoHome={handleGoHome}
+        isUpdate={isUpdateReview}
+      />
     </SafeAreaView>
   );
 };
@@ -473,38 +633,27 @@ const styles = StyleSheet.create({
   },
   productItem: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f4',
   },
   productImageContainer: {
+    marginRight: 12,
+  },
+  productImage: {
     width: 60,
     height: 80,
     borderRadius: 8,
-    overflow: 'hidden',
-    marginRight: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
   },
   productInfo: {
     flex: 1,
-    justifyContent: 'center',
   },
   productTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 4,
-    lineHeight: 20,
   },
   productAuthor: {
     fontSize: 14,
@@ -512,8 +661,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#4A90E2',
   },
   addressContainer: {
@@ -526,13 +675,8 @@ const styles = StyleSheet.create({
   },
   receiverName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 4,
-  },
-  phoneNumber: {
-    fontSize: 14,
-    color: '#7f8c8d',
     marginBottom: 4,
   },
   addressDetail: {
@@ -596,6 +740,54 @@ const styles = StyleSheet.create({
   historyTime: {
     fontSize: 14,
     color: '#7f8c8d',
+  },
+  // Review button styles for product items
+  productReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  productReviewButtonText: {
+    color: '#667eea',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  // Action buttons container and styles
+  actionButtonsContainer: {
+    padding: 16,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#667eea',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  reviewButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#bbb',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    opacity: 1,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

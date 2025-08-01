@@ -35,4 +35,7 @@ export interface User {
   full_name: string;
   phone_number?: string;
   roles: string[];
+  avatar?: string;
+  gender?: string;
+  birthday?: string;
 }

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Book, Category } from '../types';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth';
 
-const API_BASE_URL = 'https://server-shelf-stacker.onrender.com';
+const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 
 export const getCategories = async (): Promise<Category[]> => {
   const response = await fetch(`${API_BASE_URL}/api/categories`);
@@ -189,7 +189,7 @@ export const removeFromWishlist = async (token: string, bookId: string) => {
   }
 };
 
-export const getWishlist = async (token: string): Promise<Book[]> => {
+export const getWishlist = async (token: string): Promise<any[]> => {
   console.log('getWishlist called with token:', token ? 'present' : 'missing');
   try {
     const response = await fetch(`${API_BASE_URL}/api/wishlist`, {
@@ -203,22 +203,17 @@ export const getWishlist = async (token: string): Promise<Book[]> => {
     }
     const result = await response.json();
     console.log('getWishlist success result:', result);
-    
-    // Handle different response formats
-    if (result.success && result.data && result.data.books) {
-      console.log('📚 Found books in data.books:', result.data.books.length);
-      return result.data.books;
+    // Chuẩn hóa dữ liệu trả về: lấy books[].book
+    if (result.success && result.data && Array.isArray(result.data.books)) {
+      const books = result.data.books.map((item: any) => item.book).filter(Boolean);
+      return books;
     } else if (Array.isArray(result)) {
-      console.log('📚 Found books as array:', result.length);
       return result;
     } else if (result.books) {
-      console.log('📚 Found books in result.books:', result.books.length);
       return result.books;
     } else if (result.wishlist) {
-      console.log('📚 Found books in result.wishlist:', result.wishlist.length);
       return result.wishlist;
     } else {
-      console.log('📚 No books found in response');
       return [];
     }
   } catch (error) {

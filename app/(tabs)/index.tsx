@@ -95,12 +95,23 @@ const Index = () => {
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
             <Text style={styles.modalText}>Vui lòng đăng nhập để sử dụng đầy đủ tính năng</Text>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonClose]}
-              onPress={() => setModalVisible(!modalVisible)}
-            >
-              <Text style={styles.textStyle}>Đóng</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.skipButton]}
+                onPress={() => setModalVisible(!modalVisible)}
+              >
+                <Text style={styles.skipButtonText}>Đăng nhập sau</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.loginButton]}
+                onPress={() => {
+                  setModalVisible(!modalVisible);
+                  router.push('/(auth)/login');
+                }}
+              >
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -152,7 +163,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 50, // Tăng padding bottom để đẩy footer tab xuống
   },
   centeredView: {
     flex: 1,
@@ -163,35 +174,58 @@ const styles = StyleSheet.create({
   modalView: {
     margin: 20,
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5
-  },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2
-  },
-  buttonClose: {
-    backgroundColor: '#2196F3',
-  },
-  textStyle: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center'
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+    minWidth: 280,
+    maxWidth: 340,
   },
   modalText: {
-    marginBottom: 15,
-    textAlign: 'center'
-  }
+    marginBottom: 28,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#222',
+    lineHeight: 24,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 8,
+    gap: 16,
+  },
+  button: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 0,
+  },
+  skipButton: {
+    backgroundColor: '#F1F5F9',
+    marginRight: 8,
+  },
+  skipButtonText: {
+    color: '#222',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  loginButton: {
+    backgroundColor: '#3255FB',
+    marginLeft: 8,
+  },
+  loginButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default Index;
