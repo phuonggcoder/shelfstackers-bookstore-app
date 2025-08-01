@@ -231,17 +231,23 @@ class GoogleAuthService {
     try {
       console.log('🔍 Signing out and clearing cache...');
       
-      // Đăng xuất Google
-      await GoogleSignin.signOut();
+      // Thử đăng xuất Google (sẽ không lỗi nếu user không đăng nhập Google)
+      try {
+        await GoogleSignin.signOut();
+        console.log('✅ Google Sign-Out successful');
+      } catch (signOutError) {
+        console.log('ℹ️ Google sign out failed, user may not be signed in to Google');
+      }
       
-      // Xóa tokens
+      // Xóa tokens (nếu có)
       await this.clearTokens();
       
       console.log('✅ Sign-Out and cache clear successful');
       return { success: true };
     } catch (error: any) {
       console.error('❌ Sign-Out and cache clear Error:', error);
-      throw error;
+      // Không throw error để không ảnh hưởng đến sign out của SMS users
+      return { success: false, error: error.message };
     }
   }
 
