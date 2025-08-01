@@ -177,6 +177,68 @@ export const authService = {
       }
       throw new Error(error.message || 'Password change failed');
     }
+  },
+
+  // Hàm đăng nhập Google
+  loginWithGoogle: async (idToken: string) => {
+    try {
+      console.log('🔧 Sending Google login request to:', `${USER_URL}/google-signin`);
+      
+      const response = await fetch(`${USER_URL}/google-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+
+      console.log('🔧 Response status:', response.status);
+      console.log('🔧 Response headers:', response.headers);
+
+      // Kiểm tra status code
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('🔧 Server error response:', errorText.slice(0, 200));
+        throw new Error(`Server error: ${response.status} - ${errorText.slice(0, 100)}`);
+      }
+
+      // Đọc response text trước
+      const responseText = await response.text();
+      console.log('🔧 Response text:', responseText.slice(0, 200));
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.log('🔧 JSON parse error. Response text:', responseText);
+        throw new Error(`Invalid JSON response: ${responseText.slice(0, 100)}`);
+      }
+
+      console.log('🔧 Parsed Google login response:', result);
+
+      if (result.success && result.user) {
+        // Lưu token vào AsyncStorage
+        await AsyncStorage.setItem('token', result.token);
+        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+        
+        return {
+          success: true,
+          user: result.user,
+          token: result.token
+        };
+      } else {
+        return {
+          success: false,
+          error: result.message || 'Đăng nhập Google thất bại'
+        };
+      }
+    } catch (error: any) {
+      console.log('🔧 Google login error:', error);
+      return {
+        success: false,
+        error: error.message || 'Có lỗi xảy ra khi đăng nhập Google'
+      };
+    }
   }
 
   

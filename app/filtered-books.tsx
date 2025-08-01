@@ -619,8 +619,6 @@ const FilteredBooksScreen = () => {
             let fixedHeight = 300;
             if (itemPerRow === 3) { Comp = BookGrid3Col; fixedHeight = 210; }
             else if (itemPerRow === 4) { Comp = BookGrid4Col; fixedHeight = 170; }
-            // Tăng chiều cao col2 nhiều hơn
-            if (itemPerRow === 2) fixedHeight = 320;
             return (
               <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4, height: fixedHeight }}>
                 <Comp book={item} onPress={handleBookPress} />
