@@ -4,6 +4,7 @@ import { Alert, Platform } from 'react-native';
 import { storageHelper } from '../config/storage';
 import { authService } from '../services/authService';
 import { createOrUpdateSession, listenFcmTokenRefresh, removeFcmToken, syncFcmToken, updateSessionFcmToken } from '../services/fcmService';
+import googleAuthService from '../services/googleAuthService';
 import { AuthResponse, User } from '../types/auth';
 
 interface AuthContextType {
@@ -197,6 +198,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user && user._id) {
         await removeFcmToken(user._id);
       }
+      
+      // Đăng xuất Google và force hiển thị account picker cho lần sau
+      await googleAuthService.signOutAndClearCache();
+      
       await AsyncStorage.multiRemove(['token', 'user']);
       setToken(null);
       setUser(null);

@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "346115100070-jqh5ig70iu5k11d80bk8ol99apshmuj8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lathsenpai.shelfstackersbookstoreappfix",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 50, // Tăng padding bottom để đẩy footer tab xuống
   },
   centeredView: {
     flex: 1,

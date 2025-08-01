@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import CustomLoginDialog from '../../components/BottomAlert';
@@ -12,8 +13,33 @@ import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
+import ReviewService, { ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
+
+// Helper function to format publication date
+const formatPublicationDate = (dateString: string) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateString;
+  }
+};
+
+// Helper function to truncate text
+const truncateText = (text: string, maxLength: number = 25) => {
+  if (!text) return '-';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
 
 const BookDetailsScreen = () => {
   const { id } = useLocalSearchParams();
@@ -67,6 +93,14 @@ const BookDetailsScreen = () => {
   const [qtyError, setQtyError] = useState('');
   const inputQtyRef = useRef<TextInput>(null);
   const maxQty = book?.stock || 99;
+  
+  // Review summary state
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
+  
+  // Description state
+  const [descriptionHeight, setDescriptionHeight] = useState(0);
+  const [isLongContent, setIsLongContent] = useState(false);
 
   // Memoize values to prevent unnecessary re-renders
   const tagsStyles = useMemo(() => ({
@@ -154,6 +188,24 @@ const BookDetailsScreen = () => {
       fetchRelated();
     }
   }, [book]);
+
+  // Fetch review summary when book is loaded
+  useEffect(() => {
+    if (book && token) {
+      const fetchReviewSummary = async () => {
+        try {
+          setLoadingReviewSummary(true);
+          const summary = await ReviewService.getProductReviewSummary(book._id, token);
+          setReviewSummary(summary);
+        } catch (error) {
+          console.error('Error fetching review summary:', error);
+        } finally {
+          setLoadingReviewSummary(false);
+        }
+      };
+      fetchReviewSummary();
+    }
+  }, [book, token]);
 
   // Show/hide overlay with animation when alert changes
   useEffect(() => {
@@ -532,8 +584,8 @@ const BookDetailsScreen = () => {
             </View>
           </View>
         )}
-  {/* Title, price, discount badge ra ngoài, ngay dưới hình ảnh */}
-  <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'flex-start' }}>
+          {/* Title, price, discount badge ra ngoài, ngay dưới hình ảnh */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'flex-start' }}>
           <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#222', marginBottom: 6, textAlign: 'left' }}>{book.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#E53935', marginRight: 10 }}>{formatVND(book.price)}</Text>
@@ -542,55 +594,205 @@ const BookDetailsScreen = () => {
             </View>
           </View>
         </View>
-        {/* Gộp mô tả và thông tin sản phẩm */}
-        <View style={styles.infoSectionBox}>
- 
-          <View style={styles.detailTable}>
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Thể loại:</Text><Text style={styles.detailValue}>{book.categories && book.categories.length > 0 ? book.categories.map((c: any) => c.name).join(', ') : '-'}</Text></View>
-            <View style={styles.separator} />
-            {(book as any).supplier && <><View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà cung cấp:</Text><Text style={styles.detailValue}>{(book as any).supplier}</Text></View><View style={styles.separator} /></>}
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Nhà xuất bản:</Text><Text style={styles.detailValue}>{book.publisher || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngày xuất bản:</Text><Text style={styles.detailValue}>{book.publication_date || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Ngôn ngữ:</Text><Text style={styles.detailValue}>{book.language || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>Tồn kho:</Text><Text style={styles.detailValue}>{book.stock}</Text></View>
-          </View>
-          {/* Mô tả: chỉ show 6 dòng đầu, không ghi tiêu đề, cuối dòng 6 có nút xem thêm, căn giữa nút */}
-          <View style={{ minHeight: 120 }}>
-            {(() => {
-              const plainText = book.description?.replace(/<[^>]+>/g, '') || '';
-              const lines = plainText.split(/\r?\n/).filter(Boolean);
-              const preview = lines.slice(0, 6).join('\n');
-              const isLong = lines.length > 6;
-              return <>
-                <Text style={{ fontSize: 15, color: '#333', lineHeight: 22, textAlign: 'justify' }}>{preview}{isLong ? '...' : ''}</Text>
-                {isLong && (
-                  <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}>
-                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>Xem thêm</Text>
-                  </TouchableOpacity>
-                )}
-              </>;
-            })()}
-          </View>
-        </View>
 
+        {/* Author section moved above the grey box */}
         <View style={styles.authorContainer}>
           <Text style={styles.sectionTitle}>Tác giả</Text>
           <View style={styles.authorInfo}>
-            {/* Xóa avatar tác giả */}
-            {/* <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} /> */}
             <View>
-              <Text style={styles.authorName}>{book.author}</Text>
+              <Text style={styles.authorName}>{truncateText(book.author, 30)}</Text>
             </View>
-            {/* <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileButtonText}>Xem hồ sơ</Text>
-            </TouchableOpacity> */}
           </View>
         </View>
 
+        {/* Gộp mô tả và thông tin sản phẩm */}
+        <View style={styles.infoSectionBox}>
+          <View style={styles.detailTable}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Thể loại:</Text>
+              <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                {book.categories && book.categories.length > 0 ? truncateText(book.categories.map((c: any) => c.name).join(', '), 20) : '-'}
+              </Text>
+            </View>
+            <View style={styles.separator} />
+            {(book as any).supplier && (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Nhà cung cấp:</Text>
+                  <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                    {truncateText((book as any).supplier, 20)}
+                  </Text>
+                </View>
+                <View style={styles.separator} />
+              </>
+            )}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Nhà xuất bản:</Text>
+              <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                {truncateText(book.publisher || '-', 20)}
+              </Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Ngày xuất bản:</Text>
+              <Text style={styles.detailValue}>{formatPublicationDate(book.publication_date)}</Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Ngôn ngữ:</Text>
+              <Text style={styles.detailValue}>{book.language || '-'}</Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Tồn kho:</Text>
+              <Text style={styles.detailValue}>{book.stock}</Text>
+            </View>
+          </View>
+          
+          {/* Mô tả với giới hạn 10 dòng và hiệu ứng fade */}
+          {(() => {
+            const LINE_HEIGHT = 22; // lineHeight from the Text style
+            const MAX_LINES = 10; // Giới hạn 10 dòng
+            const SHOW_LINES = 12; // Hiển thị 12 dòng nếu nội dung dài
+            const FADE_START_LINE = 10; // Bắt đầu fade từ dòng 11
+            const MAX_HEIGHT = LINE_HEIGHT * MAX_LINES;
+            const SHOW_HEIGHT = LINE_HEIGHT * SHOW_LINES;
+            
+            const handleDescriptionLayout = (event: any) => {
+              const { height } = event.nativeEvent.layout;
+              setDescriptionHeight(height);
+              setIsLongContent(height > MAX_HEIGHT);
+            };
+            
+            const plainText = book.description?.replace(/<[^>]+>/g, '') || '';
+            
+            // Estimate if content is long based on character count and line breaks
+            const estimatedLines = Math.ceil(plainText.length / 50) + (plainText.match(/\n/g) || []).length;
+            const isEstimatedLong = estimatedLines > 8; // Nếu > 8 dòng thì coi là dài
+            
+            // Use estimated length for initial render, then use actual measurement
+            const shouldShowExtended = isLongContent || (isEstimatedLong && descriptionHeight === 0);
+            
+            return (
+              <>
+                {/* Container cho mô tả và fade effect */}
+                <View style={{ position: 'relative', marginBottom: 8 }}>
+                  <Text 
+                    style={{ 
+                      fontSize: 15, 
+                      color: '#333', 
+                      lineHeight: LINE_HEIGHT, 
+                      textAlign: 'justify',
+                      ...(shouldShowExtended && { height: SHOW_HEIGHT })
+                    }}
+                    onLayout={handleDescriptionLayout}
+                    numberOfLines={shouldShowExtended ? SHOW_LINES : undefined}
+                  >
+                    {plainText}
+                  </Text>
+                  
+                  {/* Fading effect overlay for long content - fade từ dòng 11-13 */}
+                  {shouldShowExtended && (
+                    <View style={styles.fadeOverlay}>
+                      <LinearGradient
+                        colors={['transparent', '#F3F4F8', '#F3F4F8']}
+                        locations={[0, 0.3, 1]}
+                        style={styles.fadeGradient}
+                      />
+                    </View>
+                  )}
+                </View>
+                
+                {/* Button luôn hiển thị nếu có nội dung mô tả - tách riêng khỏi fade effect */}
+                {plainText.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} 
+                    style={{ alignSelf: 'center', marginBottom: 20, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>Xem thông tin chi tiết</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            );
+          })()}
+        </View>
+
         <View style={{ height: 10 }} />
+        
+        {/* Review Section */}
+        <View style={styles.reviewSection}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewTitle}>Đánh giá sản phẩm</Text>
+            <TouchableOpacity 
+              style={styles.viewAllReviewsButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Text style={styles.viewAllReviewsText}>Xem tất cả</Text>
+              <Ionicons name="chevron-forward" size={16} color="#3255FB" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Review Summary */}
+          {loadingReviewSummary ? (
+            <View style={styles.reviewPlaceholder}>
+              <ActivityIndicator size="small" color="#3255FB" />
+              <Text style={styles.reviewPlaceholderText}>Đang tải đánh giá...</Text>
+            </View>
+          ) : reviewSummary && reviewSummary.totalReviews > 0 ? (
+            <View style={styles.reviewSummary}>
+              <View style={styles.reviewRating}>
+                <Text style={styles.reviewRatingText}>{reviewSummary.averageRating.toFixed(1)}</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= reviewSummary.averageRating ? "star" : "star-outline"}
+                      size={16}
+                      color={star <= reviewSummary.averageRating ? "#FFD700" : "#CCC"}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.reviewCountText}>
+                  {reviewSummary.totalReviews} đánh giá
+                </Text>
+              </View>
+              <View style={styles.reviewDistribution}>
+                {[5, 4, 3, 2, 1].map((rating) => {
+                  const count = reviewSummary.ratingCounts[rating as keyof typeof reviewSummary.ratingCounts] || 0;
+                  const percentage = reviewSummary.totalReviews > 0 
+                    ? (count / reviewSummary.totalReviews) * 100 
+                    : 0;
+                  return (
+                    <View key={rating} style={styles.ratingBar}>
+                      <Text style={styles.ratingLabel}>{rating}★</Text>
+                      <View style={styles.ratingBarContainer}>
+                        <View 
+                          style={[
+                            styles.ratingBarFill, 
+                            { width: `${percentage}%` }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={styles.ratingCount}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.reviewPlaceholder}>
+              <Ionicons name="star-outline" size={48} color="#CCC" />
+              <Text style={styles.reviewPlaceholderText}>Chưa có đánh giá nào</Text>
+              <Text style={styles.reviewPlaceholderSubtext}>
+                Hãy là người đầu tiên đánh giá sản phẩm này
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
@@ -1188,6 +1390,122 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  reviewSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  viewAllReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllReviewsText: {
+    fontSize: 14,
+    color: '#3255FB',
+    fontWeight: '500',
+  },
+  reviewPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+  },
+  reviewPlaceholderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  reviewPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // Review Summary Styles
+  reviewSummary: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+  },
+  reviewRating: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewRatingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  reviewCountText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  reviewDistribution: {
+    gap: 8,
+  },
+  ratingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingLabel: {
+    fontSize: 12,
+    color: '#666',
+    width: 20,
+  },
+  ratingBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  ratingBarFill: {
+    height: '100%',
+    backgroundColor: '#FFD700',
+  },
+  ratingCount: {
+    fontSize: 12,
+    color: '#666',
+    width: 30,
+    textAlign: 'right',
+  },
+  fadeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 66, // 3 dòng cuối (22 * 3 = 66)
+    backgroundColor: 'transparent',
+    pointerEvents: 'none',
+    zIndex: 1,
+  },
+  fadeGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 66, // 3 dòng cuối (22 * 3 = 66)
   },
 });
 

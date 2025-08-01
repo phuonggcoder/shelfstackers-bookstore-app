@@ -225,9 +225,21 @@ const OrderHistoryScreen = () => {
               {formatPrice(item.totalAmount)}
             </Text>
           </View>
-          <TouchableOpacity style={styles.detailButton} onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}>
-            <Text style={styles.detailButtonText}>Chi tiết</Text>
-          </TouchableOpacity>
+          <View style={styles.orderActions}>
+            <TouchableOpacity style={styles.detailButton} onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}>
+              <Text style={styles.detailButtonText}>Chi tiết</Text>
+            </TouchableOpacity>
+            {/* Review button for completed orders */}
+            {item.status.toLowerCase() === 'delivered' && (
+              <TouchableOpacity 
+                style={styles.reviewButton}
+                onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}
+              >
+                <Ionicons name="star-outline" size={16} color="#667eea" />
+                <Text style={styles.reviewButtonText}>Đánh giá</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -528,6 +540,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  orderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#667eea',
+  },
+  reviewButtonText: {
+    color: '#667eea',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 
