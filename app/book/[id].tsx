@@ -12,7 +12,7 @@ import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
+import { addToCart, addToWishlist, getBookById, getBooksByCategory, getWishlist, removeFromWishlist } from '../../services/api';
 import ReviewService, { ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
@@ -156,13 +156,12 @@ const BookDetailsScreen = () => {
     if (book && token) {
       const checkFavorite = async () => {
         try {
-          const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/wishlist', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const data = await res.json();
-          const books = Array.isArray(data) ? data : data.books || [];
+          const books = await getWishlist(token);
           setIsFavorite(books.some((b: any) => b._id === book._id));
-        } catch { }
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+          setIsFavorite(false);
+        }
       };
       checkFavorite();
     }
@@ -300,18 +299,23 @@ const BookDetailsScreen = () => {
       setShowLoginDialog(true);
       return;
     }
-    if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
-      return;
-    }
+    
     try {
-      const res = await addToWishlist(token, bookId as string);
-      console.log('Add to wishlist response:', res);
-      setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      if (isFavorite) {
+        // Xóa khỏi wishlist
+        await removeFromWishlist(token, bookId as string);
+        setIsFavorite(false);
+        showToast('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        // Thêm vào wishlist
+        const res = await addToWishlist(token, bookId as string);
+        console.log('Add to wishlist response:', res);
+        setIsFavorite(true);
+        showToast('Đã thêm vào danh sách yêu thích');
+      }
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      showToast('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
