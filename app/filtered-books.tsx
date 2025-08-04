@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookGrid2Col from '../components/BookGrid2Col';
@@ -37,6 +38,7 @@ const PRICE_PRESETS = [
 type BookWithSupplier = Book & { supplier?: string };
 
 const FilteredBooksScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [books, setBooks] = useState<BookWithSupplier[]>([]);
@@ -190,9 +192,9 @@ const FilteredBooksScreen = () => {
   // Xử lý các sort chưa có API
   React.useEffect(() => {
     if (["week", "month", "year", "featured"].includes(sort)) {
-      console.log('Chức năng này chưa hỗ trợ API:', sort);
+      console.log(t('featureNotSupported'), sort);
     }
-  }, [sort]);
+  }, [sort, t]);
 
   // Xóa bộ lọc
   const clearFilters = () => {
@@ -223,59 +225,122 @@ const FilteredBooksScreen = () => {
 
   // Thanh filter ngang mới
   const renderFilterBar = () => (
-    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',gap:8}}>
+    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',gap:8, zIndex: 99998}}>
       {/* Danh mục */}
-      <View style={{width: 120}}>
+      <View style={{width: 120, zIndex: 99999}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowCategoryDropdown(!showCategoryDropdown)}>
           <Ionicons name="list" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Danh mục</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('categories')}</Text>
           <Ionicons name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
-        {showCategoryDropdown && (
-          <View style={{position:'absolute',top:44,left:0,right:0,zIndex:10,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.08,shadowRadius:8,elevation:2,borderWidth:1,borderColor:'#eee'}}>
-            <ScrollView style={{maxHeight:220}}>
-              {categories.map(cat => (
-                <Pressable key={cat._id} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
-                  setSelectedCategories([cat._id]);
-                  setShowCategoryDropdown(false);
-                }}>
-                  <Text style={{color:selectedCategories.includes(cat._id)?'#1976D2':'#222',fontWeight:selectedCategories.includes(cat._id)?'bold':'normal'}}>{cat.name}</Text>
-                </Pressable>
-              ))}
-              <Pressable style={{padding:12}} onPress={()=>{setSelectedCategories([]);setShowCategoryDropdown(false);}}>
-                <Text style={{color:'#888'}}>Tất cả danh mục</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        )}
+
+         {showCategoryDropdown && (
+           <Modal
+             visible={showCategoryDropdown}
+             transparent={true}
+             animationType="none"
+             onRequestClose={() => setShowCategoryDropdown(false)}
+           >
+             <TouchableOpacity 
+               style={{flex:1, backgroundColor:'rgba(0,0,0,0.3)'}} 
+               activeOpacity={1} 
+               onPress={() => setShowCategoryDropdown(false)}
+             >
+               <View style={{position:'absolute',top:44,left:12,right:12,zIndex:99999,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.15,shadowRadius:12,elevation:15,borderWidth:1,borderColor:'#eee'}}>
+                 <ScrollView 
+                   style={{maxHeight:200}} 
+                   showsVerticalScrollIndicator={true} 
+                   nestedScrollEnabled={true} 
+                   contentContainerStyle={{paddingBottom:8}}
+                   scrollEnabled={true}
+                   bounces={false}
+                   keyboardShouldPersistTaps="handled"
+                   alwaysBounceVertical={false}
+                   directionalLockEnabled={true}
+                   onStartShouldSetResponder={() => true}
+                   onResponderGrant={() => true}
+                   onResponderMove={() => true}
+                   onResponderRelease={() => true}
+                   onResponderTerminate={() => true}
+                   onTouchStart={() => true}
+                   onTouchMove={() => true}
+                   onTouchEnd={() => true}
+                 >
+                   {categories.map(cat => (
+                     <Pressable key={cat._id} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
+                       setSelectedCategories([cat._id]);
+                       setShowCategoryDropdown(false);
+                     }}>
+                       <Text style={{color:selectedCategories.includes(cat._id)?'#1976D2':'#222',fontWeight:selectedCategories.includes(cat._id)?'bold':'normal'}}>{cat.name}</Text>
+                     </Pressable>
+                   ))}
+                   <Pressable style={{padding:12}} onPress={()=>{setSelectedCategories([]);setShowCategoryDropdown(false);}}>
+                     <Text style={{color:'#888'}}>Tất cả danh mục</Text>
+                   </Pressable>
+                 </ScrollView>
+               </View>
+             </TouchableOpacity>
+           </Modal>
+         )}
       </View>
       {/* Sắp xếp */}
-      <View style={{width: 120}}>
+      <View style={{width: 120, zIndex: 99999}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowSortDropdown(!showSortDropdown)}>
           <Ionicons name="swap-vertical" size={18} color="#1976D2" style={{marginRight:6}} />
-          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>Sắp xếp</Text>
+          <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('sort')}</Text>
           <Ionicons name={showSortDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showSortDropdown && (
-          <View style={{position:'absolute',top:44,left:0,right:0,zIndex:10,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.08,shadowRadius:8,elevation:2,borderWidth:1,borderColor:'#eee'}}>
-            <ScrollView style={{maxHeight:220}}>
-              {SORT_OPTIONS.map(opt => (
-                <Pressable key={opt.value} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
-                  setSort(opt.value);
-                  setShowSortDropdown(false);
-                }}>
-                  <Text style={{color:sort===opt.value?'#1976D2':'#222',fontWeight:sort===opt.value?'bold':'normal'}}>{opt.label}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+           <Modal
+             visible={showSortDropdown}
+             transparent={true}
+             animationType="none"
+             onRequestClose={() => setShowSortDropdown(false)}
+           >
+             <TouchableOpacity 
+               style={{flex:1, backgroundColor:'rgba(0,0,0,0.3)'}} 
+               activeOpacity={1} 
+               onPress={() => setShowSortDropdown(false)}
+             >
+               <View style={{position:'absolute',top:44,left:12,right:12,zIndex:99999,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.15,shadowRadius:12,elevation:15,borderWidth:1,borderColor:'#eee'}}>
+                 <ScrollView 
+                   style={{maxHeight:200}} 
+                   showsVerticalScrollIndicator={true} 
+                   nestedScrollEnabled={true} 
+                   contentContainerStyle={{paddingBottom:8}}
+                   scrollEnabled={true}
+                   bounces={false}
+                   keyboardShouldPersistTaps="handled"
+                   alwaysBounceVertical={false}
+                   directionalLockEnabled={true}
+                   onStartShouldSetResponder={() => true}
+                   onResponderGrant={() => true}
+                   onResponderMove={() => true}
+                   onResponderRelease={() => true}
+                   onResponderTerminate={() => true}
+                   onTouchStart={() => true}
+                   onTouchMove={() => true}
+                   onTouchEnd={() => true}
+                 >
+                   {SORT_OPTIONS.map(opt => (
+                     <Pressable key={opt.value} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
+                       setSort(opt.value);
+                       setShowSortDropdown(false);
+                     }}>
+                       <Text style={{color:sort===opt.value?'#1976D2':'#222',fontWeight:sort===opt.value?'bold':'normal'}}>{opt.label}</Text>
+                     </Pressable>
+                   ))}
+                 </ScrollView>
+               </View>
+             </TouchableOpacity>
+           </Modal>
+         )}
       </View>
       {/* Lọc nâng cao + X */}
       <View style={{flexDirection:'row',alignItems:'center'}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:16,paddingVertical:8, minWidth: 0}} onPress={()=>setShowFilterSidebar(true)}>
           <Ionicons name="filter" size={18} color="#fff" style={{marginRight:6}} />
-          <Text style={{color:'#fff',fontWeight:'bold',fontSize:13}}>Lọc</Text>
+          <Text style={{color:'#fff',fontWeight:'bold',fontSize:13}}>{t('filter')}</Text>
         </TouchableOpacity>
         {hasActiveFilter() && (
           <TouchableOpacity onPress={clearFilters} style={{marginLeft:4, padding:4}}>
@@ -289,17 +354,17 @@ const FilteredBooksScreen = () => {
   // Sidebar filter nâng cao (Modal trượt từ phải sang)
   const renderFilterSidebar = () => (
     <Modal visible={showFilterSidebar} animationType="slide" transparent onRequestClose={()=>setShowFilterSidebar(false)}>
-      <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.18)',flexDirection:'row',justifyContent:'flex-end'}}>
-        <View style={{width:'80%',backgroundColor:'#fff',height:'100%',padding:18,shadowColor:'#000',shadowOpacity:0.12,shadowRadius:12,elevation:4}}>
+      <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.18)',flexDirection:'row',justifyContent:'flex-end', zIndex: 9999}}>
+        <View style={{width:'80%',backgroundColor:'#fff',height:'100%',padding:18,shadowColor:'#000',shadowOpacity:0.12,shadowRadius:12,elevation:8, zIndex: 10000}}>
           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <Text style={{fontSize:18,fontWeight:'bold',color:'#1976D2'}}>Bộ Lọc</Text>
+            <Text style={{fontSize:18,fontWeight:'bold',color:'#1976D2'}}>{t('filters')}</Text>
             <TouchableOpacity onPress={()=>setShowFilterSidebar(false)}>
               <Ionicons name="close" size={26} color="#1976D2" />
             </TouchableOpacity>
           </View>
           <ScrollView>
       {/* Giá */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>Giá</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>{t('price')}</Text>
         <Slider
               style={{ width: '100%', height: 30 }}
           minimumValue={0}
@@ -322,7 +387,7 @@ const FilteredBooksScreen = () => {
             </View>
             {/* Giá theo khoảng tùy chỉnh */}
             <View style={{flexDirection:'row',alignItems:'center',gap:8,marginBottom:8}}>
-              <Text style={{color:'#1976D2'}}>Từ</Text>
+              <Text style={{color:'#1976D2'}}>{t('from')}</Text>
               <TextInput
                 style={{borderWidth:1,borderColor:'#1976D2',borderRadius:6,padding:4,minWidth:60,textAlign:'center',color:'#1976D2'}}
                 keyboardType="numeric"
@@ -330,7 +395,7 @@ const FilteredBooksScreen = () => {
                 onChangeText={v=>setMinPrice(Number(v.replace(/\D/g, '')))}
                 placeholder="0"
               />
-              <Text style={{color:'#1976D2'}}>đến</Text>
+              <Text style={{color:'#1976D2'}}>{t('to')}</Text>
               <TextInput
                 style={{borderWidth:1,borderColor:'#1976D2',borderRadius:6,padding:4,minWidth:60,textAlign:'center',color:'#1976D2'}}
                 keyboardType="numeric"
@@ -341,7 +406,7 @@ const FilteredBooksScreen = () => {
               <Text style={{color:'#1976D2'}}>đ</Text>
       </View>
             {/* Ngôn ngữ */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Ngôn ngữ</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('language')}</Text>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
               {languages.map(lang => (
                 <TouchableOpacity key={lang} style={{backgroundColor:selectedLanguages.includes(lang)?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:16,paddingHorizontal:12,paddingVertical:6,marginBottom:6}} onPress={()=>setSelectedLanguages(selectedLanguages.includes(lang)?selectedLanguages.filter(l=>l!==lang):[...selectedLanguages,lang])}>
@@ -350,7 +415,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
       {/* Số item/hàng */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Số item/hàng</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('itemsPerRow')}</Text>
             <View style={{flexDirection:'row',gap:8,marginBottom:8}}>
         {ITEM_PER_ROW_OPTIONS.map(opt => (
                 <TouchableOpacity key={opt} style={{backgroundColor:itemPerRow===opt?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:12,paddingVertical:6}} onPress={()=>setItemPerRow(opt)}>
@@ -359,7 +424,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
       {/* Số item/trang */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>Số item/trang</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4}}>{t('itemsPerPage')}</Text>
             <View style={{flexDirection:'row',gap:8,marginBottom:8}}>
         {PAGE_SIZE_OPTIONS.map(opt => (
                 <TouchableOpacity key={opt} style={{backgroundColor:pageSize===opt?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:12,paddingVertical:6}} onPress={()=>setPageSize(opt)}>
@@ -368,7 +433,7 @@ const FilteredBooksScreen = () => {
         ))}
       </View>
             {/* Nhà cung cấp động + Xem thêm */}
-            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>Nhà cung cấp</Text>
+            <Text style={{fontWeight:'bold',marginTop:12,marginBottom:4, color:'#1976D2'}}>{t('supplier')}</Text>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:8}}>
               {(showAllSuppliers?supplierList:supplierList.slice(0,6)).map(sup => (
                 <TouchableOpacity key={sup} style={{backgroundColor:selectedSuppliers.includes(sup)?'#1976D2':'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:16,paddingHorizontal:12,paddingVertical:6,marginBottom:6}} onPress={()=>setSelectedSuppliers(selectedSuppliers.includes(sup)?selectedSuppliers.filter(l=>l!==sup):[...selectedSuppliers,sup])}>
@@ -377,22 +442,22 @@ const FilteredBooksScreen = () => {
               ))}
               {supplierList.length>6 && !showAllSuppliers && (
                 <TouchableOpacity onPress={()=>setShowAllSuppliers(true)} style={{alignSelf:'center',marginTop:6}}>
-                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>Xem thêm ▼</Text>
+                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>{t('showMore')} ▼</Text>
                 </TouchableOpacity>
               )}
               {supplierList.length>6 && showAllSuppliers && (
                 <TouchableOpacity onPress={()=>setShowAllSuppliers(false)} style={{alignSelf:'center',marginTop:6}}>
-                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>Ẩn bớt ▲</Text>
+                  <Text style={{color:'#1976D2',fontWeight:'bold',textDecorationLine:'underline'}}>{t('showLess')} ▲</Text>
                 </TouchableOpacity>
               )}
             </View>
     </ScrollView>
           <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:18}}>
             <TouchableOpacity style={{backgroundColor:'#fff',borderColor:'#1976D2',borderWidth:1,borderRadius:8,paddingHorizontal:18,paddingVertical:10}} onPress={clearFilters}>
-              <Text style={{color:'#1976D2',fontWeight:'bold'}}>Xóa Bộ Lọc</Text>
+              <Text style={{color:'#1976D2',fontWeight:'bold'}}>{t('clearFilters')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{backgroundColor:'#1976D2',borderRadius:8,paddingHorizontal:18,paddingVertical:10}} onPress={()=>setShowFilterSidebar(false)}>
-              <Text style={{color:'#fff',fontWeight:'bold'}}>Đóng</Text>
+              <Text style={{color:'#fff',fontWeight:'bold'}}>{t('close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -433,7 +498,7 @@ const FilteredBooksScreen = () => {
           >
             <TouchableOpacity activeOpacity={1} onPress={() => setShowModalInputPage(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
               <TouchableOpacity activeOpacity={1} style={{ width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 28, alignItems: 'center', elevation: 6 }} onPress={e => e.stopPropagation()}>
-                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>Nhập số trang</Text>
+                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>{t('enterPageNumber')}</Text>
                 <TextInput
                   ref={inputPageRef}
                   style={{ borderWidth: 1, borderColor: '#1976D2', borderRadius: 12, padding: 16, minWidth: 120, textAlign: 'center', color: '#1976D2', fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}
@@ -488,7 +553,7 @@ const FilteredBooksScreen = () => {
           >
             <TouchableOpacity activeOpacity={1} onPress={() => setShowModalInputPage(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
               <TouchableOpacity activeOpacity={1} style={{ width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 28, alignItems: 'center', elevation: 6 }} onPress={e => e.stopPropagation()}>
-                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>Nhập số trang</Text>
+                <Text style={{fontSize:18, fontWeight:'bold', color:'#1976D2', marginBottom:16}}>{t('enterPageNumber')}</Text>
                 <TextInput
                   ref={inputPageRef}
                   style={{ borderWidth: 1, borderColor: '#1976D2', borderRadius: 12, padding: 16, minWidth: 120, textAlign: 'center', color: '#1976D2', fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}
@@ -573,7 +638,7 @@ const FilteredBooksScreen = () => {
             <Ionicons name="search" size={28} color="#888" style={{marginRight:10}} />
             <TextInput
               style={{flex:1, color:'#222', fontSize:20, height:56, paddingVertical:0, backgroundColor:'transparent'}}
-              placeholder="Tìm kiếm sách..."
+              placeholder={t('searchBooks')}
               placeholderTextColor="#888"
               value={searchText}
               onChangeText={setSearchText}
@@ -585,7 +650,7 @@ const FilteredBooksScreen = () => {
       {/* Hiển thị tên danh mục đã chọn hoặc kết quả tìm kiếm */}
       {searchText.trim() ? (
         <Text style={{fontSize:20, fontWeight:'bold', color:'#1976D2', textAlign:'center', marginTop:12, marginBottom:4}}>
-          Kết quả tìm kiếm cho '{searchText.trim()}'
+          {t('searchResultsFor', { query: searchText.trim() })}
         </Text>
       ) : selectedCategoryName ? (
         <View style={{flexDirection:'row', alignItems:'center', justifyContent:'center', marginTop:12, marginBottom:4}}>
@@ -601,7 +666,7 @@ const FilteredBooksScreen = () => {
       {loading && (
         <View style={{alignItems:'center', marginTop:32}}>
           <ActivityIndicator size="large" color="#1976D2" />
-          <Text style={{color:'#1976D2', marginTop:8}}>Đang tải dữ liệu...</Text>
+          <Text style={{color:'#1976D2', marginTop:8}}>{t('loadingData')}</Text>
         </View>
       )}
       {/* Danh sách sách dạng lưới */}
@@ -614,6 +679,7 @@ const FilteredBooksScreen = () => {
           key={`flatlist-${itemPerRow}`}
           contentContainerStyle={{ ...styles.listContent, paddingBottom: 24 + insets.bottom + 50 }}
           columnWrapperStyle={{ justifyContent: 'center', marginHorizontal: 4 }}
+          style={{ zIndex: 1 }}
           renderItem={({ item }) => {
             let Comp: React.ComponentType<{ book: Book; onPress?: (book: Book) => void }> = BookGrid2Col;
             let fixedHeight = 300;
@@ -628,8 +694,8 @@ const FilteredBooksScreen = () => {
           ListEmptyComponent={
             <View style={{alignItems:'center', marginTop:48}}>
               <Ionicons name="book-outline" size={64} color="#bdc3c7" style={{marginBottom:8}} />
-              <Text style={{fontSize:16, color:'#888', fontWeight:'500'}}>Không có sách phù hợp</Text>
-              <Text style={{fontSize:13, color:'#aaa', marginTop:4}}>Hãy thử thay đổi bộ lọc hoặc tìm kiếm khác.</Text>
+              <Text style={{fontSize:16, color:'#888', fontWeight:'500'}}>{t('noBooksFound')}</Text>
+              <Text style={{fontSize:13, color:'#aaa', marginTop:4}}>{t('tryChangingFilters')}</Text>
           </View>
           }
         />

@@ -2,20 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomAlert from '../components/BottomAlert';
+
 import { useAuth } from '../context/AuthContext';
 import AddressService from '../services/addressService';
 
 const EditAddressScreen = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showAlert, setShowAlert] = useState(false);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -49,7 +51,7 @@ const EditAddressScreen = () => {
       const address = addresses.find((addr: any) => addr._id === id);
       
       if (!address) {
-        Alert.alert('Lỗi', 'Địa chỉ không tồn tại hoặc đã bị xóa');
+        Alert.alert(t('error'), t('addressNotFoundOrDeleted'));
         router.back();
         return;
       }
@@ -71,7 +73,7 @@ const EditAddressScreen = () => {
       });
     } catch (error: any) {
       console.error('Error fetching address:', error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin địa chỉ');
+      Alert.alert(t('error'), t('cannotLoadAddressInfo'));
       router.back();
     } finally {
       setLoading(false);
@@ -83,27 +85,27 @@ const EditAddressScreen = () => {
 
     // Validation
     if (!formData.receiver_name.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tên người nhận');
+      Alert.alert(t('error'), t('pleaseEnterReceiverName'));
       return;
     }
     if (!formData.phone_number.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
       return;
     }
     if (!formData.province) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tỉnh/thành phố');
+      Alert.alert(t('error'), t('pleaseEnterProvinceCity'));
       return;
     }
     if (!formData.district) {
-      Alert.alert('Lỗi', 'Vui lòng nhập quận/huyện');
+      Alert.alert(t('error'), t('pleaseEnterDistrict'));
       return;
     }
     if (!formData.ward) {
-      Alert.alert('Lỗi', 'Vui lòng nhập phường/xã');
+      Alert.alert(t('error'), t('pleaseEnterWard'));
       return;
     }
     if (!formData.address_detail.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
       return;
     }
 
@@ -112,18 +114,20 @@ const EditAddressScreen = () => {
               await AddressService.updateAddress(token, id as string, formData);
       
       // Show success alert
-      setShowAlert(true);
-      
-      // Set flag to show alert in address list
-      await AsyncStorage.setItem('address_added', 'true');
-      
-      // Go back to address list
-      setTimeout(() => {
-        router.back();
-      }, 1500);
+      Alert.alert(t('success'), t('addressUpdatedSuccessfully'), [
+        {
+          text: t('ok'),
+          onPress: () => {
+            // Set flag to show alert in address list
+            AsyncStorage.setItem('address_added', 'true');
+            // Go back to address list
+            router.back();
+          },
+        },
+      ]);
     } catch (error) {
       console.error('Error updating address:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật địa chỉ');
+      Alert.alert(t('error'), t('cannotUpdateAddress'));
     } finally {
       setSaving(false);
     }
@@ -134,7 +138,7 @@ const EditAddressScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>Đang tải thông tin địa chỉ...</Text>
+          <Text style={styles.loadingText}>{t('loadingAddressInfo')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -146,115 +150,111 @@ const EditAddressScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chỉnh sửa địa chỉ</Text>
+        <Text style={styles.headerTitle}>{t('editAddress')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <BottomAlert
-        title="Cập nhật địa chỉ thành công!"
-        visible={showAlert}
-        onHide={() => setShowAlert(false)}
-      />
+      {/* Success alert will be shown via Alert.alert */}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
+          <Text style={styles.sectionTitle}>{t('recipientInformation')}</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tên người nhận *</Text>
+            <Text style={styles.label}>{t('receiverName')} *</Text>
             <TextInput
               style={styles.input}
               value={formData.receiver_name}
               onChangeText={(text) => setFormData(prev => ({ ...prev, receiver_name: text }))}
-              placeholder="Nhập tên người nhận"
+              placeholder={t('enterReceiverName')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Số điện thoại *</Text>
+            <Text style={styles.label}>{t('phoneNumber')} *</Text>
             <TextInput
               style={styles.input}
               value={formData.phone_number}
               onChangeText={(text) => setFormData(prev => ({ ...prev, phone_number: text }))}
-              placeholder="Nhập số điện thoại"
+              placeholder={t('enterPhoneNumber')}
               keyboardType="phone-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('email')}</Text>
             <TextInput
               style={styles.input}
               value={formData.email}
               onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
-              placeholder="Nhập email (không bắt buộc)"
+              placeholder={t('enterEmailOptional')}
               keyboardType="email-address"
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+          <Text style={styles.sectionTitle}>{t('shippingAddress')}</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tỉnh/Thành phố *</Text>
+            <Text style={styles.label}>{t('provinceCity')} *</Text>
             <TextInput
               style={styles.input}
               value={formData.province}
               onChangeText={(text) => setFormData(prev => ({ ...prev, province: text }))}
-              placeholder="Nhập tỉnh/thành phố"
+              placeholder={t('enterProvinceCity')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Quận/Huyện *</Text>
+            <Text style={styles.label}>{t('district')} *</Text>
             <TextInput
               style={styles.input}
               value={formData.district}
               onChangeText={(text) => setFormData(prev => ({ ...prev, district: text }))}
-              placeholder="Nhập quận/huyện"
+              placeholder={t('enterDistrict')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phường/Xã *</Text>
+            <Text style={styles.label}>{t('ward')} *</Text>
             <TextInput
               style={styles.input}
               value={formData.ward}
               onChangeText={(text) => setFormData(prev => ({ ...prev, ward: text }))}
-              placeholder="Nhập phường/xã"
+              placeholder={t('enterWard')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Đường</Text>
+            <Text style={styles.label}>{t('street')}</Text>
             <TextInput
               style={styles.input}
               value={formData.street}
               onChangeText={(text) => setFormData(prev => ({ ...prev, street: text }))}
-              placeholder="Nhập đường (không bắt buộc)"
+              placeholder={t('enterStreetOptional')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Địa chỉ chi tiết *</Text>
+            <Text style={styles.label}>{t('detailedAddress')} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={formData.address_detail}
               onChangeText={(text) => setFormData(prev => ({ ...prev, address_detail: text }))}
-              placeholder="Số nhà, tên tòa nhà, v.v."
+              placeholder={t('houseNumberBuildingName')}
               multiline
               numberOfLines={3}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ghi chú</Text>
+            <Text style={styles.label}>{t('note')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={formData.note}
               onChangeText={(text) => setFormData(prev => ({ ...prev, note: text }))}
-              placeholder="Ghi chú giao hàng (không bắt buộc)"
+              placeholder={t('deliveryNoteOptional')}
               multiline
               numberOfLines={2}
             />
@@ -262,14 +262,14 @@ const EditAddressScreen = () => {
 
           {/* Thêm phần chọn loại địa chỉ */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Loại địa chỉ</Text>
+            <Text style={styles.label}>{t('addressType')}</Text>
             <View style={styles.typeButtons}>
               <TouchableOpacity
                 style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
                 onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
               >
                 <Text style={[styles.typeText, formData.type === 'office' && styles.typeTextActive]}>
-                  🏢 Văn phòng
+                  {t('office')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -277,7 +277,7 @@ const EditAddressScreen = () => {
                 onPress={() => setFormData(prev => ({ ...prev, type: 'home' }))}
               >
                 <Text style={[styles.typeText, formData.type === 'home' && styles.typeTextActive]}>
-                  🏠 Nhà riêng
+                  {t('home')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -296,7 +296,7 @@ const EditAddressScreen = () => {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Cập nhật địa chỉ</Text>
+            <Text style={styles.saveButtonText}>{t('updateAddress')}</Text>
           )}
         </TouchableOpacity>
       </View>

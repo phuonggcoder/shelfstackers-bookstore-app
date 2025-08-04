@@ -1,9 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BookCarousel from "../../components/BookCarousel";
+import CoverFlowCarousel3D from "../../components/CoverFlowCarousel3D";
 import HomeTopSection from '../../components/HomeTopSection';
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
@@ -11,6 +13,7 @@ import api from "../../services/api";
 import { Campaign } from "../../types";
 
 const Index = () => {
+  const { t } = useTranslation();
   const { books, categories, isLoading, refreshData } = useData();
   const { user } = useAuth();
   const router = useRouter();
@@ -74,6 +77,13 @@ const Index = () => {
     return filteredBooks.filter(book => book.categories.some(cat => cat._id === categoryId));
   }
 
+  // Lấy sách nổi bật (top 5 sách có rating cao nhất)
+  const featuredBooks = useMemo(() => {
+    return [...filteredBooks]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 5);
+  }, [filteredBooks]);
+
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -94,45 +104,54 @@ const Index = () => {
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
-            <Text style={styles.modalText}>Vui lòng đăng nhập để sử dụng đầy đủ tính năng</Text>
+            <Text style={styles.modalText}>{t('pleaseLoginForFullFeatures')}</Text>
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, styles.skipButton]}
-                onPress={() => setModalVisible(!modalVisible)}
+                onPress={() => {
+                  setModalVisible(!modalVisible);
+                }}
               >
-                <Text style={styles.skipButtonText}>Đăng nhập sau</Text>
+                <Text style={styles.skipButtonText}>Bỏ qua</Text>
+
+                <Text style={styles.skipButtonText}>{t('loginLater')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.loginButton]}
                 onPress={() => {
                   setModalVisible(!modalVisible);
-                  router.push('/(auth)/login');
+                  router.push('/login');
                 }}
               >
-                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+                <Text style={styles.loginButtonText}>{t('login')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={styles.container}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#3255FB']}
-            tintColor="#3255FB"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <HomeTopSection 
-          campaigns={campaigns} 
+        <HomeTopSection
+          campaigns={campaigns}
           campaignsLoading={campaignsLoading}
           onApplySimpleFilter={setSimpleFilter}
         />
+        
+        {/* Featured Books Section với Cover Flow Carousel */}
+        {featuredBooks.length > 0 && (
+          <CoverFlowCarousel3D
+            title="Sách Nổi Bật"
+            books={featuredBooks}
+            categoryId="featured"
+            categoryName="Sách Nổi Bật"
+          />
+        )}
+        
         {/* Categories Section */}
         {categories.map(category => {
           const categoryBooks = getBooksForCategory(category._id);

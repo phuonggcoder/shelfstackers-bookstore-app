@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
@@ -13,7 +14,7 @@ import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import ReviewCard from '../../components/ReviewCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
+import { addToCart, addToWishlist, getBookById, getBooksByCategory, getWishlist, removeFromWishlist } from '../../services/api';
 import ReviewService, { Review, ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
@@ -44,6 +45,7 @@ const truncateText = (text: string, maxLength: number = 25) => {
 };
 
 const BookDetailsScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -163,13 +165,12 @@ const BookDetailsScreen = () => {
     if (book && token) {
       const checkFavorite = async () => {
         try {
-          const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/wishlist', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const data = await res.json();
-          const books = Array.isArray(data) ? data : data.books || [];
+          const books = await getWishlist(token);
           setIsFavorite(books.some((b: any) => b._id === book._id));
-        } catch { }
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+          setIsFavorite(false);
+        }
       };
       checkFavorite();
     }
@@ -317,18 +318,24 @@ const BookDetailsScreen = () => {
       setShowLoginDialog(true);
       return;
     }
-    if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
-      return;
-    }
+
+    
     try {
-      const res = await addToWishlist(token, bookId as string);
-      console.log('Add to wishlist response:', res);
-      setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      if (isFavorite) {
+        // Xóa khỏi wishlist
+        await removeFromWishlist(token, bookId as string);
+        setIsFavorite(false);
+        showToast('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        // Thêm vào wishlist
+        const res = await addToWishlist(token, bookId as string);
+        console.log('Add to wishlist response:', res);
+        setIsFavorite(true);
+        showToast('Đã thêm vào danh sách yêu thích');
+      }
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      showToast('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -370,7 +377,7 @@ const BookDetailsScreen = () => {
         });
       } catch (error) {
         console.error('Error adding book to cart for buy now:', error);
-        Alert.alert('Lỗi', 'Không thể thêm sản phẩm vào giỏ hàng.');
+        Alert.alert(t('error'), t('cannotAddProductToCart'));
       }
     };
     
@@ -392,11 +399,11 @@ const BookDetailsScreen = () => {
   const handleQtyConfirm = () => {
     const val = parseInt(inputQty, 10);
     if (isNaN(val) || val < 1) {
-      setQtyError('Số lượng phải lớn hơn 0');
+      setQtyError(t('quantityMustBeGreaterThanZero'));
       return;
     }
     if (val > maxQty) {
-      setQtyError('Chỉ còn ' + maxQty + ' sản phẩm');
+      setQtyError(t('onlyLeftProducts', { count: maxQty }));
       return;
     }
     setQuantity(val);
@@ -442,7 +449,7 @@ const BookDetailsScreen = () => {
           setShowLoginDialog(false);
           router.push('/(auth)/login');
         }}
-        message="Bạn cần đăng nhập để sử dụng tính năng này."
+        message={t('loginRequiredForFeature')}
       />
       <Stack.Screen
         options={{
@@ -949,7 +956,7 @@ const BookDetailsScreen = () => {
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
-            <Text style={styles.relatedTitle}>Sách liên quan</Text>
+            <Text style={styles.relatedTitle}>{t('relatedBooks')}</Text>
             <FlatList
               data={relatedBooks}
               renderItem={({ item }) => <BookCard book={item} />}
@@ -1004,7 +1011,7 @@ const BookDetailsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
-            Thêm vào{"\n"}giỏ hàng
+            {t('addToCart')}{"\n"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1013,7 +1020,7 @@ const BookDetailsScreen = () => {
           disabled={showLoginAlert || outOfStock}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Mua ngay</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{t('buyNow')}</Text>
         </TouchableOpacity>
       </Animated.View>
       {insets.bottom > 0 && (

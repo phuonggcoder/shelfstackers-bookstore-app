@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Header from '../components/Header';
 import { getCategories } from '../services/api';
 import { Category } from '../types';
 
 export default function AllCategoryScreen() {
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -31,8 +33,8 @@ export default function AllCategoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Danh Mục" showBackButton showIcons={false} />
-      <Text style={styles.subtitle}>Khám phá sách theo chủ đề yêu thích</Text>
+      <Header title={t('categories')} showBackButton showIcons={false} />
+      <Text style={styles.subtitle}>{t('exploreBooksByTopic')}</Text>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366F1" />

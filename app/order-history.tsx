@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -30,17 +32,18 @@ interface OrderItem {
 
 const OrderHistoryScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { orders, loading, refreshing, refreshOrders } = useOrders();
   const [selectedTab, setSelectedTab] = useState('all');
 
   const tabs = [
-    { key: 'all', label: 'Tất cả' },
-    { key: 'pending', label: 'Chờ xác nhận' },
-    { key: 'processing', label: 'Đang xử lý' },
-    { key: 'shipped', label: 'Đang giao hàng' },
-    { key: 'delivered', label: 'Đã giao' },
-    { key: 'cancelled', label: 'Đã huỷ' },
+    { key: 'all', label: t('all') },
+    { key: 'pending', label: t('pending') },
+    { key: 'processing', label: t('processing') },
+    { key: 'shipped', label: t('shipped') },
+    { key: 'delivered', label: t('delivered') },
+    { key: 'cancelled', label: t('cancelled') },
   ];
 
   // Refresh data when screen comes into focus
@@ -85,6 +88,7 @@ const OrderHistoryScreen = () => {
       case 'cancelled_by_admin':
         return 'Đã huỷ';
       default: return 'Không xác định';
+
     }
   };
 
@@ -99,7 +103,7 @@ const OrderHistoryScreen = () => {
     try {
       return new Date(dateString).toLocaleDateString('vi-VN');
     } catch {
-      return 'Ngày không xác định';
+      return t('unknownDate');
     }
   };
 
@@ -160,7 +164,7 @@ const OrderHistoryScreen = () => {
         {/* Mã đơn lên đầu */}
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderCode}>Mã đơn: {item.order_id || item._id}</Text>
+            <Text style={styles.orderCode}>{t('orderNumber')}: {item.order_id || item._id}</Text>
             <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}> 
@@ -188,9 +192,9 @@ const OrderHistoryScreen = () => {
                   transition={200}
                 />
                 <View style={{ alignItems: 'flex-start' }}>
-                  <Text style={[styles.bookTitle, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">{it.book?.title || 'Không có tên'}</Text>
-                  <Text style={[styles.bookAuthor, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">Tác giả: {it.book?.author || ''}</Text>
-                  <Text style={styles.itemCount}>Số lượng: {it.quantity || 1}</Text>
+                  <Text style={[styles.bookTitle, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">{it.book?.title || t('noTitle')}</Text>
+                  <Text style={[styles.bookAuthor, { maxWidth: 220 }]} numberOfLines={2} ellipsizeMode="tail">{t('author')}: {it.book?.author || ''}</Text>
+                  <Text style={styles.itemCount}>{t('quantity')}: {it.quantity || 1}</Text>
                   <Text style={styles.totalAmount}>{formatPrice(it.price)}</Text>
                 </View>
               </View>
@@ -201,7 +205,7 @@ const OrderHistoryScreen = () => {
         <View style={styles.orderFooter}>
           <View style={styles.totalInfo}>
             <Text style={styles.totalLabel}>
-              Tổng số tiền ({item.items.length} sản phẩm):
+              {t('totalAmount')} ({item.items.length} {t('products')}):
             </Text>
             <Text style={styles.totalAmount}>
               {formatPrice(item.totalAmount)}
@@ -209,7 +213,7 @@ const OrderHistoryScreen = () => {
           </View>
           <View style={styles.orderActions}>
             <TouchableOpacity style={styles.detailButton} onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}>
-              <Text style={styles.detailButtonText}>Chi tiết</Text>
+              <Text style={styles.detailButtonText}>{t('details')}</Text>
             </TouchableOpacity>
             {/* Review button for completed orders */}
             {item.status.toLowerCase() === 'delivered' && (
@@ -218,7 +222,7 @@ const OrderHistoryScreen = () => {
                 onPress={() => router.push({ pathname: '/order-detail', params: { orderId: item.order_id || item._id } })}
               >
                 <Ionicons name="star-outline" size={16} color="#667eea" />
-                <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                <Text style={styles.reviewButtonText}>{t('review')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -234,12 +238,12 @@ const OrderHistoryScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+          <Text style={styles.headerTitle}>{t('myOrders')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+          <Text style={styles.loadingText}>{t('loadingOrders')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -251,7 +255,7 @@ const OrderHistoryScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+        <Text style={styles.headerTitle}>{t('myOrders')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -265,11 +269,11 @@ const OrderHistoryScreen = () => {
       {filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
+          <Text style={styles.emptyTitle}>{t('noOrdersYet')}</Text>
           <Text style={styles.emptyText}>
             {selectedTab === 'all' 
-              ? 'Bạn chưa có đơn hàng nào'
-              : `Chưa có đơn hàng ${getStatusText(selectedTab).toLowerCase()}`
+              ? t('youHaveNoOrders')
+              : t('noOrdersWithStatus', { status: getStatusText(selectedTab).toLowerCase() })
             }
           </Text>
         </View>

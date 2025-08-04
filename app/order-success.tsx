@@ -5,7 +5,8 @@ import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { getOrderDetail } from '../services/orderService';
 import { formatVND } from '../utils/format';
 
 export default function OrderSuccessScreen() {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
@@ -37,16 +39,16 @@ export default function OrderSuccessScreen() {
         }
       } catch (error) {
         console.error('Error loading order detail:', error);
-        Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng. Vui lòng thử lại.');
+        Alert.alert(t('error'), t('cannotLoadOrderInfo'));
       } finally {
         setLoading(false);
       }
     };
     loadOrderDetail();
-  }, [token, orderId]);
+  }, [token, orderId, t]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
-  if (!order) return <Text>Không tìm thấy đơn hàng.</Text>;
+  if (!order) return <Text>{t('orderNotFound')}</Text>;
 
   // Lấy thông tin payment nếu có - Safe access với fallback
   const payment = order.payment_id || order.payment || {};
@@ -80,7 +82,7 @@ export default function OrderSuccessScreen() {
         await Sharing.shareAsync(fileUri, { mimeType: 'image/png' });
       });
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải ảnh QR.');
+      Alert.alert(t('error'), t('cannotDownloadQR'));
     }
   };
 
@@ -88,7 +90,7 @@ export default function OrderSuccessScreen() {
   const handleCopyOrderUrl = async () => {
     if (qrValue) {
       await Clipboard.setStringAsync(qrValue);
-      Alert.alert('Đã copy', 'Đã copy link thanh toán vào clipboard!');
+      Alert.alert(t('copied'), t('paymentLinkCopied'));
     }
   };
 
@@ -102,28 +104,28 @@ export default function OrderSuccessScreen() {
               <Text style={styles.shopName}>Bookstore</Text>
             </View>
             <View style={styles.infoBox}>
-              <Text style={styles.infoLabel}>Giá trị đơn hàng</Text>
+              <Text style={styles.infoLabel}>{t('orderValue')}</Text>
               <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
-              <Text style={styles.infoLabel}>Số tiền thanh toán</Text>
+              <Text style={styles.infoLabel}>{t('paymentAmount')}</Text>
               <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
-              <Text style={styles.infoLabel}>Mã đơn hàng</Text>
+              <Text style={styles.infoLabel}>{t('orderNumber')}</Text>
               <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
               {order.createdAt && (
                 <>
-                  <Text style={styles.infoLabel}>Ngày đặt hàng</Text>
+                  <Text style={styles.infoLabel}>{t('orderDate')}</Text>
                   <Text style={styles.infoValue}>{dayjs(order.createdAt).format('HH:mm DD/MM/YYYY')}</Text>
                 </>
               )}
             </View>
             <View style={styles.statusBox}>
-              <Text style={styles.statusTitle}>Trạng thái thanh toán</Text>
-              <Text style={[styles.statusValue, {color: '#FFA500'}]}>Thanh toán khi nhận hàng</Text>
+              <Text style={styles.statusTitle}>{t('paymentStatus')}</Text>
+              <Text style={[styles.statusValue, {color: '#FFA500'}]}>{t('payOnDelivery')}</Text>
             </View>
             <TouchableOpacity style={styles.button} onPress={() => router.replace({ pathname: '/order-history', params: { orderId: order.order_id || order._id } })}>
-              <Text style={styles.buttonText}>Xem lịch sử đơn hàng</Text>
+              <Text style={styles.buttonText}>{t('viewOrderHistory')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
-              <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
+              <Text style={styles.buttonOutlineText}>{t('backToHome')}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -132,7 +134,7 @@ export default function OrderSuccessScreen() {
         {/* QR code lớn ở trên cùng nếu có order_url */}
         {qrValue && (
           <View style={styles.qrBoxTop}>
-            <Text style={styles.qrTitle}>Quét QR để thanh toán</Text>
+            <Text style={styles.qrTitle}>{t('scanQRToPay')}</Text>
             <View style={{ alignItems: 'center', position: 'relative' }}>
               <QRCode value={qrValue} size={220} getRef={c => (qrRef.current = c)} />
               <View style={styles.qrActionRow}>
@@ -153,23 +155,23 @@ export default function OrderSuccessScreen() {
         </View>
         {/* Thông tin đơn hàng */}
         <View style={styles.infoBox}>
-          <Text style={styles.infoLabel}>Giá trị đơn hàng</Text>
+          <Text style={styles.infoLabel}>{t('orderValue')}</Text>
           <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
-          <Text style={styles.infoLabel}>Số tiền thanh toán</Text>
+          <Text style={styles.infoLabel}>{t('paymentAmount')}</Text>
           <Text style={styles.infoValue}>{formatVND(paymentAmount)}</Text>
           {transactionId && <>
-            <Text style={styles.infoLabel}>Mã giao dịch</Text>
+            <Text style={styles.infoLabel}>{t('transactionId')}</Text>
             <Text style={styles.infoValue}>{transactionId}</Text>
           </>}
-          <Text style={styles.infoLabel}>Mã đơn hàng</Text>
+          <Text style={styles.infoLabel}>{t('orderNumber')}</Text>
           <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
           {paymentNotes && <>
-            <Text style={styles.infoLabel}>Nội dung</Text>
+            <Text style={styles.infoLabel}>{t('content')}</Text>
             <Text style={styles.infoValue}>{paymentNotes}</Text>
           </>}
           {expireTime && <>
-            <Text style={styles.infoLabel}>Giao dịch kết thúc lúc</Text>
-            <Text style={[styles.infoValue, isExpired && {color:'#4A90E2'}]}>{expireTime} {isExpired ? '(Đã hết hạn)' : ''}</Text>
+            <Text style={styles.infoLabel}>{t('transactionExpiresAt')}</Text>
+            <Text style={[styles.infoValue, isExpired && {color:'#4A90E2'}]}>{expireTime} {isExpired ? `(${t('expired')})` : ''}</Text>
           </>}
         </View>
         {/* Nút chuyển sang web/app thanh toán (order_url) */}
@@ -178,22 +180,22 @@ export default function OrderSuccessScreen() {
             style={styles.payButton}
             onPress={() => router.push({ pathname: '/zalo-pay', params: { orderId: order.order_id || order._id } })}
           >
-            <Text style={styles.payButtonText}>Thanh toán qua ZaloPay</Text>
+            <Text style={styles.payButtonText}>{t('payViaZaloPay')}</Text>
           </TouchableOpacity>
         )}
         {/* Trạng thái thanh toán */}
         <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>Trạng thái thanh toán</Text>
+          <Text style={styles.statusTitle}>{t('paymentStatus')}</Text>
           <Text style={[styles.statusValue, {color: paymentStatus === 'Completed' ? '#4CAF50' : '#FFA500'}]}>
-            {paymentStatus === 'Completed' ? 'Đã thanh toán' : (isExpired ? 'Hết hạn' : (paymentStatus || 'Đang xử lý'))}
+            {paymentStatus === 'Completed' ? t('paymentCompleted') : (isExpired ? t('expired') : (paymentStatus || t('processing')))}
           </Text>
         </View>
         {/* Nút điều hướng */}
         <TouchableOpacity style={styles.button} onPress={() => router.replace('/order-history')}>
-          <Text style={styles.buttonText}>Xem lịch sử đơn hàng</Text>
+          <Text style={styles.buttonText}>{t('viewOrderHistory')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
-          <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
+          <Text style={styles.buttonOutlineText}>{t('backToHome')}</Text>
         </TouchableOpacity>
         </>
         )}

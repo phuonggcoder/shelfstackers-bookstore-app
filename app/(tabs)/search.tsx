@@ -4,8 +4,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BookGrid2Col from '../../components/BookGrid2Col';
 import { getBooks, getCategories } from '../../services/api';
 import { Book, Category } from '../../types';
 
@@ -20,6 +22,7 @@ const CACHE_KEYS = {
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const SearchScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { autoFocus } = useLocalSearchParams();
   const searchInputRef = useRef<TextInput>(null);
@@ -107,31 +110,37 @@ const SearchScreen = () => {
     }
   };
 
+  const clearCache = async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(CACHE_KEYS.BOOKS),
+        AsyncStorage.removeItem(CACHE_KEYS.CATEGORIES),
+        AsyncStorage.removeItem(CACHE_KEYS.LAST_UPDATE),
+      ]);
+      console.log('Cache cleared');
+      // Force reload data
+      await loadData();
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Check if cache is valid
-      const cacheValid = await isCacheValid();
+      // Force load from API (skip cache check)
+      const [booksData, categoriesData] = await Promise.all([
+        getBooks(),
+        getCategories()
+      ]);
       
-      if (cacheValid) {
-        // Load from cache
-        await loadCachedData();
-        console.log('Data loaded from cache');
-      } else {
-        // Load from API and update cache
-        const [booksData, categoriesData] = await Promise.all([
-          getBooks(),
-          getCategories()
-        ]);
-        
-        setBooks(booksData);
-        setCategories(categoriesData);
-        
-        // Save to cache
-        await saveToCache(booksData, categoriesData);
-        console.log('Data loaded from API and cached');
-      }
+      setBooks(booksData);
+      setCategories(categoriesData);
+      
+      // Save to cache
+      await saveToCache(booksData, categoriesData);
+      console.log('Data loaded from API and cached');
     } catch (error) {
       console.error('Error loading data:', error);
       // Try to load from cache as fallback
@@ -188,20 +197,7 @@ const SearchScreen = () => {
     setFilteredCategories(filteredCategoriesData);
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(price);
-  };
 
-  const getBookImage = (book: Book) => {
-    if (book.thumbnail) return book.thumbnail;
-    if (book.cover_image && book.cover_image.length > 0) {
-      return book.cover_image[0];
-    }
-    return 'https://i.imgur.com/gTzT0hA.jpeg';
-  };
 
   const getCategoryImage = (category: Category) => {
     if (category.image) return category.image;
@@ -222,44 +218,9 @@ const SearchScreen = () => {
     });
   };
 
-  const renderBookItem = ({ item }: { item: Book }) => (
-    <TouchableOpacity
-      style={styles.bookCard}
-      onPress={() => handleBookPress(item)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.bookImageContainer}>
-        <Image
-          source={{ uri: getBookImage(item) }}
-          style={styles.bookImage}
-          contentFit="cover"
-          transition={300}
-        />
-        <TouchableOpacity style={styles.heartButton}>
-          <Ionicons name="heart-outline" size={18} color="#4A90E2" />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>
-          {item.author}
-        </Text>
-        <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>
-            {formatPrice(item.price)}
-          </Text>
-          {item.price > 0 && (
-            <Text style={styles.originalPrice}>
-              {formatPrice(item.price * 1.2)}
-            </Text>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderBookItem = ({ item }: { item: Book }) => {
+    return <BookGrid2Col book={item} onPress={handleBookPress} />;
+  };
 
   const renderCategoryItem = ({ item }: { item: Category }) => (
     <TouchableOpacity
@@ -317,7 +278,7 @@ const SearchScreen = () => {
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Tìm kiếm sách, tác giả, danh mục..."
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#7f8c8d"
@@ -343,7 +304,7 @@ const SearchScreen = () => {
           onPress={() => setActiveTab('books')}
         >
           <Text style={[styles.tabText, activeTab === 'books' && styles.tabTextActive]}>
-            Sách ({filteredBooks.length})
+            {t('books')} ({filteredBooks.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -351,7 +312,7 @@ const SearchScreen = () => {
           onPress={() => setActiveTab('categories')}
         >
           <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>
-            Danh mục ({filteredCategories.length})
+            {t('category')} ({filteredCategories.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -369,10 +330,10 @@ const SearchScreen = () => {
               <View style={styles.emptyContainer}>
                 <Ionicons name="search-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'Không tìm thấy sách phù hợp' : 'Chưa có sách nào'}
+                  {searchQuery ? t('noBooksFound') : t('noBooksAvailable')}
                 </Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm sách bạn muốn'}
+                  {searchQuery ? t('tryDifferentKeywords') : t('trySearchingBooks')}
                 </Text>
               </View>
             ) : (
@@ -400,10 +361,10 @@ const SearchScreen = () => {
               <View style={styles.emptyContainer}>
                 <Ionicons name="grid-outline" size={64} color="#bdc3c7" />
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có danh mục nào'}
+                  {searchQuery ? t('noCategoriesFound') : t('noCategoriesAvailable')}
                 </Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử tìm kiếm danh mục bạn muốn'}
+                  {searchQuery ? t('tryDifferentKeywords') : t('trySearchingCategories')}
                 </Text>
               </View>
             ) : (
@@ -536,67 +497,6 @@ const styles = StyleSheet.create({
   row: {
     justifyContent: 'space-between',
     marginBottom: 16,
-  },
-  bookCard: {
-    width: (width - 48) / 2,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  bookImageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: 180,
-  },
-  bookImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heartButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bookInfo: {
-    padding: 12,
-  },
-  bookTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  bookAuthor: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginBottom: 8,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  currentPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4A90E2',
-  },
-  originalPrice: {
-    fontSize: 11,
-    color: '#7f8c8d',
-    textDecorationLine: 'line-through',
   },
   categoryCard: {
     width: (width - 48) / 2,
