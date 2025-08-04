@@ -1,273 +1,451 @@
-import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
     Modal,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-
-interface Address {
-  _id: string;
-  receiver_name: string;
-  phone_number: string;
-  province: string;
-  district: string;
-  ward: string;
-  address_detail: string;
-  is_default: boolean;
-  type: 'office' | 'home';
-}
+import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
 
 interface AddressSelectorProps {
-  visible: boolean;
-  addresses: Address[];
-  selectedAddress: Address | null;
-  onSelectAddress: (address: Address) => void;
-  onAddNewAddress: () => void;
-  onClose: () => void;
+  value?: AddressData | null;
+  onChange?: (address: AddressData) => void;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  style?: any;
 }
 
 const AddressSelector: React.FC<AddressSelectorProps> = ({
-  visible,
-  addresses,
-  selectedAddress,
-  onSelectAddress,
-  onAddNewAddress,
-  onClose,
+  value,
+  onChange,
+  label = 'Địa chỉ',
+  placeholder = 'Chọn địa chỉ',
+  required = false,
+  disabled = false,
+  style
 }) => {
-  const formatAddress = (addr: Address) => {
-    const parts = [];
-    if (addr.address_detail) parts.push(addr.address_detail);
-    if (addr.ward) parts.push(addr.ward);
-    if (addr.district) parts.push(addr.district);
-    if (addr.province) parts.push(addr.province);
-    return parts.join(', ');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
+  
+  const [selectedProvince, setSelectedProvince] = useState<Province | null>(value?.province || null);
+  const [selectedDistrict, setSelectedDistrict] = useState<District | null>(value?.district || null);
+  const [selectedWard, setSelectedWard] = useState<Ward | null>(value?.ward || null);
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (modalVisible) {
+      loadProvinces();
+    }
+  }, [modalVisible]);
+
+  const loadProvinces = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await AddressService.getAllProvinces();
+      
+      if (response.success) {
+        setProvinces(response.data);
+      } else {
+        setError('Không thể tải danh sách tỉnh/thành phố');
+      }
+    } catch (err) {
+      setError('Không thể tải danh sách tỉnh/thành phố');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+  const loadDistricts = async (provinceCode: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await AddressService.getDistricts(provinceCode);
+      
+      if (response.success) {
+        setDistricts(response.data);
+        setWards([]);
+      } else {
+        setError('Không thể tải danh sách quận/huyện');
+      }
+    } catch (err) {
+      setError('Không thể tải danh sách quận/huyện');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWards = async (districtCode: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await AddressService.getWards(districtCode);
+      
+      if (response.success) {
+        setWards(response.data);
+      } else {
+        setError('Không thể tải danh sách phường/xã');
+      }
+    } catch (err) {
+      setError('Không thể tải danh sách phường/xã');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProvinceSelect = (province: Province) => {
+    setSelectedProvince(province);
+    setSelectedDistrict(null);
+    setSelectedWard(null);
+    loadDistricts(province.code);
+  };
+
+  const handleDistrictSelect = (district: District) => {
+    setSelectedDistrict(district);
+    setSelectedWard(null);
+    loadWards(district.code);
+  };
+
+  const handleWardSelect = (ward: Ward) => {
+    setSelectedWard(ward);
+    
+    if (onChange && selectedProvince && selectedDistrict) {
+      const addressData: AddressData = {
+        province: selectedProvince,
+        district: selectedDistrict,
+        ward: ward,
+        fullAddress: `${ward.name}, ${selectedDistrict.name}, ${selectedProvince.name}`,
+        addressCode: {
+          provinceCode: selectedProvince.code,
+          districtCode: selectedDistrict.code,
+          wardCode: ward.code
+        }
+      };
+      
+      onChange(addressData);
+      setModalVisible(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!selectedProvince || !selectedDistrict || !selectedWard) {
+      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố, quận/huyện và phường/xã');
+      return;
+    }
+    
+    if (onChange) {
+      const addressData: AddressData = {
+        province: selectedProvince,
+        district: selectedDistrict,
+        ward: selectedWard,
+        fullAddress: `${selectedWard.name}, ${selectedDistrict.name}, ${selectedProvince.name}`,
+        addressCode: {
+          provinceCode: selectedProvince.code,
+          districtCode: selectedDistrict.code,
+          wardCode: selectedWard.code
+        }
+      };
+      
+      onChange(addressData);
+      setModalVisible(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setSelectedProvince(value?.province || null);
+    setSelectedDistrict(value?.district || null);
+    setSelectedWard(value?.ward || null);
+    setModalVisible(false);
+  };
+
+  const renderItem = ({ item, type }: { item: Province | District | Ward; type: 'province' | 'district' | 'ward' }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={() => {
+        switch (type) {
+          case 'province':
+            handleProvinceSelect(item as Province);
+            break;
+          case 'district':
+            handleDistrictSelect(item as District);
+            break;
+          case 'ward':
+            handleWardSelect(item as Ward);
+            break;
+        }
+      }}
     >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chọn địa chỉ giao hàng</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <Text style={styles.itemText}>{item.name}</Text>
+    </TouchableOpacity>
+  );
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {addresses.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="location-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyTitle}>Chưa có địa chỉ nào</Text>
-              <Text style={styles.emptySubtitle}>Thêm địa chỉ để nhận hàng</Text>
-            </View>
-          ) : (
-            addresses.map((address) => (
-              <TouchableOpacity
-                key={address._id}
-                style={[
-                  styles.addressCard,
-                  selectedAddress?._id === address._id && styles.selectedCard,
-                ]}
-                onPress={() => onSelectAddress(address)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.radioContainer}>
-                  <Ionicons
-                    name={
-                      selectedAddress?._id === address._id
-                        ? 'radio-button-on'
-                        : 'radio-button-off'
-                    }
-                    size={24}
-                    color={
-                      selectedAddress?._id === address._id ? '#3255FB' : '#ccc'
-                    }
-                  />
-                </View>
-                <View style={styles.addressInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.name}>{address.receiver_name}</Text>
-                    <Text style={styles.phone}>{address.phone_number}</Text>
-                    {address.is_default && (
-                      <View style={styles.defaultTag}>
-                        <Text style={styles.defaultText}>Mặc định</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.addressText}>{formatAddress(address)}</Text>
-                  <View style={styles.typeTag}>
-                    <Ionicons
-                      name={
-                        address.type === 'office'
-                          ? 'business-outline'
-                          : 'home-outline'
-                      }
-                      size={16}
-                      color="#666"
-                    />
-                    <Text style={styles.typeText}>
-                      {address.type === 'office' ? 'Văn phòng' : 'Nhà riêng'}
-                    </Text>
-                  </View>
-                </View>
+  return (
+    <View style={[styles.container, style]}>
+      {label && (
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+      )}
+      
+      <TouchableOpacity
+        style={[styles.selector, disabled && styles.disabled]}
+        onPress={() => !disabled && setModalVisible(true)}
+        disabled={disabled}
+      >
+        <Text style={[styles.selectorText, !value && styles.placeholder]}>
+          {value ? value.fullAddress : placeholder}
+        </Text>
+        <Text style={styles.arrow}>▼</Text>
+      </TouchableOpacity>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={handleCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn địa chỉ</Text>
+              <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
+            </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={onAddNewAddress}
-          >
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Thêm địa chỉ mới</Text>
-          </TouchableOpacity>
+            {error && <Text style={styles.error}>{error}</Text>}
+
+            <View style={styles.modalBody}>
+              {/* Province Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Tỉnh/Thành phố *</Text>
+                <Text style={styles.selectedText}>
+                  {selectedProvince?.name || 'Chưa chọn'}
+                </Text>
+                {provinces.length > 0 && (
+                  <FlatList
+                    data={provinces}
+                    keyExtractor={(item) => item.code}
+                    renderItem={(props) => renderItem({ ...props, type: 'province' })}
+                    style={styles.list}
+                    nestedScrollEnabled={true}
+                  />
+                )}
+              </View>
+
+              {/* District Selection */}
+              {selectedProvince && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Quận/Huyện *</Text>
+                  <Text style={styles.selectedText}>
+                    {selectedDistrict?.name || 'Chưa chọn'}
+                  </Text>
+                  {districts.length > 0 && (
+                    <FlatList
+                      data={districts}
+                      keyExtractor={(item) => item.code}
+                      renderItem={(props) => renderItem({ ...props, type: 'district' })}
+                      style={styles.list}
+                      nestedScrollEnabled={true}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Ward Selection */}
+              {selectedDistrict && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Phường/Xã *</Text>
+                  <Text style={styles.selectedText}>
+                    {selectedWard?.name || 'Chưa chọn'}
+                  </Text>
+                  {wards.length > 0 && (
+                    <FlatList
+                      data={wards}
+                      keyExtractor={(item) => item.code}
+                      renderItem={(props) => renderItem({ ...props, type: 'ward' })}
+                      style={styles.list}
+                      nestedScrollEnabled={true}
+                    />
+                  )}
+                </View>
+              )}
+
+              {loading && <ActivityIndicator size="small" color="#007AFF" style={styles.loading} />}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+                <Text style={styles.cancelButtonText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
+                <Text style={styles.confirmButtonText}>Xác nhận</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#fff',
+    marginBottom: 16,
   },
-  header: {
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  required: {
+    color: '#FF3B30',
+  },
+  selector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  disabled: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
+  },
+  selectorText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  placeholder: {
+    color: '#999',
+  },
+  arrow: {
+    fontSize: 12,
+    color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   closeButton: {
     padding: 4,
   },
-  headerTitle: {
-    fontSize: 18,
+  closeButtonText: {
+    fontSize: 20,
+    color: '#666',
+  },
+  modalBody: {
+    padding: 16,
+    flex: 1,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionLabel: {
+    fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 8,
     color: '#333',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
+  selectedText: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginBottom: 8,
+    fontWeight: '600',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
+  list: {
+    maxHeight: 150,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  item: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  itemText: {
+    fontSize: 16,
     color: '#333',
+  },
+  error: {
+    color: '#FF3B30',
+    marginBottom: 16,
+    textAlign: 'center',
+    padding: 12,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+  },
+  loading: {
     marginTop: 16,
   },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  addressCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  selectedCard: {
-    borderColor: '#3255FB',
-    backgroundColor: '#f8fbff',
-  },
-  radioContainer: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  addressInfo: {
-    flex: 1,
-  },
-  nameRow: {
+  modalFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    flexWrap: 'wrap',
-  },
-  name: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#333',
-    marginRight: 8,
-  },
-  phone: {
-    color: '#666',
-    fontSize: 14,
-  },
-  defaultTag: {
-    backgroundColor: '#e8f4fd',
-    borderRadius: 12,
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  defaultText: {
-    color: '#3255FB',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  addressText: {
-    color: '#333',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  typeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  typeText: {
-    color: '#666',
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  footer: {
     padding: 16,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderColor: '#eee',
+    borderTopColor: '#eee',
   },
-  addButton: {
-    backgroundColor: '#3255FB',
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  addButtonText: {
-    color: '#fff',
+  cancelButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    color: '#666',
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 12,
     marginLeft: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

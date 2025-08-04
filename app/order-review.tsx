@@ -7,7 +7,7 @@ import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, Touchabl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import VoucherValidationPopup from '../components/VoucherValidationPopup';
 import { useAuth } from '../context/AuthContext';
-import { getAddresses } from '../services/addressService';
+import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
 import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
@@ -52,7 +52,7 @@ export default function OrderReviewScreen() {
     const loadAddresses = async () => {
       if (!token) return;
       try {
-        const addresses = await getAddresses(token);
+        const addresses = await AddressService.getAddresses(token);
         setAddresses(addresses);
         console.log('OrderReview addresses:', addresses);
         

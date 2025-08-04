@@ -32,9 +32,15 @@ const mapUserResponse = (serverResponse: any): AuthResponse => {
   console.log('🔧 mapUserResponse - Valid response structure found');
   console.log('🔧 mapUserResponse - User keys:', Object.keys(serverResponse.user));
 
+  // Check for different token field names
+  const token2 = serverResponse.token || serverResponse.access_token;
+  if (!token2) {
+    throw new Error('No token found in server response');
+  }
+
   // Map response từ server sang định dạng AuthResponse
   const mappedResponse = {
-    token: token,
+    token: token2,
     user: {
       _id: serverResponse.user._id || serverResponse.user.id, // Thử cả _id và id
       username: serverResponse.user.username,
@@ -236,7 +242,7 @@ export const authService = {
         body: JSON.stringify({ id_token: idToken }),
       });
 
-      console.log('🔧 Response status:', response.status);
+      console.log('�� Response status:', response.status);
       console.log('🔧 Response headers:', response.headers);
 
       // Kiểm tra status code
@@ -277,7 +283,7 @@ export const authService = {
         };
       }
     } catch (error: any) {
-      console.log('🔧 Google login error:', error);
+      console.log('�� Google login error:', error);
       return {
         success: false,
         error: error.message || 'Có lỗi xảy ra khi đăng nhập Google'
