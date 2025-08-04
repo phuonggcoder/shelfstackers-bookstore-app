@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { getMyOrders } from '../services/orderService';
+import { useOrders } from '../hooks/useOrders';
 
 interface OrderItem {
   _id: string;
@@ -30,9 +31,7 @@ interface OrderItem {
 const OrderHistoryScreen = () => {
   const router = useRouter();
   const { token } = useAuth();
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { orders, loading, refreshing, refreshOrders } = useOrders();
   const [selectedTab, setSelectedTab] = useState('all');
 
   const tabs = [
@@ -44,42 +43,17 @@ const OrderHistoryScreen = () => {
     { key: 'cancelled', label: 'Đã huỷ' },
   ];
 
-  useEffect(() => {
-    loadOrders();
-  }, [token]);
-
-  const loadOrders = async () => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      const response = await getMyOrders(token);
-      setOrders((response.orders || []).map((order: any) => ({
-        _id: order._id,
-        order_id: order.order_id, // Lưu cả hai trường
-        orderCode: order.order_id || order._id,
-        status: order.order_status || order.status,
-        totalAmount: order.total_amount,
-        // Map lại items đúng chuẩn: [{book, quantity, price}]
-        items: (order.order_items || []).map((oi: any) => ({
-          book: oi.book_id, // BE trả về book_id là object
-          quantity: oi.quantity,
-          price: oi.price
-        })),
-        address: order.address_id, // BE trả về address_id là object
-        createdAt: order.order_date || order.createdAt,
-        updatedAt: order.updatedAt,
-      })));
-    } catch (error) {
-      console.error('Error loading orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token) {
+        refreshOrders();
+      }
+    }, [token, refreshOrders])
+  );
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await loadOrders();
-    setRefreshing(false);
+    refreshOrders();
   };
 
   const getStatusColor = (status: string) => {
@@ -89,7 +63,11 @@ const OrderHistoryScreen = () => {
       case 'processing': return '#3498db';
       case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
-      case 'cancelled': return '#4A90E2';
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_user':
+      case 'cancelled_by_admin':
+        return '#e74c3c';
       default: return '#95a5a6';
     }
   };
@@ -101,7 +79,11 @@ const OrderHistoryScreen = () => {
       case 'processing': return 'Đang xử lý';
       case 'shipped': return 'Đang giao hàng';
       case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã huỷ';
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_user':
+      case 'cancelled_by_admin':
+        return 'Đã huỷ';
       default: return 'Không xác định';
     }
   };

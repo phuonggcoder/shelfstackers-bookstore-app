@@ -1,0 +1,139 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { getMyOrders, getOrderDetail } from '../services/orderService';
+import OrderStatusService from '../services/orderStatusService';
+
+export const useOrders = () => {
+  const { token } = useAuth();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadOrders = useCallback(async (forceRefresh = false) => {
+    if (!token) return;
+    
+    try {
+      if (forceRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
+      const response = await getMyOrders(token);
+      const mappedOrders = (response.orders || []).map((order: any) => {
+        const status = order.order_status || order.status;
+        // Kiểm tra thay đổi trạng thái
+        OrderStatusService.checkStatusChange(order._id, status);
+        
+        return {
+          _id: order._id,
+          order_id: order.order_id,
+          orderCode: order.order_id || order._id,
+          status: status,
+          totalAmount: order.total_amount,
+          items: (order.order_items || []).map((oi: any) => ({
+            book: oi.book_id,
+            quantity: oi.quantity,
+            price: oi.price
+          })),
+          address: order.address_id,
+          createdAt: order.order_date || order.createdAt,
+          updatedAt: order.updatedAt,
+        };
+      });
+      
+      setOrders(mappedOrders);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  const refreshOrders = useCallback(() => {
+    loadOrders(true);
+  }, [loadOrders]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  return {
+    orders,
+    loading,
+    refreshing,
+    loadOrders,
+    refreshOrders
+  };
+};
+
+export const useOrderDetail = (orderId: string) => {
+  const { token } = useAuth();
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadOrderDetail = useCallback(async () => {
+    if (!token || !orderId) return;
+    
+    try {
+      setLoading(true);
+      const response = await getOrderDetail(token, orderId);
+      const order = response.order || response;
+      const shippingAddressRaw = order.shipping_address_snapshot || order.address_id || {};
+      
+      const status = order.order_status || order.status;
+      // Kiểm tra thay đổi trạng thái
+      OrderStatusService.checkStatusChange(order._id, status);
+      
+      const mappedOrder = {
+        _id: order._id,
+        orderCode: order.order_id || order._id,
+        status: status,
+        totalAmount: order.total_amount,
+        subtotal: order.subtotal || order.total_amount,
+        shippingFee: order.ship_amount || order.shipping_fee || 0,
+        items: (order.order_items || []).map((oi: any) => ({
+          book: oi.book_id,
+          quantity: oi.quantity,
+          price: oi.price
+        })),
+        paymentMethod: order.payment_method || 'COD',
+        paymentStatus: order.payment_status || 'pending',
+        shippingAddress: {
+          receiverName: shippingAddressRaw.full_name || shippingAddressRaw.receiver_name || '',
+          phoneNumber: shippingAddressRaw.phone || shippingAddressRaw.phone_number || '',
+          addressDetail: shippingAddressRaw.address || shippingAddressRaw.address_detail || '',
+          street: shippingAddressRaw.street || '',
+          ward: shippingAddressRaw.ward || '',
+          district: shippingAddressRaw.district || '',
+          province: shippingAddressRaw.province || ''
+        },
+        createdAt: order.order_date || order.createdAt,
+        updatedAt: order.updatedAt,
+        orderHistory: order.order_history || [],
+      };
+      
+      setOrder(mappedOrder);
+    } catch (error) {
+      console.error('Error loading order detail:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, orderId]);
+
+  const refreshOrderDetail = useCallback(() => {
+    loadOrderDetail();
+  }, [loadOrderDetail]);
+
+  useEffect(() => {
+    loadOrderDetail();
+  }, [loadOrderDetail]);
+
+  return {
+    order,
+    loading,
+    loadOrderDetail,
+    refreshOrderDetail
+  };
+}; 

@@ -6,15 +6,37 @@ const API_URL = 'https://server-shelf-stacker-w1ds.onrender.com/auth';
 const USER_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api/users';
 
 const mapUserResponse = (serverResponse: any): AuthResponse => {
-  if (!serverResponse || !serverResponse.token || !serverResponse.user) {
-    throw new Error('Invalid response format from server');
+  console.log('🔧 mapUserResponse - serverResponse:', JSON.stringify(serverResponse, null, 2));
+  
+  // Kiểm tra response có tồn tại không
+  if (!serverResponse) {
+    console.log('🔧 mapUserResponse - No response received');
+    throw new Error('Không nhận được phản hồi từ server');
   }
+  
+  // Kiểm tra token (có thể là access_token hoặc token)
+  const token = serverResponse.access_token || serverResponse.token;
+  if (!token) {
+    console.log('🔧 mapUserResponse - No token in response');
+    console.log('🔧 mapUserResponse - Available keys:', Object.keys(serverResponse));
+    throw new Error('Token không hợp lệ');
+  }
+  
+  // Kiểm tra user object
+  if (!serverResponse.user) {
+    console.log('🔧 mapUserResponse - No user object in response');
+    console.log('🔧 mapUserResponse - Available keys:', Object.keys(serverResponse));
+    throw new Error('Thông tin người dùng không hợp lệ');
+  }
+  
+  console.log('🔧 mapUserResponse - Valid response structure found');
+  console.log('🔧 mapUserResponse - User keys:', Object.keys(serverResponse.user));
 
   // Map response từ server sang định dạng AuthResponse
-  return {
-    token: serverResponse.token,
+  const mappedResponse = {
+    token: token,
     user: {
-      _id: serverResponse.user.id, // Map id -> _id
+      _id: serverResponse.user._id || serverResponse.user.id, // Thử cả _id và id
       username: serverResponse.user.username,
       email: serverResponse.user.email,
       full_name: serverResponse.user.full_name || '',
@@ -25,12 +47,19 @@ const mapUserResponse = (serverResponse: any): AuthResponse => {
       birthday: serverResponse.user.birthday,
     }
   };
+  
+  console.log('🔧 mapUserResponse - mapped response:', JSON.stringify(mappedResponse, null, 2));
+  return mappedResponse;
 };
 
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
+      console.log('🔧 login - sending credentials:', { username: credentials.username, password: '***' });
       const response = await axios.post(`${API_URL}/login`, credentials);
+      
+      console.log('🔧 login - response status:', response.status);
+      console.log('🔧 login - response data:', JSON.stringify(response.data, null, 2));
       
       if (!response.data) {
         throw new Error('No data received from server');
@@ -38,10 +67,24 @@ export const authService = {
 
       return mapUserResponse(response.data);
     } catch (error: any) {
-      if (error.response?.data?.message) {
+      console.log('🔧 login - error:', error);
+      console.log('🔧 login - error.response:', error.response?.data);
+      
+      // Xử lý các loại lỗi khác nhau
+      if (error.response?.status === 400) {
+        const errorMessage = error.response.data?.message || 'Tên đăng nhập hoặc mật khẩu không đúng';
+        throw new Error(errorMessage);
+      } else if (error.response?.status === 401) {
+        throw new Error('Tài khoản không được phép truy cập');
+      } else if (error.response?.status === 500) {
+        throw new Error('Lỗi server, vui lòng thử lại sau');
+      } else if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
+      } else if (error.code === 'NETWORK_ERROR') {
+        throw new Error('Không thể kết nối đến server, vui lòng kiểm tra kết nối internet');
+      } else {
+        throw new Error(error.message || 'Đăng nhập thất bại');
       }
-      throw new Error(error.message || 'Login failed');
     }
   },
 
@@ -55,7 +98,7 @@ export const authService = {
 
       // Sau khi đăng ký thành công, thực hiện đăng nhập
       const loginResponse = await axios.post(`${API_URL}/login`, {
-        username: data.username,
+        email: data.email,
         password: data.password
       });
 
@@ -156,7 +199,8 @@ export const authService = {
       throw new Error(text || 'Failed to fetch user info');
     }
 
-    
+    const data = await response.json();
+    return data;
   },
   changePassword: async (currentPassword: string, newPassword: string, token: string): Promise<string> => {
     try {

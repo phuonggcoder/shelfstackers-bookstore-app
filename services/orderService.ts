@@ -55,11 +55,18 @@ export const getOrderDetail = async (token: string, orderId: string) => {
   }
 };
 
-export const cancelOrder = async (token: string, orderId: string, cancellationReason: string) => {
+export const cancelOrder = async (token: string, orderId: string, cancellationReason: string, newAddress?: string) => {
   try {
-    const response = await axios.patch(getApiUrl(`/api/orders/${orderId}/cancel`), {
+    const requestData: any = {
       cancellation_reason: cancellationReason
-    }, {
+    };
+    
+    // Nếu có địa chỉ mới, thêm vào request
+    if (newAddress) {
+      requestData.new_address = newAddress;
+    }
+    
+    const response = await axios.patch(getApiUrl(`/api/orders/${orderId}/cancel`), requestData, {
       headers: getAuthHeaders(token)
     });
     console.log('cancelOrder response:', response.data);
@@ -67,6 +74,21 @@ export const cancelOrder = async (token: string, orderId: string, cancellationRe
   } catch (error: any) {
     console.error('cancelOrder error:', error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to cancel order');
+  }
+};
+
+export const requestRefund = async (token: string, orderId: string, refundReason: string) => {
+  try {
+    const response = await axios.post(getApiUrl(`/api/orders/${orderId}/refund`), {
+      refund_reason: refundReason
+    }, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('requestRefund response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('requestRefund error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to request refund');
   }
 };
 
