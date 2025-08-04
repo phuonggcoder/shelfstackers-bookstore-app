@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
-import { createAddress, LocationItem } from '../services/addressService';
+import AddressService, { LocationItem } from '../services/addressService';
 
 const AddAddress = () => {
   const router = useRouter();
@@ -75,7 +75,7 @@ const AddAddress = () => {
 
     setLoading(true);
     try {
-      await createAddress(token, {
+      await AddressService.createAddress(token, {
         receiver_name: receiverName.trim(),
         phone_number: phoneNumber.trim(),
         province: province.name,

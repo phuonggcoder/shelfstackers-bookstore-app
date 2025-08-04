@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomAlert from '../components/BottomAlert';
 import { useAuth } from '../context/AuthContext';
-import { getAddresses, updateAddress } from '../services/addressService';
+import AddressService from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { token } = useAuth();
@@ -45,7 +45,7 @@ const EditAddressScreen = () => {
       console.log('Fetching address with id:', id, 'token:', token);
       
       // Lấy danh sách địa chỉ và tìm địa chỉ cần edit
-      const addresses = await getAddresses(token);
+      const addresses = await AddressService.getAddresses(token);
       const address = addresses.find((addr: any) => addr._id === id);
       
       if (!address) {
@@ -67,7 +67,7 @@ const EditAddressScreen = () => {
         address_detail: address.address_detail || '',
         note: address.note || '',
         is_default: address.is_default || false,
-        type: address.type || 'office', // Thêm type
+        type: (address.type as 'home' | 'office') || 'office', // Thêm type
       });
     } catch (error: any) {
       console.error('Error fetching address:', error);
@@ -109,7 +109,7 @@ const EditAddressScreen = () => {
 
     try {
       setSaving(true);
-      await updateAddress(token, id as string, formData);
+              await AddressService.updateAddress(token, id as string, formData);
       
       // Show success alert
       setShowAlert(true);

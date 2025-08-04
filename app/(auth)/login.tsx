@@ -1,5 +1,6 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
 import GoogleSignInWithAccountPicker from '@/components/GoogleSignInWithAccountPicker';
+import OTPLogin from '@/components/OTPLogin';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -27,11 +28,18 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'main' | 'otp'>('main');
 
   // Cấu hình Google Sign-In với Firebase
   useEffect(() => {
     configureGoogleSignIn();
   }, []);
+
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,9 +47,14 @@ export default function Login() {
       return;
     }
 
+    if (!validateEmail(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await authService.login({ username: email, password });
+      const response = await authService.login({ email: email, password });
       await signIn(response);
       Alert.alert('Thành công', 'Đăng nhập thành công!', [
         { text: 'OK', onPress: () => router.replace('/(tabs)') }
@@ -81,6 +94,46 @@ export default function Login() {
     // Error handling đã được xử lý trong component
   };
 
+  // Hàm xử lý thành công OTP Login
+  const handleOTPLoginSuccess = async (result: any) => {
+    try {
+      console.log('✅ OTP Login successful:', result);
+      
+      if (result.success && result.user) {
+        // Convert OTP response to auth format
+        const authResponse = {
+          token: result.access_token, // Use access_token as token
+          user: result.user
+        };
+        
+        await signIn(authResponse);
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
+      } else {
+        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      console.error('❌ Error after OTP Login:', error);
+      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+    }
+  };
+
+  // Hàm quay lại trang chính
+  const handleBackToMain = () => {
+    setAuthMethod('main');
+  };
+
+  // Hiển thị OTP Login nếu authMethod là 'otp'
+  if (authMethod === 'otp') {
+    return (
+      <OTPLogin
+        onLoginSuccess={handleOTPLoginSuccess}
+        onBack={handleBackToMain}
+      />
+    );
+  }
+
   return (
     <ScrollView style={styles.scrollbox}> 
       
@@ -103,9 +156,14 @@ export default function Login() {
           disabled={isLoading}
           style={styles.googleButton}
         />
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../assets/images/applelogo.png')} style={styles.icon} />
-          <Text style={styles.socialText}>Apple</Text>
+        <TouchableOpacity 
+          style={styles.socialButton}
+          onPress={() => setAuthMethod('otp')}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="call-outline" size={24} color="#333" />
+          </View>
+          <Text style={styles.socialText}>Số điện thoại</Text>
         </TouchableOpacity>
       </View>
 
@@ -260,6 +318,9 @@ const styles = StyleSheet.create({
   icon: {
     width: 24,
     height: 24,
+    marginRight: 8,
+  },
+  iconContainer: {
     marginRight: 8,
   },
   socialText: {
