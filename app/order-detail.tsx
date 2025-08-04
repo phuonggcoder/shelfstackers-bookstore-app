@@ -1,14 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import CancelOrderModal from '../components/CancelOrderModal';
+import RefundStatusNotification from '../components/RefundStatusNotification';
 import ReviewForm from '../components/ReviewForm';
 import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
-import { cancelOrder, getOrderDetail } from '../services/orderService';
+import { useOrderDetail } from '../hooks/useOrders';
+import { cancelOrder, requestRefund } from '../services/orderService';
 import ReviewService from '../services/reviewService';
 
 interface OrderItem {
@@ -57,8 +62,7 @@ const OrderDetailScreen = () => {
   const { orderId } = useLocalSearchParams();
   const { t } = useTranslation();
   const { token } = useAuth();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { order, loading, refreshOrderDetail } = useOrderDetail(orderId as string);
   const [cancelling, setCancelling] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
@@ -66,72 +70,65 @@ const OrderDetailScreen = () => {
   const [selectedProduct, setSelectedProduct] = useState<OrderItem | null>(null);
   const [existingReview, setExistingReview] = useState<any>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
-  useEffect(() => {
-    loadOrderDetail();
-  }, [orderId, token]);
-
-  const loadOrderDetail = async () => {
-    if (!token || !orderId) return;
-    try {
-      setLoading(true);
-      const response = await getOrderDetail(token, orderId as string);
-      // Map lại dữ liệu từ BE
-      const order = response.order || response;
-      // Ưu tiên lấy snapshot địa chỉ giao hàng
-      const shippingAddressRaw = order.shipping_address_snapshot || order.address_id || {};
-      setOrder({
-        _id: order._id,
-        orderCode: order.order_id || order._id,
-        status: order.order_status || order.status,
-        totalAmount: order.total_amount,
-        subtotal: order.subtotal || order.total_amount,
-        shippingFee: order.ship_amount || order.shipping_fee || 0,
-        items: (order.order_items || []).map((oi: any) => ({
-          book: oi.book_id,
-          quantity: oi.quantity,
-          price: oi.price
-        })),
-        paymentMethod: order.payment_method || 'COD',
-        paymentStatus: order.payment_status || 'pending',
-        shippingAddress: {
-          receiverName: shippingAddressRaw.full_name || shippingAddressRaw.receiver_name || '',
-          phoneNumber: shippingAddressRaw.phone || shippingAddressRaw.phone_number || '',
-          addressDetail: shippingAddressRaw.address || shippingAddressRaw.address_detail || '',
-          street: shippingAddressRaw.street || '',
-          ward: shippingAddressRaw.ward || '',
-          district: shippingAddressRaw.district || '',
-          province: shippingAddressRaw.province || ''
-        },
-        createdAt: order.order_date || order.createdAt,
-        updatedAt: order.updatedAt,
-        orderHistory: order.order_history || [],
-      });
-    } catch (error) {
-      console.error('Error loading order detail:', error);
-      Alert.alert(t('error'), t('cannotLoadOrderInfo'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token && orderId) {
+        refreshOrderDetail();
+      }
+    }, [token, orderId, refreshOrderDetail])
+  );
 
   const handleCancelOrder = async () => {
     if (!token || !orderId) return;
-    Alert.alert(t('confirm'), t('confirmCancelOrder'), [
-      { text: t('no'), style: 'cancel' },
-      { text: t('cancelOrder'), style: 'destructive', onPress: async () => {
-        setCancelling(true);
-        try {
-          await cancelOrder(token, orderId as string, t('customerCancelled'));
-          Alert.alert(t('success'), t('orderCancelled'));
-          loadOrderDetail();
-        } catch (e) {
-          Alert.alert(t('error'), t('cannotCancelOrder'));
-        } finally {
-          setCancelling(false);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async (reason: string, newAddress?: string) => {
+    if (!token || !order) return;
+
+    // Sử dụng order._id thực sự từ response thay vì orderId từ params
+    const actualOrderId = order._id;
+    console.log('Processing order with ID:', actualOrderId);
+    console.log('Reason:', reason);
+    if (newAddress) {
+      console.log('New address:', newAddress);
+    }
+
+    setCancelling(true);
+    try {
+      if (canRequestRefund(order.status)) {
+        // Hoàn tiền cho đơn hàng đã giao
+        await requestRefund(token, actualOrderId, reason);
+        Alert.alert('Thành công', 'Yêu cầu hoàn tiền đã được gửi. Admin sẽ xem xét và xử lý.');
+      } else {
+        // Hủy đơn hàng hoặc thay đổi địa chỉ
+        if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
+          // Gửi yêu cầu thay đổi địa chỉ thay vì hủy đơn hàng
+          await cancelOrder(token, actualOrderId, reason, newAddress);
+          Alert.alert('Thành công', 'Yêu cầu thay đổi địa chỉ đã được gửi. Admin sẽ xem xét và xử lý.');
+        } else {
+          // Hủy đơn hàng bình thường
+          await cancelOrder(token, actualOrderId, reason);
+          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
         }
-      }}
-    ]);
+      }
+      setShowCancelModal(false);
+      refreshOrderDetail();
+    } catch (e: any) {
+      console.error('Order processing error:', e);
+      const errorMessage = e.message || 'Không thể xử lý yêu cầu.';
+      Alert.alert('Lỗi', errorMessage
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleCancelModalClose = () => {
+    setShowCancelModal(false);
+
   };
 
   const handleReviewProduct = async (product: OrderItem) => {
@@ -221,6 +218,16 @@ const OrderDetailScreen = () => {
     return order?.status?.toLowerCase() === 'delivered';
   };
 
+  const canCancelOrder = (status: string) => {
+    const normalized = (status || '').toLowerCase();
+    return normalized === 'pending' || normalized === 'confirmed' || normalized === 'processing';
+  };
+
+  const canRequestRefund = (status: string) => {
+    const normalized = (status || '').toLowerCase();
+    return normalized === 'delivered';
+  };
+
   const getStatusColor = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
@@ -228,7 +235,11 @@ const OrderDetailScreen = () => {
       case 'processing': return '#3498db';
       case 'shipped': return '#9b59b6';
       case 'delivered': return '#27ae60';
-      case 'cancelled': return '#4A90E2';
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelled_by_user':
+      case 'cancelled_by_admin':
+        return '#e74c3c';
       default: return '#95a5a6';
     }
   };
@@ -236,22 +247,78 @@ const OrderDetailScreen = () => {
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
+
       case 'pending': return t('pending');
       case 'processing': return t('processing');
       case 'shipped': return t('shipped');
       case 'delivered': return t('delivered');
       case 'cancelled': return t('cancelled');
+      case 'cancelled_by_user': return t('cancelled');
+      case 'cancelled_by_admin': return t('cancelled');
+        return 'Đã huỷ';
       default: return t('unknown');
+        
     }
   };
 
   const getPaymentStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return t('paymentPending');
-      case 'paid': return t('paymentPaid');
-      case 'failed': return t('paymentFailed');
-      default: return t('unknown');
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
+      case 'pending': return 'Chờ xử lý';
+      case 'paid': return 'Đã thanh toán';
+      case 'failed': return 'Thanh toán thất bại';
+      case 'refunded':
+      case 'refund_pending':
+      case 'refund_processing':
+      case 'refund_completed':
+        return 'Đã hoàn tiền';
+      case 'partially_refunded':
+      case 'partial_refund':
+        return 'Hoàn tiền một phần';
+      case 'cancelled':
+      case 'canceled':
+        return 'Đã hủy';
+      default: return 'Không xác định';
+
     }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    const normalized = (status || '').toLowerCase();
+    switch (normalized) {
+      case 'pending': return '#f39c12';
+      case 'paid': return '#27ae60';
+      case 'failed': return '#e74c3c';
+      case 'refunded':
+      case 'refund_pending':
+      case 'refund_processing':
+      case 'refund_completed':
+        return '#3498db';
+      case 'partially_refunded':
+      case 'partial_refund':
+        return '#9b59b6';
+      case 'cancelled':
+      case 'canceled':
+        return '#e74c3c';
+      default: return '#95a5a6';
+    }
+  };
+
+  const isRealRefund = (paymentStatus: string, orderStatus: string) => {
+    const normalizedPayment = (paymentStatus || '').toLowerCase();
+    const normalizedOrder = (orderStatus || '').toLowerCase();
+    
+    // Chỉ hiển thị hoàn tiền khi đã thanh toán VÀ (có refund HOẶC đơn hàng bị hủy)
+    return normalizedPayment === 'paid' && (
+      normalizedPayment.includes('refund') || 
+      normalizedOrder.includes('cancelled') || 
+      normalizedOrder.includes('canceled')
+    );
+  };
+
+  const isCancelledOrder = (orderStatus: string) => {
+    const normalizedOrder = (orderStatus || '').toLowerCase();
+    return normalizedOrder.includes('cancelled') || normalizedOrder.includes('canceled');
   };
 
   const formatPrice = (price: number) => {
@@ -347,6 +414,7 @@ const OrderDetailScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>{t('orderDetails')}</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -362,6 +430,7 @@ const OrderDetailScreen = () => {
               <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
               <Text style={styles.statusDescription}>
                 {isOrderCompleted() 
+
                   ? t('orderDeliveredSuccessfully')
                   : t('orderProcessing')
                 }
@@ -385,6 +454,7 @@ const OrderDetailScreen = () => {
 
         {/* Purchased Products */}
         <View style={styles.section}>
+
           <Text style={styles.sectionTitle}>{t('purchasedProducts')}</Text>
           {order.items.map((item, index) => (
             <View key={index} style={styles.productItem}>
@@ -451,7 +521,7 @@ const OrderDetailScreen = () => {
           </View>
         </View>
 
-        {/* Payment Information */}
+                {/* Payment Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('paymentInformation')}</Text>
           <View style={styles.infoRow}>
@@ -459,12 +529,22 @@ const OrderDetailScreen = () => {
             <Text style={styles.infoValue}>{order.paymentMethod}</Text>
           </View>
           <View style={styles.infoRow}>
+
             <Text style={styles.infoLabel}>{t('status')}:</Text>
             <Text style={[styles.infoValue, { color: getStatusColor(order.paymentStatus) }]}>
               {getPaymentStatusText(order.paymentStatus)}
             </Text>
           </View>
         </View>
+
+        {/* Refund Status Notification */}
+        {isRealRefund(order.paymentStatus, order.status) && (
+          <RefundStatusNotification 
+            paymentStatus={order.paymentStatus}
+            orderStatus={order.status}
+            refundAmount={order.totalAmount}
+          />
+        )}
 
         {/* Order Summary */}
         <View style={styles.section}>
@@ -487,6 +567,7 @@ const OrderDetailScreen = () => {
 
         {/* Order History */}
         <View style={styles.section}>
+
           <Text style={styles.sectionTitle}>{t('orderHistory')}</Text>
           {order.orderHistory.map((history, index) => (
             <View key={index} style={styles.historyItem}>
@@ -505,14 +586,29 @@ const OrderDetailScreen = () => {
       {/* Action Buttons */}
       <View style={styles.actionButtonsContainer}>
         {isOrderCompleted() ? (
-          <TouchableOpacity
-            style={styles.reviewButton}
-            onPress={handleReviewOrder}
-          >
-            <Ionicons name="star-outline" size={20} color="white" />
-            <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
-          </TouchableOpacity>
-        ) : order.status !== 'cancelled' && order.status !== 'delivered' ? (
+          <>
+            <TouchableOpacity
+              style={styles.reviewButton}
+              onPress={handleReviewOrder}
+            >
+              <Ionicons name="star-outline" size={20} color="white" />
+              <Text style={styles.reviewButtonText}>Đánh giá đơn hàng</Text>
+            </TouchableOpacity>
+            {canRequestRefund(order.status) && order.paymentMethod !== 'cod' && (
+              <TouchableOpacity
+                style={styles.refundButton}
+                onPress={() => setShowCancelModal(true)}
+                disabled={cancelling}
+              >
+                <Ionicons name="card-outline" size={20} color="white" />
+                <Text style={styles.refundButtonText}>
+                  {cancelling ? 'Đang xử lý...' : 'Yêu cầu hoàn tiền'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : canCancelOrder(order.status) ? (
+
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={handleCancelOrder}
@@ -543,6 +639,16 @@ const OrderDetailScreen = () => {
         onClose={handleCloseThankYouModal}
         onGoHome={handleGoHome}
         isUpdate={isUpdateReview}
+      />
+
+      {/* Cancel Order Modal */}
+      <CancelOrderModal
+        visible={showCancelModal}
+        onClose={handleCancelModalClose}
+        onConfirm={handleCancelConfirm}
+        loading={cancelling}
+        paymentMethod={order?.paymentMethod || 'cod'}
+        isRefund={canRequestRefund(order?.status || '')}
       />
     </SafeAreaView>
   );
@@ -807,6 +913,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  refundButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#28a745',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  refundButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  refundNote: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontStyle: 'italic',
+  },
+
 });
 
 export default OrderDetailScreen; 
