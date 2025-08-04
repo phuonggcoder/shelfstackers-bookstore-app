@@ -225,53 +225,116 @@ const FilteredBooksScreen = () => {
 
   // Thanh filter ngang mới
   const renderFilterBar = () => (
-    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',gap:8}}>
+    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff',borderBottomWidth:1,borderColor:'#eee',gap:8, zIndex: 99998}}>
       {/* Danh mục */}
-      <View style={{width: 120}}>
+      <View style={{width: 120, zIndex: 99999}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowCategoryDropdown(!showCategoryDropdown)}>
           <Ionicons name="list" size={18} color="#1976D2" style={{marginRight:6}} />
           <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('categories')}</Text>
           <Ionicons name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
-        {showCategoryDropdown && (
-          <View style={{position:'absolute',top:44,left:0,right:0,zIndex:10,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.08,shadowRadius:8,elevation:2,borderWidth:1,borderColor:'#eee'}}>
-            <ScrollView style={{maxHeight:220}}>
-              {categories.map(cat => (
-                <Pressable key={cat._id} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
-                  setSelectedCategories([cat._id]);
-                  setShowCategoryDropdown(false);
-                }}>
-                  <Text style={{color:selectedCategories.includes(cat._id)?'#1976D2':'#222',fontWeight:selectedCategories.includes(cat._id)?'bold':'normal'}}>{cat.name}</Text>
-                </Pressable>
-              ))}
-              <Pressable style={{padding:12}} onPress={()=>{setSelectedCategories([]);setShowCategoryDropdown(false);}}>
-                <Text style={{color:'#888'}}>{t('allCategories')}</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        )}
+
+         {showCategoryDropdown && (
+           <Modal
+             visible={showCategoryDropdown}
+             transparent={true}
+             animationType="none"
+             onRequestClose={() => setShowCategoryDropdown(false)}
+           >
+             <TouchableOpacity 
+               style={{flex:1, backgroundColor:'rgba(0,0,0,0.3)'}} 
+               activeOpacity={1} 
+               onPress={() => setShowCategoryDropdown(false)}
+             >
+               <View style={{position:'absolute',top:44,left:12,right:12,zIndex:99999,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.15,shadowRadius:12,elevation:15,borderWidth:1,borderColor:'#eee'}}>
+                 <ScrollView 
+                   style={{maxHeight:200}} 
+                   showsVerticalScrollIndicator={true} 
+                   nestedScrollEnabled={true} 
+                   contentContainerStyle={{paddingBottom:8}}
+                   scrollEnabled={true}
+                   bounces={false}
+                   keyboardShouldPersistTaps="handled"
+                   alwaysBounceVertical={false}
+                   directionalLockEnabled={true}
+                   onStartShouldSetResponder={() => true}
+                   onResponderGrant={() => true}
+                   onResponderMove={() => true}
+                   onResponderRelease={() => true}
+                   onResponderTerminate={() => true}
+                   onTouchStart={() => true}
+                   onTouchMove={() => true}
+                   onTouchEnd={() => true}
+                 >
+                   {categories.map(cat => (
+                     <Pressable key={cat._id} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
+                       setSelectedCategories([cat._id]);
+                       setShowCategoryDropdown(false);
+                     }}>
+                       <Text style={{color:selectedCategories.includes(cat._id)?'#1976D2':'#222',fontWeight:selectedCategories.includes(cat._id)?'bold':'normal'}}>{cat.name}</Text>
+                     </Pressable>
+                   ))}
+                   <Pressable style={{padding:12}} onPress={()=>{setSelectedCategories([]);setShowCategoryDropdown(false);}}>
+                     <Text style={{color:'#888'}}>Tất cả danh mục</Text>
+                   </Pressable>
+                 </ScrollView>
+               </View>
+             </TouchableOpacity>
+           </Modal>
+         )}
       </View>
       {/* Sắp xếp */}
-      <View style={{width: 120}}>
+      <View style={{width: 120, zIndex: 99999}}>
         <TouchableOpacity style={{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:8,borderWidth:1,borderColor:'#1976D2',paddingHorizontal:8,paddingVertical:8, minWidth: 0}} onPress={()=>setShowSortDropdown(!showSortDropdown)}>
           <Ionicons name="swap-vertical" size={18} color="#1976D2" style={{marginRight:6}} />
           <Text style={{color:'#1976D2',fontWeight:'bold',fontSize:13}}>{t('sort')}</Text>
           <Ionicons name={showSortDropdown ? 'chevron-up' : 'chevron-down'} size={16} color="#1976D2" style={{marginLeft:4}} />
         </TouchableOpacity>
         {showSortDropdown && (
-          <View style={{position:'absolute',top:44,left:0,right:0,zIndex:10,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.08,shadowRadius:8,elevation:2,borderWidth:1,borderColor:'#eee'}}>
-            <ScrollView style={{maxHeight:220}}>
-              {SORT_OPTIONS.map(opt => (
-                <Pressable key={opt.value} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
-                  setSort(opt.value);
-                  setShowSortDropdown(false);
-                }}>
-                  <Text style={{color:sort===opt.value?'#1976D2':'#222',fontWeight:sort===opt.value?'bold':'normal'}}>{opt.label}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+           <Modal
+             visible={showSortDropdown}
+             transparent={true}
+             animationType="none"
+             onRequestClose={() => setShowSortDropdown(false)}
+           >
+             <TouchableOpacity 
+               style={{flex:1, backgroundColor:'rgba(0,0,0,0.3)'}} 
+               activeOpacity={1} 
+               onPress={() => setShowSortDropdown(false)}
+             >
+               <View style={{position:'absolute',top:44,left:12,right:12,zIndex:99999,backgroundColor:'#fff',borderRadius:8,shadowColor:'#000',shadowOpacity:0.15,shadowRadius:12,elevation:15,borderWidth:1,borderColor:'#eee'}}>
+                 <ScrollView 
+                   style={{maxHeight:200}} 
+                   showsVerticalScrollIndicator={true} 
+                   nestedScrollEnabled={true} 
+                   contentContainerStyle={{paddingBottom:8}}
+                   scrollEnabled={true}
+                   bounces={false}
+                   keyboardShouldPersistTaps="handled"
+                   alwaysBounceVertical={false}
+                   directionalLockEnabled={true}
+                   onStartShouldSetResponder={() => true}
+                   onResponderGrant={() => true}
+                   onResponderMove={() => true}
+                   onResponderRelease={() => true}
+                   onResponderTerminate={() => true}
+                   onTouchStart={() => true}
+                   onTouchMove={() => true}
+                   onTouchEnd={() => true}
+                 >
+                   {SORT_OPTIONS.map(opt => (
+                     <Pressable key={opt.value} style={{padding:12,borderBottomWidth:1,borderColor:'#f2f2f2'}} onPress={()=>{
+                       setSort(opt.value);
+                       setShowSortDropdown(false);
+                     }}>
+                       <Text style={{color:sort===opt.value?'#1976D2':'#222',fontWeight:sort===opt.value?'bold':'normal'}}>{opt.label}</Text>
+                     </Pressable>
+                   ))}
+                 </ScrollView>
+               </View>
+             </TouchableOpacity>
+           </Modal>
+         )}
       </View>
       {/* Lọc nâng cao + X */}
       <View style={{flexDirection:'row',alignItems:'center'}}>
@@ -291,8 +354,8 @@ const FilteredBooksScreen = () => {
   // Sidebar filter nâng cao (Modal trượt từ phải sang)
   const renderFilterSidebar = () => (
     <Modal visible={showFilterSidebar} animationType="slide" transparent onRequestClose={()=>setShowFilterSidebar(false)}>
-      <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.18)',flexDirection:'row',justifyContent:'flex-end'}}>
-        <View style={{width:'80%',backgroundColor:'#fff',height:'100%',padding:18,shadowColor:'#000',shadowOpacity:0.12,shadowRadius:12,elevation:4}}>
+      <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.18)',flexDirection:'row',justifyContent:'flex-end', zIndex: 9999}}>
+        <View style={{width:'80%',backgroundColor:'#fff',height:'100%',padding:18,shadowColor:'#000',shadowOpacity:0.12,shadowRadius:12,elevation:8, zIndex: 10000}}>
           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <Text style={{fontSize:18,fontWeight:'bold',color:'#1976D2'}}>{t('filters')}</Text>
             <TouchableOpacity onPress={()=>setShowFilterSidebar(false)}>
@@ -616,13 +679,12 @@ const FilteredBooksScreen = () => {
           key={`flatlist-${itemPerRow}`}
           contentContainerStyle={{ ...styles.listContent, paddingBottom: 24 + insets.bottom + 50 }}
           columnWrapperStyle={{ justifyContent: 'center', marginHorizontal: 4 }}
+          style={{ zIndex: 1 }}
           renderItem={({ item }) => {
             let Comp: React.ComponentType<{ book: Book; onPress?: (book: Book) => void }> = BookGrid2Col;
             let fixedHeight = 300;
             if (itemPerRow === 3) { Comp = BookGrid3Col; fixedHeight = 210; }
             else if (itemPerRow === 4) { Comp = BookGrid4Col; fixedHeight = 170; }
-            // Tăng chiều cao col2 nhiều hơn
-            if (itemPerRow === 2) fixedHeight = 320;
             return (
               <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4, height: fixedHeight }}>
                 <Comp book={item} onPress={handleBookPress} />

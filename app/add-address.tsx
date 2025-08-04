@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
-import { createAddress, LocationItem } from '../services/addressService';
+import AddressService, { LocationItem } from '../services/addressService';
 
 const AddAddress = () => {
   const { t } = useTranslation();
@@ -77,7 +78,7 @@ const AddAddress = () => {
 
     setLoading(true);
     try {
-      await createAddress(token, {
+      await AddressService.createAddress(token, {
         receiver_name: receiverName.trim(),
         phone_number: phoneNumber.trim(),
         province: province.name,

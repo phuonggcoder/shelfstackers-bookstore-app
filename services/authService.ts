@@ -6,15 +6,21 @@ const API_URL = 'https://server-shelf-stacker-w1ds.onrender.com/auth';
 const USER_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api/users';
 
 const mapUserResponse = (serverResponse: any): AuthResponse => {
-  if (!serverResponse || !serverResponse.token || !serverResponse.user) {
+  if (!serverResponse || !serverResponse.user) {
     throw new Error('Invalid response format from server');
+  }
+
+  // Check for different token field names
+  const token = serverResponse.token || serverResponse.access_token;
+  if (!token) {
+    throw new Error('No token found in server response');
   }
 
   // Map response từ server sang định dạng AuthResponse
   return {
-    token: serverResponse.token,
+    token: token,
     user: {
-      _id: serverResponse.user.id, // Map id -> _id
+      _id: serverResponse.user.id || serverResponse.user._id, // Support both id and _id
       username: serverResponse.user.username,
       email: serverResponse.user.email,
       full_name: serverResponse.user.full_name || '',
@@ -55,7 +61,7 @@ export const authService = {
 
       // Sau khi đăng ký thành công, thực hiện đăng nhập
       const loginResponse = await axios.post(`${API_URL}/login`, {
-        username: data.username,
+        email: data.email,
         password: data.password
       });
 
@@ -176,6 +182,68 @@ export const authService = {
         throw new Error(error.response.data.message);
       }
       throw new Error(error.message || 'Password change failed');
+    }
+  },
+
+  // Hàm đăng nhập Google
+  loginWithGoogle: async (idToken: string) => {
+    try {
+      console.log('🔧 Sending Google login request to:', `${USER_URL}/google-signin`);
+      
+      const response = await fetch(`${USER_URL}/google-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+
+      console.log('🔧 Response status:', response.status);
+      console.log('🔧 Response headers:', response.headers);
+
+      // Kiểm tra status code
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('🔧 Server error response:', errorText.slice(0, 200));
+        throw new Error(`Server error: ${response.status} - ${errorText.slice(0, 100)}`);
+      }
+
+      // Đọc response text trước
+      const responseText = await response.text();
+      console.log('🔧 Response text:', responseText.slice(0, 200));
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.log('🔧 JSON parse error. Response text:', responseText);
+        throw new Error(`Invalid JSON response: ${responseText.slice(0, 100)}`);
+      }
+
+      console.log('🔧 Parsed Google login response:', result);
+
+      if (result.success && result.user) {
+        // Lưu token vào AsyncStorage
+        await AsyncStorage.setItem('token', result.token);
+        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+        
+        return {
+          success: true,
+          user: result.user,
+          token: result.token
+        };
+      } else {
+        return {
+          success: false,
+          error: result.message || 'Đăng nhập Google thất bại'
+        };
+      }
+    } catch (error: any) {
+      console.log('🔧 Google login error:', error);
+      return {
+        success: false,
+        error: error.message || 'Có lỗi xảy ra khi đăng nhập Google'
+      };
     }
   }
 

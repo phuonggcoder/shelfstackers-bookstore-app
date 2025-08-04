@@ -1,7 +1,7 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
+import GoogleSignInWithAccountPicker from '@/components/GoogleSignInWithAccountPicker';
+import OTPLogin from '@/components/OTPLogin';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -20,6 +20,7 @@ import {
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+import { convertGoogleSignInResponse } from '../../utils/authUtils';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -29,11 +30,18 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'main' | 'otp'>('main');
 
   // Cấu hình Google Sign-In với Firebase
   useEffect(() => {
     configureGoogleSignIn();
   }, []);
+
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -41,9 +49,14 @@ export default function Login() {
       return;
     }
 
+    if (!validateEmail(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await authService.login({ username: email, password });
+      const response = await authService.login({ email: email, password });
       await signIn(response);
       Alert.alert(t('success'), t('loginSuccess'), [
         { text: 'OK', onPress: () => router.replace('/(tabs)') }
@@ -55,63 +68,75 @@ export default function Login() {
     }
   };
 
-  // Hàm đăng nhập Google
-  const handleGoogleLogin = async () => {
+  // Hàm xử lý thành công Google Sign-In
+  const handleGoogleSignInSuccess = async (result: any) => {
     try {
-      console.log('🔍 Checking Google Play Services...');
-      await GoogleSignin.hasPlayServices();
-      console.log('✅ Google Play Services OK');
+      console.log('✅ Google Sign-In successful:', result);
       
-      console.log('🔍 Starting Google Sign-In...');
-      const userInfo = await GoogleSignin.signIn();
-      console.log('✅ Google Sign-In successful:', userInfo);
-      
-      // Lấy idToken từ userInfo.data
-      const idToken = userInfo.data?.idToken;
-      console.log('🔍 ID Token:', idToken ? 'Found' : 'Not found');
-      if (!idToken) {
-        Alert.alert(t('cannotGetIdTokenFromGoogle'));
-        return;
-      }
-      // Gửi idToken lên backend
-      console.log('🔍 Sending idToken to backend:', idToken.substring(0, 50) + '...');
-      const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/google-signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token: idToken }),
-      });
-      const data = await res.json();
-      console.log('🔍 Backend response:', data);
-      console.log('🔍 Response status:', res.status);
-      if (res.ok) {
-        // Lưu JWT vào AsyncStorage hoặc context
-        await AsyncStorage.setItem('jwt', data.token);
-        await signIn(data); // data phải trả về { user, token }
-        Alert.alert(t('loginSuccess'), t('welcome'));
-        router.replace('/(tabs)');
+
+      if (result.success && result.user) {
+        // Sử dụng utility function để convert format
+        const authResponse = convertGoogleSignInResponse(result);
+        
+        await signIn(authResponse);
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
       } else {
-        // Xử lý lỗi EMAIL_NOT_VERIFIED
-        if (data.code === 'EMAIL_NOT_VERIFIED') {
-          Alert.alert(
-            t('googleEmailNotVerified'),
-            t('googleEmailNotVerifiedMessage')
-          );
-        } else {
-          Alert.alert(t('loginError'), data.message || t('anErrorOccurred'));
-        }
+        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
       }
     } catch (error: any) {
-      console.log('❌ Google Sign-In error:', error);
-      console.log('❌ Error code:', error.code);
-      console.log('❌ Error message:', error.message);
-      
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        Alert.alert(t('loginCancelled'));
-      } else {
-        Alert.alert(t('error'), error.message);
-      }
+      console.error('❌ Error after Google Sign-In:', error);
+      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
     }
   };
+
+  // Hàm xử lý lỗi Google Sign-In
+  const handleGoogleSignInError = (error: any) => {
+    console.error('❌ Google Sign-In error:', error);
+    // Error handling đã được xử lý trong component
+  };
+
+  // Hàm xử lý thành công OTP Login
+  const handleOTPLoginSuccess = async (result: any) => {
+    try {
+      console.log('✅ OTP Login successful:', result);
+      
+
+      if (result.success && result.user) {
+        // Convert OTP response to auth format
+        const authResponse = {
+          token: result.access_token, // Use access_token as token
+          user: result.user
+        };
+        
+        await signIn(authResponse);
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
+      } else {
+        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      console.error('❌ Error after OTP Login:', error);
+      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+    }
+  };
+
+  // Hàm quay lại trang chính
+  const handleBackToMain = () => {
+    setAuthMethod('main');
+  };
+
+  // Hiển thị OTP Login nếu authMethod là 'otp'
+  if (authMethod === 'otp') {
+    return (
+      <OTPLogin
+        onLoginSuccess={handleOTPLoginSuccess}
+        onBack={handleBackToMain}
+      />
+    );
+  }
 
   return (
     <ScrollView style={styles.scrollbox}> 
@@ -129,13 +154,20 @@ export default function Login() {
       </View>
 
       <View style={styles.socialContainer}>
-        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
-          <Image source={require('../../assets/images/google.png')} style={styles.icon} />
-          <Text style={styles.socialText}>Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../assets/images/applelogo.png')} style={styles.icon} />
-          <Text style={styles.socialText}>Apple</Text>
+        <GoogleSignInWithAccountPicker
+          onSuccess={handleGoogleSignInSuccess}
+          onError={handleGoogleSignInError}
+          disabled={isLoading}
+          style={styles.googleButton}
+        />
+        <TouchableOpacity 
+          style={styles.socialButton}
+          onPress={() => setAuthMethod('otp')}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="call-outline" size={24} color="#333" />
+          </View>
+          <Text style={styles.socialText}>Số điện thoại</Text>
         </TouchableOpacity>
       </View>
 
@@ -284,9 +316,15 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     width: '48%',
   },
+  googleButton: {
+    width: '48%',
+  },
   icon: {
     width: 24,
     height: 24,
+    marginRight: 8,
+  },
+  iconContainer: {
     marginRight: 8,
   },
   socialText: {

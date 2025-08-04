@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +11,38 @@ import CustomLoginDialog from '../../components/BottomAlert';
 import CartAddedDialog from '../../components/CartAddedDialog';
 import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
+import ReviewCard from '../../components/ReviewCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
-import ReviewService, { ReviewSummary } from '../../services/reviewService';
+import { addToCart, addToWishlist, getBookById, getBooksByCategory, getWishlist, removeFromWishlist } from '../../services/api';
+import ReviewService, { Review, ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
+import { getUserId } from '../../utils/reviewUtils';
+
+// Helper function to format publication date
+const formatPublicationDate = (dateString: string) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateString;
+  }
+};
+
+// Helper function to truncate text
+const truncateText = (text: string, maxLength: number = 25) => {
+  if (!text) return '-';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
 
 const BookDetailsScreen = () => {
   const { t } = useTranslation();
@@ -29,7 +56,7 @@ const BookDetailsScreen = () => {
 
   const footerAnim = useRef(new Animated.Value(0)).current;
   const lastOffsetY = useRef(0);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [addingCart, setAddingCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
@@ -74,6 +101,15 @@ const BookDetailsScreen = () => {
   // Review summary state
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
+  
+  // Review list state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  
+  // Description state
+  const [descriptionHeight, setDescriptionHeight] = useState(0);
+  const [isLongContent, setIsLongContent] = useState(false);
 
   // Memoize values to prevent unnecessary re-renders
   const tagsStyles = useMemo(() => ({
@@ -129,13 +165,12 @@ const BookDetailsScreen = () => {
     if (book && token) {
       const checkFavorite = async () => {
         try {
-          const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/wishlist', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const data = await res.json();
-          const books = Array.isArray(data) ? data : data.books || [];
+          const books = await getWishlist(token);
           setIsFavorite(books.some((b: any) => b._id === book._id));
-        } catch { }
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+          setIsFavorite(false);
+        }
       };
       checkFavorite();
     }
@@ -162,21 +197,31 @@ const BookDetailsScreen = () => {
     }
   }, [book]);
 
-  // Fetch review summary when book is loaded
+  // Fetch review summary and reviews when book is loaded
   useEffect(() => {
     if (book && token) {
-      const fetchReviewSummary = async () => {
+      const fetchReviewData = async () => {
         try {
           setLoadingReviewSummary(true);
+          setLoadingReviews(true);
+          setReviewError(null);
+          
+          // Fetch review summary
           const summary = await ReviewService.getProductReviewSummary(book._id, token);
           setReviewSummary(summary);
+          
+          // Fetch first few reviews
+          const reviewsResponse = await ReviewService.getProductReviews(book._id, 1, 3, token);
+          setReviews(reviewsResponse.reviews);
         } catch (error) {
-          console.error('Error fetching review summary:', error);
+          console.error('Error fetching review data:', error);
+          setReviewError('Không thể tải đánh giá. Vui lòng thử lại sau.');
         } finally {
           setLoadingReviewSummary(false);
+          setLoadingReviews(false);
         }
       };
-      fetchReviewSummary();
+      fetchReviewData();
     }
   }, [book, token]);
 
@@ -273,18 +318,24 @@ const BookDetailsScreen = () => {
       setShowLoginDialog(true);
       return;
     }
-    if (isFavorite) {
-      showToast(t('addedToWishlist'));
-      return;
-    }
+
+    
     try {
-      const res = await addToWishlist(token, bookId as string);
-      console.log('Add to wishlist response:', res);
-      setIsFavorite(true);
-      showToast(t('addedToWishlist'));
+      if (isFavorite) {
+        // Xóa khỏi wishlist
+        await removeFromWishlist(token, bookId as string);
+        setIsFavorite(false);
+        showToast('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        // Thêm vào wishlist
+        const res = await addToWishlist(token, bookId as string);
+        console.log('Add to wishlist response:', res);
+        setIsFavorite(true);
+        showToast('Đã thêm vào danh sách yêu thích');
+      }
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast(t('cannotAddToWishlist'));
+      showToast('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -557,8 +608,8 @@ const BookDetailsScreen = () => {
             </View>
           </View>
         )}
-  {/* Title, price, discount badge ra ngoài, ngay dưới hình ảnh */}
-  <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'flex-start' }}>
+          {/* Title, price, discount badge ra ngoài, ngay dưới hình ảnh */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, alignItems: 'flex-start' }}>
           <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#222', marginBottom: 6, textAlign: 'left' }}>{book.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#E53935', marginRight: 10 }}>{formatVND(book.price)}</Text>
@@ -567,52 +618,127 @@ const BookDetailsScreen = () => {
             </View>
           </View>
         </View>
-        {/* Gộp mô tả và thông tin sản phẩm */}
-        <View style={styles.infoSectionBox}>
- 
-          <View style={styles.detailTable}>
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('category')}:</Text><Text style={styles.detailValue}>{book.categories && book.categories.length > 0 ? book.categories.map((c: any) => c.name).join(', ') : '-'}</Text></View>
-            <View style={styles.separator} />
-            {(book as any).supplier && <><View style={styles.detailRow}><Text style={styles.detailLabel}>{t('supplier')}:</Text><Text style={styles.detailValue}>{(book as any).supplier}</Text></View><View style={styles.separator} /></>}
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('publisher')}:</Text><Text style={styles.detailValue}>{book.publisher || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('publicationDate')}:</Text><Text style={styles.detailValue}>{book.publication_date || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('language')}:</Text><Text style={styles.detailValue}>{book.language || '-'}</Text></View>
-            <View style={styles.separator} />
-            <View style={styles.detailRow}><Text style={styles.detailLabel}>{t('stock')}:</Text><Text style={styles.detailValue}>{book.stock}</Text></View>
-          </View>
-          {/* Mô tả: chỉ show 6 dòng đầu, không ghi tiêu đề, cuối dòng 6 có nút xem thêm, căn giữa nút */}
-          <View style={{ minHeight: 120 }}>
-            {(() => {
-              const plainText = book.description?.replace(/<[^>]+>/g, '') || '';
-              const lines = plainText.split(/\r?\n/).filter(Boolean);
-              const preview = lines.slice(0, 6).join('\n');
-              const isLong = lines.length > 6;
-              return <>
-                <Text style={{ fontSize: 15, color: '#333', lineHeight: 22, textAlign: 'justify' }}>{preview}{isLong ? '...' : ''}</Text>
-                {isLong && (
-                  <TouchableOpacity onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} style={{ alignSelf: 'center', marginTop: 8, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}>
-                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>{t('readMore')}</Text>
-                  </TouchableOpacity>
-                )}
-              </>;
-            })()}
+
+        {/* Author section moved above the grey box */}
+        <View style={styles.authorContainer}>
+          <Text style={styles.sectionTitle}>Tác giả</Text>
+          <View style={styles.authorInfo}>
+            <View>
+              <Text style={styles.authorName}>{truncateText(book.author, 30)}</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.authorContainer}>
-          <Text style={styles.sectionTitle}>{t('author')}</Text>
-          <View style={styles.authorInfo}>
-            {/* Xóa avatar tác giả */}
-            {/* <Image source={{ uri: 'https://i.pravatar.cc/150?u=' + book.author }} style={styles.authorImage} /> */}
-            <View>
-              <Text style={styles.authorName}>{book.author}</Text>
+        {/* Gộp mô tả và thông tin sản phẩm */}
+        <View style={styles.infoSectionBox}>
+          <View style={styles.detailTable}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Thể loại:</Text>
+              <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                {book.categories && book.categories.length > 0 ? truncateText(book.categories.map((c: any) => c.name).join(', '), 20) : '-'}
+              </Text>
             </View>
-            {/* <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileButtonText}>Xem hồ sơ</Text>
-            </TouchableOpacity> */}
+            <View style={styles.separator} />
+            {(book as any).supplier && (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Nhà cung cấp:</Text>
+                  <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                    {truncateText((book as any).supplier, 20)}
+                  </Text>
+                </View>
+                <View style={styles.separator} />
+              </>
+            )}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Nhà xuất bản:</Text>
+              <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                {truncateText(book.publisher || '-', 20)}
+              </Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Ngày xuất bản:</Text>
+              <Text style={styles.detailValue}>{formatPublicationDate(book.publication_date)}</Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Ngôn ngữ:</Text>
+              <Text style={styles.detailValue}>{book.language || '-'}</Text>
+            </View>
+            <View style={styles.separator} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Tồn kho:</Text>
+              <Text style={styles.detailValue}>{book.stock}</Text>
+            </View>
           </View>
+          
+          {/* Mô tả với giới hạn 10 dòng và hiệu ứng fade */}
+          {(() => {
+            const LINE_HEIGHT = 22; // lineHeight from the Text style
+            const MAX_LINES = 10; // Giới hạn 10 dòng
+            const SHOW_LINES = 12; // Hiển thị 12 dòng nếu nội dung dài
+            const FADE_START_LINE = 10; // Bắt đầu fade từ dòng 11
+            const MAX_HEIGHT = LINE_HEIGHT * MAX_LINES;
+            const SHOW_HEIGHT = LINE_HEIGHT * SHOW_LINES;
+            
+            const handleDescriptionLayout = (event: any) => {
+              const { height } = event.nativeEvent.layout;
+              setDescriptionHeight(height);
+              setIsLongContent(height > MAX_HEIGHT);
+            };
+            
+            const plainText = book.description?.replace(/<[^>]+>/g, '') || '';
+            
+            // Estimate if content is long based on character count and line breaks
+            const estimatedLines = Math.ceil(plainText.length / 50) + (plainText.match(/\n/g) || []).length;
+            const isEstimatedLong = estimatedLines > 8; // Nếu > 8 dòng thì coi là dài
+            
+            // Use estimated length for initial render, then use actual measurement
+            const shouldShowExtended = isLongContent || (isEstimatedLong && descriptionHeight === 0);
+            
+            return (
+              <>
+                {/* Container cho mô tả và fade effect */}
+                <View style={{ position: 'relative', marginBottom: 8 }}>
+                  <Text 
+                    style={{ 
+                      fontSize: 15, 
+                      color: '#333', 
+                      lineHeight: LINE_HEIGHT, 
+                      textAlign: 'justify',
+                      ...(shouldShowExtended && { height: SHOW_HEIGHT })
+                    }}
+                    onLayout={handleDescriptionLayout}
+                    numberOfLines={shouldShowExtended ? SHOW_LINES : undefined}
+                  >
+                    {plainText}
+                  </Text>
+                  
+                  {/* Fading effect overlay for long content - fade từ dòng 11-13 */}
+                  {shouldShowExtended && (
+                    <View style={styles.fadeOverlay}>
+                      <LinearGradient
+                        colors={['transparent', '#F3F4F8', '#F3F4F8']}
+                        locations={[0, 0.3, 1]}
+                        style={styles.fadeGradient}
+                      />
+                    </View>
+                  )}
+                </View>
+                
+                {/* Button luôn hiển thị nếu có nội dung mô tả - tách riêng khỏi fade effect */}
+                {plainText.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => router.push({ pathname: '/book-detail-info', params: { id: book._id } })} 
+                    style={{ alignSelf: 'center', marginBottom: 20, backgroundColor: '#f6f6fa', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: '#5E5CE6', fontWeight: 'bold', fontSize: 15 }}>Xem thông tin chi tiết</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            );
+          })()}
         </View>
 
         <View style={{ height: 10 }} />
@@ -687,7 +813,143 @@ const BookDetailsScreen = () => {
               <Text style={styles.reviewPlaceholderSubtext}>
                 Hãy là người đầu tiên đánh giá sản phẩm này
               </Text>
+              {user && (
+                <TouchableOpacity 
+                  style={styles.writeReviewButtonPlaceholder}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Ionicons name="pencil" size={18} color="white" />
+                  <Text style={styles.writeReviewButtonPlaceholderText}>Viết đánh giá đầu tiên</Text>
+                </TouchableOpacity>
+              )}
             </View>
+          )}
+          
+          {/* Review List */}
+          {loadingReviews ? (
+            <View style={styles.reviewListLoading}>
+              <ActivityIndicator size="small" color="#3255FB" />
+              <Text style={styles.reviewListLoadingText}>Đang tải đánh giá...</Text>
+            </View>
+          ) : reviewError ? (
+            <View style={styles.reviewError}>
+              <Ionicons name="alert-circle-outline" size={24} color="#E53935" />
+              <Text style={styles.reviewErrorText}>{reviewError}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={() => {
+                  if (book && token) {
+                    const fetchReviewData = async () => {
+                      try {
+                        setLoadingReviews(true);
+                        setReviewError(null);
+                        const reviewsResponse = await ReviewService.getProductReviews(book._id, 1, 3, token);
+                        setReviews(reviewsResponse.reviews);
+                      } catch (error) {
+                        console.error('Error retrying review fetch:', error);
+                        setReviewError('Không thể tải đánh giá. Vui lòng thử lại sau.');
+                      } finally {
+                        setLoadingReviews(false);
+                      }
+                    };
+                    fetchReviewData();
+                  }
+                }}
+              >
+                <Text style={styles.retryButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
+          ) : reviews.length > 0 ? (
+            <View style={styles.reviewListContainer}>
+              <Text style={styles.reviewListTitle}>Đánh giá gần đây</Text>
+              {reviews.map((review) => (
+                <View key={review._id} style={styles.reviewItem}>
+                  <ReviewCard 
+                    review={review}
+                    isOwnReview={user?._id === getUserId(review)}
+                  />
+                </View>
+              ))}
+              {reviewSummary && reviewSummary.totalReviews > 3 && (
+                <TouchableOpacity 
+                  style={styles.viewMoreReviewsButton}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Text style={styles.viewMoreReviewsText}>
+                    Xem thêm {reviewSummary.totalReviews - 3} đánh giá khác
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#3255FB" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : reviewSummary && reviewSummary.totalReviews === 0 ? (
+            <View style={styles.reviewEmptyState}>
+              <Ionicons name="chatbubble-outline" size={48} color="#CCC" />
+              <Text style={styles.reviewEmptyStateText}>Chưa có đánh giá nào</Text>
+              <Text style={styles.reviewEmptyStateSubtext}>
+                Hãy là người đầu tiên đánh giá sản phẩm này
+              </Text>
+              {user && (
+                <TouchableOpacity 
+                  style={styles.writeReviewButtonEmpty}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Ionicons name="pencil" size={18} color="white" />
+                  <Text style={styles.writeReviewButtonEmptyText}>Viết đánh giá đầu tiên</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+          
+          {/* Write Review Button */}
+          {user && reviewSummary && reviewSummary.totalReviews > 0 && !loadingReviews && reviews.length === 0 && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Write Review Button for no reviews case */}
+          {user && !loadingReviewSummary && !reviewSummary && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Write Review Button for error case */}
+          {user && reviewError && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -1387,6 +1649,172 @@ const styles = StyleSheet.create({
     color: '#666',
     width: 30,
     textAlign: 'right',
+  },
+  // Review List Styles
+  reviewListContainer: {
+    marginTop: 16,
+  },
+  reviewListLoading: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  reviewListLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  reviewError: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  reviewErrorText: {
+    fontSize: 14,
+    color: '#E53935',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#E53935',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  reviewEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  reviewEmptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  reviewEmptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  writeReviewButtonEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  writeReviewButtonEmptyText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  writeReviewButtonPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  writeReviewButtonPlaceholderText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  reviewListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  reviewItem: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  viewMoreReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  viewMoreReviewsText: {
+    fontSize: 14,
+    color: '#3255FB',
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  writeReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  writeReviewButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  fadeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 66, // 3 dòng cuối (22 * 3 = 66)
+    backgroundColor: 'transparent',
+    pointerEvents: 'none',
+    zIndex: 1,
+  },
+  fadeGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 66, // 3 dòng cuối (22 * 3 = 66)
   },
 });
 

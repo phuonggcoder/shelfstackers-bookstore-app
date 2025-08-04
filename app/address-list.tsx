@@ -7,13 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { deleteAddress, getAddresses, setDefaultAddress, updateAddress } from '../services/addressService';
+import AddressService, { UserAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
   const { t } = useTranslation();
   const { token } = useAuth();
   const { from } = useLocalSearchParams();
-  const [addresses, setAddresses] = useState([]);
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -47,8 +47,8 @@ const AddressListScreen = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await getAddresses(token);
-      const arr = Array.isArray(res) ? res : res.addresses || [];
+      const res = await AddressService.getAddresses(token);
+      const arr = Array.isArray(res) ? res : [];
       setAddresses(arr);
       console.log('Fetched addresses:', arr);
       if (!selected && arr.length > 0) {
@@ -94,7 +94,7 @@ const AddressListScreen = () => {
     setShowDeleteModal(false);
     setLoading(true);
     try {
-      await deleteAddress(token, deleteId);
+      await AddressService.deleteAddress(token, deleteId);
       fetchAddresses();
     } catch (error) {
       console.error('Error deleting address:', error);
@@ -118,7 +118,7 @@ const AddressListScreen = () => {
     } else if (!currentDefault && newDefault) {
       // Nếu chưa có mặc định, cho phép set luôn
       try {
-        await setDefaultAddress(token, id);
+        await AddressService.setDefaultAddress(token, id);
         fetchAddresses();
       } catch (error) {
         console.error('Error setting default address:', error);
@@ -135,12 +135,12 @@ const AddressListScreen = () => {
       const addrArr = addresses as any[];
       // Set tất cả địa chỉ thành false trước
       const updatePromises = addrArr.map((addr) => 
-        updateAddress(token, addr._id, { is_default: false })
+        AddressService.updateAddress(token, addr._id, { is_default: false })
       );
       await Promise.all(updatePromises);
       
       // Sau đó set địa chỉ mới thành true
-      await setDefaultAddress(token, defaultChangeData.newId);
+      await AddressService.setDefaultAddress(token, defaultChangeData.newId);
       fetchAddresses();
     } catch (error) {
       console.error('Error setting default address:', error);

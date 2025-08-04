@@ -4,6 +4,7 @@ import { Alert, Platform } from 'react-native';
 import { storageHelper } from '../config/storage';
 import { authService } from '../services/authService';
 import { createOrUpdateSession, listenFcmTokenRefresh, removeFcmToken, syncFcmToken, updateSessionFcmToken } from '../services/fcmService';
+import googleAuthService from '../services/googleAuthService';
 import { AuthResponse, User } from '../types/auth';
 
 interface AuthContextType {
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [tokenExpiredAlertVisible, setTokenExpiredAlertVisible] = useState(false);
+  const [fcmSyncAttempted, setFcmSyncAttempted] = useState(false);
 
   useEffect(() => {
     loadStoredAuth();
@@ -68,14 +70,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Đồng bộ FCM token khi app khởi động nếu đã đăng nhập
   useEffect(() => {
-    if (user && user._id && token) {
+    if (user && user._id && token && !fcmSyncAttempted) {
       (async () => {
-        const deviceId = await storageHelper.getOrCreateMobileDeviceId();
-        syncFcmToken(user._id, deviceId, token);
-        listenFcmTokenRefresh(user._id, deviceId);
+        try {
+          setFcmSyncAttempted(true);
+          const deviceId = await storageHelper.getOrCreateMobileDeviceId();
+          console.log('🔄 Syncing FCM token for user:', user._id, 'deviceId:', deviceId);
+          const result = await syncFcmToken(user._id, deviceId, token);
+          if (result) {
+            console.log('✅ FCM token synced successfully');
+          } else {
+            console.log('⚠️ FCM token sync failed, will retry later');
+          }
+          listenFcmTokenRefresh(user._id, deviceId);
+        } catch (error) {
+          console.error('❌ Error in FCM sync effect:', error);
+        }
       })();
     }
-  }, [user, token]);
+  }, [user, token, fcmSyncAttempted]);
 
   // Check token expiration periodically (only if user is actively using the app)
   useEffect(() => {
@@ -127,11 +140,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(parsedUser);
         
-        // Đồng bộ FCM token khi load lại user (chỉ khi có token hợp lệ)
+        // FCM token sync sẽ được handle trong useEffect để tránh duplicate calls
+        // Chỉ setup listener cho FCM token refresh
         const deviceId = await storageHelper.getOrCreateMobileDeviceId();
-        // Chỉ sync FCM token nếu có token hợp lệ
         if (storedToken) {
-          syncFcmToken(parsedUser._id, deviceId, storedToken);
           listenFcmTokenRefresh(parsedUser._id, deviceId);
         }
 
@@ -165,6 +177,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!userData?.token || !userData?.user) {
         throw new Error('Invalid authentication data');
       }
+      // Reset FCM sync flag for new login
+      setFcmSyncAttempted(false);
+      
       // Lưu token vào AsyncStorage
       await AsyncStorage.setItem('token', userData.token);
       setToken(userData.token);
@@ -175,11 +190,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const loginTime = new Date().toISOString();
       const deviceInfo = { platform: Platform.OS, version: Platform.Version };
       await createOrUpdateSession(userData.user._id, deviceId, loginTime, deviceInfo, userData.token);
-      // Lấy FCM token và update vào session
-      const fcmToken = await syncFcmToken(userData.user._id, deviceId, userData.token); // syncFcmToken trả về token
-      if (fcmToken) {
-        await updateSessionFcmToken(userData.user._id, deviceId, fcmToken, userData.token);
+      
+      // Lấy FCM token và update vào session với retry logic
+      console.log('🔄 Syncing FCM token after login...');
+      const fcmResult = await syncFcmToken(userData.user._id, deviceId, userData.token);
+      if (fcmResult && fcmResult.deviceToken) {
+        await updateSessionFcmToken(userData.user._id, deviceId, fcmResult.deviceToken, userData.token);
+        console.log('✅ FCM token updated in session');
+      } else {
+        console.log('⚠️ FCM token sync failed during login, will retry via useEffect');
       }
+      
       listenFcmTokenRefresh(userData.user._id, deviceId);
       Alert.alert('Thành công', 'Đăng nhập thành công!');
     } catch (error) {
@@ -197,9 +218,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user && user._id) {
         await removeFcmToken(user._id);
       }
+      
+      // Chỉ đăng xuất Google nếu user đã đăng nhập bằng Google
+      // Kiểm tra xem có Google tokens không
+      try {
+        const hasGoogleTokens = await AsyncStorage.getItem('access_token');
+        if (hasGoogleTokens) {
+          console.log('🔍 User has Google tokens, signing out from Google...');
+          await googleAuthService.signOutAndClearCache();
+        } else {
+          console.log('🔍 User logged in via SMS/email, skipping Google sign out');
+        }
+      } catch (googleError) {
+        console.log('⚠️ Google sign out failed (user may not be logged in via Google):', googleError);
+        // Không throw error vì user có thể đăng nhập bằng SMS
+      }
+      
       await AsyncStorage.multiRemove(['token', 'user']);
       setToken(null);
       setUser(null);
+      setFcmSyncAttempted(false);
+      
+      console.log('✅ Sign out completed successfully');
     } catch (error) {
       console.error('Error signing out:', error);
       Alert.alert('Lỗi', 'Không thể đăng xuất đúng cách');

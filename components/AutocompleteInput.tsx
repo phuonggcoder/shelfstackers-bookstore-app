@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { getDistricts, getProvinces, getWards, LocationItem } from '../services/addressService';
+import AddressService, { LocationItem } from '../services/addressService';
 
 interface AutocompleteInputProps {
   label: string;
@@ -58,11 +58,11 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       let result: LocationItem[] = [];
       
       if (level === 'province') {
-        result = await getProvinces(searchText);
+        result = await AddressService.getProvinces(searchText);
       } else if (level === 'district' && provinceId) {
-        result = await getDistricts(provinceId, searchText);
+        result = await AddressService.getDistrictsLegacy(provinceId, searchText);
       } else if (level === 'ward' && districtId) {
-        result = await getWards(districtId, searchText);
+        result = await AddressService.getWardsLegacy(districtId, searchText);
       }
       
       setSuggestions(result);
@@ -89,11 +89,11 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
         let result: LocationItem[] = [];
         
         if (level === 'province') {
-          result = await getProvinces('');
+          result = await AddressService.getProvinces('');
         } else if (level === 'district' && provinceId) {
-          result = await getDistricts(provinceId, '');
+          result = await AddressService.getDistrictsLegacy(provinceId, '');
         } else if (level === 'ward' && districtId) {
-          result = await getWards(districtId, '');
+          result = await AddressService.getWardsLegacy(districtId, '');
         }
         
         setSuggestions(result);

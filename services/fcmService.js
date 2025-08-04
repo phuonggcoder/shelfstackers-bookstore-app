@@ -8,34 +8,62 @@ export async function getFcmToken() {
 
 // Gửi token lên server
 export async function syncFcmToken(userId, deviceId, authToken) {
-  const token = await getFcmToken();
-  console.log('FCM token:', token, 'userId:', userId, 'deviceId:', deviceId);
-  if (userId && token && authToken) {
+  // Kiểm tra ngay từ đầu - nếu thiếu userId hoặc authToken thì không sync
+  if (!userId || !authToken) {
+    console.log('🔄 FCM token sync skipped - user not logged in yet');
+    return null;
+  }
+
+  // Thêm retry logic để đảm bảo FCM token đã sẵn sàng
+  let retryCount = 0;
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1 giây
+
+  while (retryCount < maxRetries) {
     try {
-      // Sử dụng endpoint mới register-device-token
-      const headers = { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      };
+      const token = await getFcmToken();
+      console.log(`FCM token (attempt ${retryCount + 1}):`, token, 'userId:', userId, 'deviceId:', deviceId);
       
-      const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/register-device-token', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          deviceToken: token, 
-          deviceId: deviceId 
-        }),
-      });
-      
-      const resJson = await res.json().catch(() => ({}));
-      console.log('✅ Sync FCM response:', res.status, resJson);
-      return resJson;
+      if (userId && token && authToken) {
+        // Sử dụng endpoint mới register-device-token
+        const headers = { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+        
+        const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/auth/register-device-token', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            deviceToken: token, 
+            deviceId: deviceId 
+          }),
+        });
+        
+        const resJson = await res.json().catch(() => ({}));
+        console.log('✅ Sync FCM response:', res.status, resJson);
+        return resJson;
+      } else if (retryCount < maxRetries - 1) {
+        // Nếu thiếu FCM token và chưa hết retry, đợi rồi thử lại
+        console.log(`⏳ FCM token not ready, retrying in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryCount++;
+        continue;
+      } else {
+        // Hết retry, log warning
+        console.warn('Không có FCM token để sync lên BE sau khi retry');
+        return null;
+      }
     } catch (error) {
       console.error('❌ Error syncing FCM token:', error);
+      if (retryCount < maxRetries - 1) {
+        console.log(`⏳ Retrying FCM sync in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryCount++;
+        continue;
+      }
       throw error;
     }
-  } else {
-    console.warn('Không có userId, FCM token hoặc authToken để sync lên BE');
   }
 }
 

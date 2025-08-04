@@ -4,10 +4,12 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import VoucherValidationPopup from '../components/VoucherValidationPopup';
 import { useAuth } from '../context/AuthContext';
-import { getAddresses } from '../services/addressService';
+import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
 import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
@@ -38,6 +40,14 @@ export default function OrderReviewScreen() {
   // State tạm cho bottom sheet
   const [tempOrderVoucher, setTempOrderVoucher] = useState<any|null>(null);
   const [tempShippingVoucher, setTempShippingVoucher] = useState<any|null>(null);
+  
+  // State cho voucher validation popup
+  const [voucherValidationPopup, setVoucherValidationPopup] = useState({
+    visible: false,
+    voucher: null,
+    subtotal: 0,
+  });
+  const [lastValidationTime, setLastValidationTime] = useState(0);
 
 
   // Load addresses
@@ -45,7 +55,7 @@ export default function OrderReviewScreen() {
     const loadAddresses = async () => {
       if (!token) return;
       try {
-        const addresses = await getAddresses(token);
+        const addresses = await AddressService.getAddresses(token);
         setAddresses(addresses);
         console.log('OrderReview addresses:', addresses);
         
@@ -480,6 +490,41 @@ export default function OrderReviewScreen() {
     setVoucherModalVisible(true);
   };
 
+  // Function để validate voucher và hiển thị popup
+  const validateVoucherAndShowPopup = (voucher: any) => {
+    const now = Date.now();
+    const timeSinceLastValidation = now - lastValidationTime;
+    
+    // Prevent spam clicking - chỉ cho phép validation mỗi 2 giây
+    if (timeSinceLastValidation < 2000) {
+      return false;
+    }
+    
+    setLastValidationTime(now);
+    
+    const minOrderValue = voucher?.min_order_value || 0;
+    const isInsufficient = subtotal < minOrderValue;
+    
+    if (isInsufficient) {
+      setVoucherValidationPopup({
+        visible: true,
+        voucher: voucher,
+        subtotal: subtotal,
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
+  const closeVoucherValidationPopup = () => {
+    setVoucherValidationPopup({
+      visible: false,
+      voucher: null,
+      subtotal: 0,
+    });
+  };
+
   if (loading) return (
     <SafeAreaView style={styles.safeArea}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -684,16 +729,29 @@ export default function OrderReviewScreen() {
                 )}
                 {vouchers.filter(v => v.discount_type === 'order').map(v => {
                   const expired = new Date(v.end_date) <= new Date();
+                  const minOrderValue = v?.min_order_value || 0;
+                  const isInsufficient = subtotal < minOrderValue;
+                  const isDisabled = expired || isInsufficient;
                   return (
                     <TouchableOpacity
                       key={v._id}
                       style={[
                         styles.bottomSheetItem,
                         tempOrderVoucher?._id === v._id && styles.bottomSheetItemSelected,
-                        expired && styles.bottomSheetItemDisabled
+                        isDisabled && styles.bottomSheetItemDisabled
                       ]}
-                      disabled={expired}
-                      onPress={() => setTempOrderVoucher(tempOrderVoucher?._id === v._id ? null : v)}
+                      disabled={isDisabled}
+                      onPress={() => {
+                        const newVoucher = tempOrderVoucher?._id === v._id ? null : v;
+                        if (newVoucher) {
+                          // Validate voucher trước khi cho phép chọn
+                          if (validateVoucherAndShowPopup(newVoucher)) {
+                            setTempOrderVoucher(newVoucher);
+                          }
+                        } else {
+                          setTempOrderVoucher(null);
+                        }
+                      }}
                     >
                       <Ionicons name="pricetag-outline" size={28} color="#bbb" style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
@@ -704,7 +762,13 @@ export default function OrderReviewScreen() {
                             ? `${t('orderReview.discountPercent', { value: v.discount_value })}`
                             : `${t('orderReview.discountAmount', { value: formatVND(v.discount_value) })}`}
                         </Text>
-                        <Text style={styles.voucherExpiry}>{t('orderReview.voucherExpiry')}: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+
+                        <Text style={styles.voucherExpiry}>HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+                        {isInsufficient && (
+                          <Text style={styles.voucherInsufficient}>
+                            Cần thêm {(minOrderValue - subtotal).toLocaleString('vi-VN')} VNĐ
+                          </Text>
+                        )}
                       </View>
                       {tempOrderVoucher?._id === v._id && (
                         <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
@@ -830,6 +894,13 @@ export default function OrderReviewScreen() {
         <Text style={styles.payButtonText}>{t('orderReview.confirmOrder')}</Text>
       </TouchableOpacity>
 
+      {/* Voucher Validation Popup */}
+      <VoucherValidationPopup
+        visible={voucherValidationPopup.visible}
+        voucher={voucherValidationPopup.voucher}
+        subtotal={voucherValidationPopup.subtotal}
+        onClose={closeVoucherValidationPopup}
+      />
 
     </SafeAreaView>
   );
@@ -1099,5 +1170,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     marginLeft: 2,
+  },
+  voucherInsufficient: {
+    fontSize: 11,
+    color: '#FF6B6B',
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
