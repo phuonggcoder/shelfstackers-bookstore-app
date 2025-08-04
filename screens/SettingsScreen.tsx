@@ -2,10 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const SettingsScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [notifications, setNotifications] = React.useState(true);
   const [darkMode, setDarkMode] = React.useState(false);
   const [soundEffects, setSoundEffects] = React.useState(true);
@@ -72,34 +74,34 @@ const SettingsScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
+          <Text style={styles.sectionTitle}>{t('personalInfo')}</Text>
           <SettingItem
             icon="person-outline"
-            label="Chỉnh sửa hồ sơ"
+            label={t('editProfile')}
             onPress={() => {}}
           />
           <SettingItem
             icon="card-outline"
-            label="Phương thức thanh toán"
+            label={t('paymentMethod')}
             onPress={() => router.push('/payment')}
           />
           <SettingItem
             icon="location-outline"
-            label="Địa chỉ giao hàng"
+            label={t('deliveryAddress')}
             onPress={() => {}}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <Text style={styles.sectionTitle}>{t('security')}</Text>
           <SettingItem
             icon="lock-closed-outline"
-            label="Đổi mật khẩu"
+            label={t('changePassword')}
             onPress={() => {}}
           />
           <SettingItem
             icon="finger-print-outline"
-            label="Face ID / Touch ID"
+            label={t('faceIdTouchId')}
             toggle={{
               value: true,
               onToggle: () => {},
@@ -109,10 +111,10 @@ const SettingsScreen = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài đặt chung</Text>
+          <Text style={styles.sectionTitle}>{t('generalSettings')}</Text>
           <SettingItem
             icon="notifications-outline"
-            label="Thông báo đẩy"
+            label={t('pushNotifications')}
             toggle={{
               value: notifications,
               onToggle: setNotifications,
@@ -121,7 +123,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="moon-outline"
-            label="Chế độ tối"
+            label={t('darkMode')}
             toggle={{
               value: darkMode,
               onToggle: setDarkMode,
@@ -130,7 +132,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="volume-high-outline"
-            label="Hiệu ứng âm thanh"
+            label={t('soundEffects')}
             toggle={{
               value: soundEffects,
               onToggle: setSoundEffects,
@@ -139,44 +141,44 @@ const SettingsScreen = () => {
           />
           <SettingItem
             icon="language-outline"
-            label="Ngôn ngữ"
-            value="Tiếng Việt"
+            label={t('language')}
+            value={t('currentLanguage')}
             onPress={() => {}}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trợ giúp & Hỗ trợ</Text>
+          <Text style={styles.sectionTitle}>{t('helpSupport')}</Text>
           <SettingItem
             icon="help-circle-outline"
-            label="Câu hỏi thường gặp"
+            label={t('faq')}
             onPress={() => {}}
           />
           <SettingItem
             icon="chatbox-outline"
-            label="Liên hệ hỗ trợ"
+            label={t('contactSupport')}
             onPress={() => {}}
           />
           <SettingItem
             icon="document-text-outline"
-            label="Điều khoản sử dụng"
+            label={t('termsOfService')}
             onPress={() => {}}
           />
           <SettingItem
             icon="shield-outline"
-            label="Chính sách bảo mật"
+            label={t('privacyPolicy')}
             onPress={() => {}}
           />
           <SettingItem
             icon="log-out-outline"
-            label="Đăng xuất"
+            label={t('logout')}
             onPress={() => {}}
             danger
           />
         </View>
       </View>
 
-      <Text style={styles.version}>Version 1.0.0</Text>
+      <Text style={styles.version}>{t('version')} 1.0.0</Text>
     </ScrollView>
   );
 };

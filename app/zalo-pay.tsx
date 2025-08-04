@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,7 @@ import { updatePaymentStatus } from '../services/paymentService';
 import { formatVND } from '../utils/format';
 
 export default function ZaloPayScreen() {
+  const { t } = useTranslation();
   const { orderId } = useLocalSearchParams();
   const { token } = useAuth();
   const [order, setOrder] = useState<any>(null);
@@ -31,16 +33,16 @@ export default function ZaloPayScreen() {
         const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
         setOrder({ ...orderData, zaloPay, payment, paymentUrl });
       } catch (e) {
-        Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng.');
+        Alert.alert(t('error'), t('cannotLoadOrderInfo'));
       } finally {
         setLoading(false);
       }
     };
     fetchOrder();
-  }, [orderId, token]);
+  }, [orderId, token, t]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
-  if (!order) return <Text>Không tìm thấy đơn hàng.</Text>;
+  if (!order) return <Text>{t('orderNotFound')}</Text>;
 
   const paymentUrl = order.paymentUrl;
   const payment = order.payment_id || order.payment || {};
@@ -56,7 +58,7 @@ export default function ZaloPayScreen() {
   const handleCopyOrderUrl = async () => {
     if (paymentUrl) {
       await Clipboard.setStringAsync(paymentUrl);
-      Alert.alert('Đã copy', 'Đã copy link thanh toán vào clipboard!');
+      Alert.alert(t('copied'), t('paymentLinkCopied'));
     }
   };
 
@@ -66,7 +68,7 @@ export default function ZaloPayScreen() {
     setConfirming(true);
     try {
       await updatePaymentStatus(token || '', orderId as string, { payment_status: 'Completed' });
-      Alert.alert('Thành công', 'Đã xác nhận thanh toán.');
+      Alert.alert(t('success'), t('paymentConfirmed'));
       // Fetch lại đơn hàng để cập nhật trạng thái
       const response = await getOrderDetail(token || '', orderId as string);
       let orderData = response.order || {};
@@ -75,7 +77,7 @@ export default function ZaloPayScreen() {
       const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
       setOrder({ ...orderData, zaloPay, payment, paymentUrl });
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể xác nhận thanh toán.');
+      Alert.alert(t('error'), t('cannotConfirmPayment'));
     } finally {
       setConfirming(false);
     }
@@ -86,18 +88,18 @@ export default function ZaloPayScreen() {
       {paymentMethod !== 'ZALOPAY' ? (
         <View style={[styles.verticalContainer, {justifyContent: 'center', flex: 1}]}> 
           <Text style={{ color: '#4A90E2', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
-            Đơn hàng này không sử dụng phương thức thanh toán ZaloPay.
+            {t('orderNotUsingZaloPay')}
           </Text>
           <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace({ pathname: '/order-success', params: { orderId: order.order_id || order._id } })}>
-            <Text style={styles.buttonOutlineText}>Quay lại đơn hàng</Text>
+            <Text style={styles.buttonOutlineText}>{t('backToOrder')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.verticalContainer}>
-          <Text style={styles.title}>Thanh toán qua ZaloPay</Text>
+          <Text style={styles.title}>{t('payViaZaloPay')}</Text>
           {paymentUrl ? (
             <View style={styles.qrBoxTop}>
-              <Text style={styles.qrTitle}>Link thanh toán ZaloPay</Text>
+              <Text style={styles.qrTitle}>{t('zaloPayPaymentLink')}</Text>
               <View style={{ alignItems: 'center', position: 'relative' }}>
                 <View style={{ 
                   width: 220, 
@@ -118,7 +120,7 @@ export default function ZaloPayScreen() {
                     marginTop: 8,
                     paddingHorizontal: 10
                   }}>
-                    Nhấn nút bên dưới để mở app ZaloPay
+                    {t('tapButtonToOpenZaloPay')}
                   </Text>
                 </View>
                 <View style={styles.qrActionRow}>
@@ -129,7 +131,7 @@ export default function ZaloPayScreen() {
               </View>
             </View>
           ) : (
-            <Text style={{ color: '#888', textAlign: 'center', marginVertical: 20 }}>Không có link thanh toán ZaloPay.</Text>
+            <Text style={{ color: '#888', textAlign: 'center', marginVertical: 20 }}>{t('noZaloPayLink')}</Text>
           )}
           {paymentUrl && (
             <TouchableOpacity
@@ -140,53 +142,53 @@ export default function ZaloPayScreen() {
                   if (supported) {
                     await Linking.openURL(paymentUrl);
                   } else {
-                    Alert.alert('Không thể mở app ZaloPay', 'Thiết bị của bạn không hỗ trợ mở link này.');
+                    Alert.alert(t('cannotOpenZaloPay'), t('deviceNotSupportLink'));
                   }
                 } catch (e) {
-                  Alert.alert('Không thể mở trang thanh toán', String(e));
+                  Alert.alert(t('cannotOpenPaymentPage'), String(e));
                 }
               }}
             >
-              <Text style={styles.payButtonText}>Mở app ZaloPay</Text>
+              <Text style={styles.payButtonText}>{t('openZaloPayApp')}</Text>
             </TouchableOpacity>
           )}
           <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>Số tiền thanh toán</Text>
+            <Text style={styles.infoLabel}>{t('paymentAmount')}</Text>
             <Text style={styles.infoValue}>{formatVND(paymentAmount)}</Text>
-            <Text style={styles.infoLabel}>Mã đơn hàng</Text>
+            <Text style={styles.infoLabel}>{t('orderNumber')}</Text>
             <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
             {expireTime && <>
-              <Text style={styles.infoLabel}>Giao dịch kết thúc lúc</Text>
+              <Text style={styles.infoLabel}>{t('transactionExpiresAt')}</Text>
               <Text style={styles.infoValue}>{expireTime}</Text>
             </>}
           </View>
           <View style={styles.statusBox}>
-            <Text style={styles.statusTitle}>Trạng thái thanh toán</Text>
+            <Text style={styles.statusTitle}>{t('paymentStatus')}</Text>
             <Text style={[styles.statusValue, {color: paymentStatus === 'Completed' ? '#4CAF50' : '#FFA500'}]}>
-              {paymentStatus === 'Completed' ? 'Thanh toán thành công' : (paymentStatus === 'Pending' ? 'Đang chờ thanh toán' : (paymentStatus || 'Đang xử lý'))}
+              {paymentStatus === 'Completed' ? t('paymentSuccess') : (paymentStatus === 'Pending' ? t('waitingForPayment') : (paymentStatus || t('processing')))}
             </Text>
           </View>
           {/* Nút xác nhận thanh toán thủ công */}
           {paymentStatus === 'Pending' && (
             <TouchableOpacity style={[styles.payButton, {backgroundColor: '#4CAF50', marginBottom: 10}]} onPress={handleManualConfirm} disabled={confirming}>
-              <Text style={styles.payButtonText}>{confirming ? 'Đang xác nhận...' : 'Tôi đã thanh toán'}</Text>
+              <Text style={styles.payButtonText}>{confirming ? t('confirming') : t('iHavePaid')}</Text>
             </TouchableOpacity>
           )}
           {/* Sau khi thanh toán thành công, hiển thị 2 nút điều hướng */}
           {paymentStatus === 'Completed' && (
             <>
               <TouchableOpacity style={styles.payButton} onPress={() => router.replace('/order-history')}>
-                <Text style={styles.payButtonText}>Xem lịch sử đơn hàng</Text>
+                <Text style={styles.payButtonText}>{t('viewOrderHistory')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
-                <Text style={styles.buttonOutlineText}>Về trang chủ</Text>
+                <Text style={styles.buttonOutlineText}>{t('backToHome')}</Text>
               </TouchableOpacity>
             </>
           )}
           {/* Nếu chưa thanh toán thành công, vẫn hiển thị nút quay lại đơn hàng */}
           {paymentStatus !== 'Completed' && (
             <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace({ pathname: '/order-success', params: { orderId: order.order_id || order._id } })}>
-              <Text style={styles.buttonOutlineText}>Quay lại đơn hàng</Text>
+              <Text style={styles.buttonOutlineText}>{t('backToOrder')}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>

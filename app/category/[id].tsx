@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BookCard from '../../components/BookCard';
 import { useCategoryBooks } from '../../hooks/useCategoryBooks';
@@ -8,6 +9,7 @@ import { getBooks } from '../../services/api';
 import { Book } from '../../types';
 
 const CategoryScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id, name } = useLocalSearchParams();
   const { books, loading, error } = useCategoryBooks(String(id));
@@ -20,11 +22,11 @@ const CategoryScreen = () => {
         const books = await getBooks();
         setAllBooks(books);
       } catch (error) {
-        console.error('Error fetching all books:', error);
+        console.error(t('errorFetchingBooks'), error);
       }
     };
     fetchAllBooks();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (allBooks.length > 0 && books.length > 0) {
@@ -41,7 +43,7 @@ const CategoryScreen = () => {
 
   const renderCategoryBooks = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{name || 'Danh mục'}</Text>
+      <Text style={styles.sectionTitle}>{name || t('category')}</Text>
       {error && <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>}
       <FlatList
         data={books}
@@ -50,7 +52,7 @@ const CategoryScreen = () => {
         numColumns={2}
         contentContainerStyle={styles.list}
         columnWrapperStyle={{ justifyContent: 'space-between' }}
-        ListEmptyComponent={loading ? <Text>Đang tải...</Text> : <Text>Không có sách nào trong danh mục này.</Text>}
+        ListEmptyComponent={loading ? <Text>{t('loading')}</Text> : <Text>{t('noBooksInCategory')}</Text>}
         scrollEnabled={false}
       />
     </View>
@@ -59,12 +61,12 @@ const CategoryScreen = () => {
   const renderRecommendedBooks = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Sách gợi ý</Text>
+        <Text style={styles.sectionTitle}>{t('recommendedBooks')}</Text>
         <TouchableOpacity 
           style={styles.viewAllButton}
           onPress={() => router.push('/filtered-books')}
         >
-          <Text style={styles.viewAllText}>Xem tất cả</Text>
+          <Text style={styles.viewAllText}>{t('viewAll')}</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -74,7 +76,7 @@ const CategoryScreen = () => {
         numColumns={2}
         contentContainerStyle={styles.list}
         columnWrapperStyle={{ justifyContent: 'space-between' }}
-        ListEmptyComponent={<Text>Không có sách gợi ý.</Text>}
+        ListEmptyComponent={<Text>{t('noRecommendedBooks')}</Text>}
         scrollEnabled={false}
       />
     </View>
@@ -92,7 +94,7 @@ const CategoryScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{name || 'Danh mục'}</Text>
+          <Text style={styles.title}>{name || t('category')}</Text>
         </View>
         <View style={styles.placeholder} />
       </View>

@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import CampaignCard from '../components/CampaignCard';
 import Header from '../components/Header';
@@ -7,6 +8,7 @@ import api from '../services/api';
 import { Campaign } from '../types';
 
 export default function AllCampaignsScreen() {
+  const { t } = useTranslation();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +34,7 @@ export default function AllCampaignsScreen() {
           headerShown: false,
         }} 
       />
-      <Header title="Danh Mục" showBackButton showIcons={false} />
+      <Header title={t('campaigns')} showBackButton showIcons={false} />
       
       {loading ? (
         <View style={styles.loadingContainer}>

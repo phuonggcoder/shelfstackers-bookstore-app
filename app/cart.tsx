@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,7 @@ interface CartItem {
 }
 
 const CartScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { cartCount, fetchCartCount } = useCart();
   const { user, token } = useAuth();
@@ -106,7 +108,7 @@ const CartScreen = () => {
       await fetchCartCount(token);
     } catch (error) {
       console.error('Error updating quantity:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+      Alert.alert(t('error'), t('cannotUpdateQuantity'));
     } finally {
       setLoading(false);
     }
@@ -116,12 +118,12 @@ const CartScreen = () => {
     if (!token) return;
     
     Alert.alert(
-      'Xác nhận',
-      'Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?',
+      t('confirm'),
+      t('confirmRemoveFromCart'),
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Xóa',
+          text: t('remove'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -132,7 +134,7 @@ const CartScreen = () => {
               setSelectedItems(prev => prev.filter(id => id !== bookId));
             } catch (error) {
               console.error('Error removing item:', error);
-              Alert.alert('Lỗi', 'Không thể xóa sản phẩm');
+              Alert.alert(t('error'), t('cannotRemoveProduct'));
             } finally {
               setLoading(false);
             }
@@ -164,7 +166,7 @@ const CartScreen = () => {
     
     if (selectedItems.length === 0) {
       console.log('No items selected, showing alert');
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán');
+      Alert.alert(t('notification'), t('pleaseSelectAtLeastOneProduct'));
       return;
     }
     
@@ -199,11 +201,11 @@ const CartScreen = () => {
       console.log('✅ Navigation successful');
     } catch (error) {
       console.error('❌ Error storing data or navigating:', error);
-      Alert.alert('Lỗi', 'Không thể chuyển đến trang thanh toán');
+      Alert.alert(t('error'), t('cannotNavigateToPayment'));
     }
     
     console.log('=== CHECKOUT PROCESS END ===');
-  }, [selectedItems, cart, router]);
+  }, [selectedItems, cart, router, t]);
 
   const renderCartItem = ({ item }: { item: CartItem }) => {
     const isSelected = selectedItems.includes(item.book_id._id);
@@ -232,7 +234,7 @@ const CartScreen = () => {
             {item.book_id.title}
           </Text>
           <Text style={styles.bookAuthor}>
-            Tác giả: {item.book_id.author}
+            {t('author')}: {item.book_id.author}
           </Text>
           <Text style={styles.bookPrice}>
             {formatPrice(item.book_id.price)}
@@ -277,12 +279,12 @@ const CartScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+          <Text style={styles.headerTitle}>{t('cart')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang xử lý...</Text>
+          <Text style={styles.loadingText}>{t('processing')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -294,10 +296,10 @@ const CartScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
         <TouchableOpacity onPress={selectAllItems}>
           <Text style={styles.selectAllText}>
-            {selectedItems.length === cart.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            {selectedItems.length === cart.length ? t('deselectAll') : t('selectAll')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -305,13 +307,13 @@ const CartScreen = () => {
       {cart.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
-          <Text style={styles.emptyText}>Bạn chưa có sản phẩm nào trong giỏ hàng</Text>
+          <Text style={styles.emptyTitle}>{t('cartEmpty')}</Text>
+          <Text style={styles.emptyText}>{t('noProductsInCart')}</Text>
           <TouchableOpacity 
             style={styles.shopNowButton}
             onPress={() => router.push('/(tabs)')}
           >
-            <Text style={styles.shopNowText}>Mua sắm ngay</Text>
+            <Text style={styles.shopNowText}>{t('shopNow')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -330,12 +332,12 @@ const CartScreen = () => {
           <View style={styles.bottomSection}>
             <TouchableOpacity style={styles.voucherButton}>
               <Ionicons name="pricetag-outline" size={20} color="#667eea" />
-              <Text style={styles.voucherText}>Chọn mã giảm giá</Text>
+              <Text style={styles.voucherText}>{t('selectPromoCode')}</Text>
               <Ionicons name="chevron-forward" size={16} color="#667eea" />
             </TouchableOpacity>
             
             <View style={styles.totalSection}>
-              <Text style={styles.totalLabel}>Tổng cộng</Text>
+              <Text style={styles.totalLabel}>{t('total')}</Text>
               <Text style={styles.totalAmount}>
                 {formatPrice(calculateTotal())}
               </Text>
@@ -350,7 +352,7 @@ const CartScreen = () => {
               disabled={selectedItems.length === 0}
             >
               <Text style={styles.checkoutText}>
-                Thanh toán ({selectedItems.length})
+                {t('checkout')} ({selectedItems.length})
               </Text>
             </TouchableOpacity>
             
