@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Animated, Dimensions, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Animated, Dimensions } from 'react-native';
 import { DataProvider } from '../../context/DataContext';
 
 const { width } = Dimensions.get('window');
 
 const TabsLayout = () => {
+  const { t } = useTranslation();
   const slideAnim = React.useRef(new Animated.Value(0)).current;
 
   const slideToTab = (direction: 'left' | 'right') => {
@@ -59,28 +61,27 @@ const TabsLayout = () => {
             shadowOpacity: 0.15,
             shadowRadius: 6,
           },
-          tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />, // Tắt hiệu ứng nhấn
         })}
       >
         <Tabs.Screen 
           name="index" 
-          options={{ title: 'Trang chủ' }} 
+          options={{ title: t('home') }} 
         />
         <Tabs.Screen 
           name="search" 
-          options={{ title: 'Tìm kiếm' }} 
+          options={{ title: t('search') }} 
         />
         <Tabs.Screen 
           name="categories" 
-          options={{ title: 'Danh mục' }} 
+          options={{ title: t('categories') }} 
         />
         <Tabs.Screen 
           name="favourite" 
-          options={{ title: 'Yêu thích', unmountOnBlur: true }} // Chỉ tab này unmount khi chuyển tab
+          options={{ title: t('favorite') }} 
         />
         <Tabs.Screen 
           name="profile" 
-          options={{ title: 'Cá nhân' }} 
+          options={{ title: t('profile') }} 
         />
       </Tabs>
     </DataProvider>

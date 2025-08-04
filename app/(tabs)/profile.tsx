@@ -9,6 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useAvatar } from '../../context/AvatarContext';
@@ -72,30 +73,33 @@ const AnimatedSplash = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const WelcomeScreen = () => (
-
-<AnimatedSplash>
-    <View style={{ alignItems: 'center', width: '100%' }}>
-      <Ionicons name="person-circle-outline" size={100} color="#fff" style={{ marginBottom: 24 }} />
-      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 10, textAlign: 'center' }}>
-        Chào mừng bạn đến với Ebook
-      </Text>
-      <Text style={{ fontSize: 16, color: '#fff', textAlign: 'center', marginBottom: 30 }}>
-        Đăng nhập để quản lý đơn hàng, danh sách yêu thích và nhiều hơn nữa
-      </Text>
-      <Link href="/login" asChild>
-        <TouchableOpacity style={{ backgroundColor: '#fff', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 40, marginBottom: 15, width: '80%' }}>
-          <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Đăng nhập</Text>
-        </TouchableOpacity>
-      </Link>
-      <Link href="/register" asChild>
-        <TouchableOpacity style={{ backgroundColor: 'transparent', borderRadius: 10, borderWidth: 2, borderColor: '#fff', paddingVertical: 15, paddingHorizontal: 40, width: '80%' }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Tạo tài khoản</Text>
-        </TouchableOpacity>
-      </Link>
-    </View>
-  </AnimatedSplash>
-);
+const WelcomeScreen = () => {
+  const { t } = useTranslation();
+  
+  return (
+    <AnimatedSplash>
+      <View style={{ alignItems: 'center', width: '100%' }}>
+        <Ionicons name="person-circle-outline" size={100} color="#fff" style={{ marginBottom: 24 }} />
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 10, textAlign: 'center' }}>
+          {t('welcomeMessage')}
+        </Text>
+        <Text style={{ fontSize: 16, color: '#fff', textAlign: 'center', marginBottom: 30 }}>
+          {t('loginToManage')}
+        </Text>
+        <Link href="/login" asChild>
+          <TouchableOpacity style={{ backgroundColor: '#fff', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 40, marginBottom: 15, width: '80%' }}>
+            <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>{t('login')}</Text>
+          </TouchableOpacity>
+        </Link>
+        <Link href="/register" asChild>
+          <TouchableOpacity style={{ backgroundColor: 'transparent', borderRadius: 10, borderWidth: 2, borderColor: '#fff', paddingVertical: 15, paddingHorizontal: 40, width: '80%' }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>{t('signUp')}</Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+    </AnimatedSplash>
+  );
+};
 
 const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
   <TouchableOpacity style={styles.settingItem} onPress={onPress}>
@@ -108,6 +112,7 @@ const SettingItem = ({ icon, label, onPress }: { icon: string; label: string; on
 );
 
 const SettingsScreen = () => {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const navigation = useNavigation();
   const router = useRouter();
@@ -161,78 +166,76 @@ const SettingsScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
+          <Text style={styles.sectionTitle}>{t('personalInfo')}</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('user-detail' as never)}>
             <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Hồ sơ</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('profile')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>navigation.navigate('vouchers' as never)}>
             <Ionicons name="ticket-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Mã giảm giá</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('coupon')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('favourite' as never)}>
             <Ionicons name="heart-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Sách yêu thích</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('favorite')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('order-history' as never)}>
             <Ionicons name="receipt-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Lịch sử mua hàng</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('orderHistory')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/my-reviews' as any)}>
             <Ionicons name="star-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đánh giá của tôi</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('myReviews.myReviews')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>
             <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Phương thức thanh toán</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('paymentMethod')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('address-list' as never)}>
             <Ionicons name="location-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Địa chỉ đặt hàng</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('deliveryAddress')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <Text style={styles.sectionTitle}>{t('security')}</Text>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}}  onPress={() => navigation.navigate('ChangePassword' as never)}>
             <Ionicons name="key-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('changePassword')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="help-circle-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Quên mật khẩu</Text>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('forgotPassword')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Bảo mật</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
-        </View>
+                     <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+             <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('security')}</Text>
+             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+           </TouchableOpacity>
+         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài đặt chung</Text>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <TouchableOpacity onPress={() => navigation.navigate('Language' as never)}>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Ngôn ngữ</Text>
-            </TouchableOpacity>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
-        </View>
+         <View style={styles.section}>
+           <Text style={styles.sectionTitle}>{t('generalSettings')}</Text>
+           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('Language' as never)}>
+             <Ionicons name="language-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('language')}</Text>
+             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+           </TouchableOpacity>
+         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+           <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+           <Text style={styles.logoutText}>{t('logout')}</Text>
+         </TouchableOpacity>
         
         {/* Spacer to ensure button is not hidden */}
         <View style={{ height: 20 }} />

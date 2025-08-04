@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import {
     ActivityIndicator,
     FlatList,
@@ -10,9 +12,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { getDistricts, getProvinces, getWards, LocationItem } from '../services/addressService';
+import AddressService, { LocationItem } from '../services/addressService';
 
 const SelectLocationScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { level, provinceCode, districtCode } = useLocalSearchParams();
 
@@ -33,12 +36,13 @@ const SelectLocationScreen = () => {
       let result: LocationItem[] = [];
       
       if (level === 'province') {
-        result = await getProvinces(search);
-      } else if (level === 'district' && provinceCode) {
-        result = await getDistricts(String(provinceCode), search);
-      } else if (level === 'ward' && districtCode) {
-        result = await getWards(String(districtCode), search);
-      } else {
+
+        result = await AddressService.getProvinces(search);
+              } else if (level === 'district' && provinceCode) {
+          result = await AddressService.getDistrictsLegacy(String(provinceCode), search);
+        } else if (level === 'ward' && districtCode) {
+          result = await AddressService.getWardsLegacy(String(districtCode), search);
+        } else {
         console.warn('Thiếu params cần thiết');
         setLoading(false);
         return;
@@ -46,7 +50,7 @@ const SelectLocationScreen = () => {
       
       setData(result);
     } catch (err) {
-      console.error('Tải danh sách thất bại', err);
+      console.error(t('loadListFailed'), err);
       setData([]);
     } finally {
       setLoading(false);
@@ -75,13 +79,13 @@ const SelectLocationScreen = () => {
   const getTitle = () => {
     switch (level) {
       case 'province':
-        return 'Chọn Tỉnh/Thành phố';
+        return t('selectProvinceCity');
       case 'district':
-        return 'Chọn Quận/Huyện';
+        return t('selectDistrict');
       case 'ward':
-        return 'Chọn Phường/Xã';
+        return t('selectWard');
       default:
-        return 'Chọn địa chỉ';
+        return t('selectAddress');
     }
   };
 
@@ -89,7 +93,7 @@ const SelectLocationScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Quay lại</Text>
+          <Text style={styles.backText}>← {t('back')}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{getTitle()}</Text>
         <View style={{ width: 60 }} />
@@ -97,7 +101,7 @@ const SelectLocationScreen = () => {
       
       <TextInput
         style={styles.searchInput}
-        placeholder="Tìm kiếm..."
+        placeholder={t('search')}
         value={search}
         onChangeText={setSearch}
       />
@@ -107,12 +111,12 @@ const SelectLocationScreen = () => {
       ) : (
         <FlatList
           data={data}
-          keyExtractor={(item) => item.code}
+          keyExtractor={(item) => item.code || item.id}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
-              {search ? 'Không tìm thấy kết quả' : 'Đang tải dữ liệu...'}
+              {search ? t('noResultsFound') : t('loadingData')}
             </Text>
           }
         />

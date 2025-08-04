@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, View as RNView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -69,6 +70,7 @@ const AnimatedSplash = ({ children }: { children: React.ReactNode }) => {
 };
 
 const FavouriteScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
   const [favorites, setFavorites] = useState<any[]>([]);
@@ -111,13 +113,13 @@ const FavouriteScreen = () => {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
           <Ionicons name="heart-outline" size={64} color="#fff" style={{ marginBottom: 24 }} />
           <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 10, textAlign: 'center' }}>
-            Vui lòng đăng nhập để xem sách yêu thích
+            {t('pleaseLoginToViewFavorites')}
           </Text>
           <TouchableOpacity 
             style={{ backgroundColor: '#fff', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 40, marginBottom: 15 }}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Đăng nhập</Text>
+            <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>{t('login')}</Text>
           </TouchableOpacity>
         </View>
       </AnimatedSplash>
@@ -139,16 +141,16 @@ const FavouriteScreen = () => {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
         <Ionicons name="heart-outline" size={64} color="#1890FF" style={{ marginBottom: 24 }} />
         <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#1890FF', marginBottom: 10, textAlign: 'center' }}>
-          Chưa có sách yêu thích
+          {t('noFavoritesYet')}
         </Text>
         <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 24 }}>
-          Hãy thêm sách vào danh sách yêu thích để dễ dàng tìm lại sau.
+          {t('addBooksToFavorites')}
         </Text>
         <TouchableOpacity 
           style={{ backgroundColor: '#1890FF', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 40, marginBottom: 15 }}
           onPress={() => router.push('/(tabs)')}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Duyệt sách</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>{t('browseBooks')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -158,8 +160,8 @@ const FavouriteScreen = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f6fa' }} edges={['top']}> 
       <View style={{ paddingTop: 8, paddingHorizontal: 18, paddingBottom: 8, backgroundColor: '#f5f6fa' }}>
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#2d3a4a', marginBottom: 2 }}>Yêu Thích</Text>
-        <Text style={{ fontSize: 15, color: '#8a97a8' }}>Danh sách sách bạn đã lưu lại</Text>
+        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#2d3a4a', marginBottom: 2 }}>{t('favorites')}</Text>
+        <Text style={{ fontSize: 15, color: '#8a97a8' }}>{t('yourSavedBooks')}</Text>
       </View>
       <FlatList
         data={favorites}
@@ -188,6 +190,7 @@ function getBookImage(item: any) {
 }
 
 function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRemove: () => void }) {
+  const { t } = useTranslation();
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const menuButtonRef = useRef<RNView>(null);
@@ -208,12 +211,12 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
     setMenuVisible(false);
     if (!token) return;
     if (typeof window !== 'undefined' && window.confirm) {
-      if (!window.confirm('Bạn có chắc muốn xóa sách này khỏi danh sách yêu thích?')) return;
+      if (!window.confirm(t('confirmRemoveFromWishlist'))) return;
     } else if (typeof Alert !== 'undefined') {
       // Nếu là React Native, dùng Alert
-      Alert.alert('Xác nhận', 'Bạn có chắc muốn xóa sách này khỏi danh sách yêu thích?', [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Xóa', style: 'destructive', onPress: async () => {
+      Alert.alert(t('confirm'), t('confirmRemoveFromWishlist'), [
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('remove'), style: 'destructive', onPress: async () => {
           await removeFromWishlist(token, item._id || item.id);
           onRemove();
         }}
@@ -227,11 +230,11 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
   const handlePay = () => {
     setMenuVisible(false);
     Alert.alert(
-      'Xác nhận thanh toán',
-      'Bạn có muốn thanh toán cho sách này không?',
+      t('confirmPayment'),
+      t('confirmPaymentMessage'),
       [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Thanh toán', style: 'default', onPress: () => {
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('pay'), style: 'default', onPress: () => {
           // Chuyển sang màn hình order review, truyền thông tin sách
           router.push({ pathname: '/order-review', params: { bookId: item._id || item.id } });
         } }
@@ -254,9 +257,9 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
         onError={() => console.log('Image load error:', imageUrl)}
       />
       <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
-        <Text style={{ color: '#888', fontSize: 13, marginBottom: 2 }}>By {item.author || 'Unknown'}</Text>
+        <Text style={{ color: '#888', fontSize: 13, marginBottom: 2 }}>{t('by')} {item.author || t('unknown')}</Text>
         <Text style={{ fontWeight: 'bold', fontSize: 17, marginBottom: 4 }} numberOfLines={2}>{item.title}</Text>
-        <Text style={{ color: '#222', fontWeight: '600', fontSize: 15 }}>{item.price ? `$${item.price.toLocaleString()}` : 'Liên hệ'}</Text>
+        <Text style={{ color: '#222', fontWeight: '600', fontSize: 15 }}>{item.price ? `$${item.price.toLocaleString()}` : t('contact')}</Text>
       </View>
       <RNView ref={menuButtonRef} collapsable={false} style={{ justifyContent: 'center' }}>
         <TouchableOpacity onPress={openMenu} style={{ padding: 8 }}>
@@ -274,15 +277,15 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
           <View style={{ position: 'absolute', left: menuPos.x, top: menuPos.y, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, elevation: 8, minWidth: 170 }}>
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }} onPress={handleRemove}>
               <Ionicons name="trash-outline" size={20} color="#1890FF" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#222', fontSize: 15 }}>Remove from WishList</Text>
+              <Text style={{ color: '#222', fontSize: 15 }}>{t('removeFromWishlist')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }} onPress={handlePay}>
               <Ionicons name="card-outline" size={20} color="#1890FF" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#222', fontSize: 15 }}>Pay</Text>
+              <Text style={{ color: '#222', fontSize: 15 }}>{t('pay')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }} onPress={() => {/* TODO: share */ setMenuVisible(false); }}>
               <Ionicons name="share-social-outline" size={20} color="#1890FF" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#222', fontSize: 15 }}>Share</Text>
+              <Text style={{ color: '#222', fontSize: 15 }}>{t('share')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

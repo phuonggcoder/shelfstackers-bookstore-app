@@ -5,9 +5,11 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -34,6 +36,7 @@ const GENDERS = [
 ];
 
 export default function UserDetailScreen() {
+  const { t } = useTranslation();
   const { user, updateUser, isLoading, setUser, token } = useAuth();
   const router = useRouter();
   const { firstName, lastName, setFirstName, setLastName } = useName();
@@ -143,19 +146,19 @@ export default function UserDetailScreen() {
         setBirthday(formatDate(result.user.birth_date));
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật ngày sinh thành công',
+          text1: t('birthdayUpdateSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
           bottomOffset: 80,
         });
       } else {
-        throw new Error(result.message || 'Cập nhật ngày sinh thất bại');
+        throw new Error(result.message || t('birthdayUpdateFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Cập nhật ngày sinh thất bại',
+        text1: e.message || t('birthdayUpdateFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -190,7 +193,7 @@ export default function UserDetailScreen() {
         await AsyncStorage.setItem('user', JSON.stringify(result.user));
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật ảnh đại diện thành công',
+          text1: t('avatarUpdateSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -198,12 +201,12 @@ export default function UserDetailScreen() {
         });
         return result.user.avatar;
       } else {
-        throw new Error(result.message || 'Upload ảnh thất bại');
+        throw new Error(result.message || t('avatarUploadFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Upload ảnh thất bại',
+        text1: e.message || t('avatarUploadFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -218,7 +221,7 @@ export default function UserDetailScreen() {
     if (!permissionResult.granted) {
       Toast.show({
         type: 'error',
-        text1: 'Bạn cần cho phép truy cập thư viện ảnh để đổi avatar!',
+        text1: t('needPhotoLibraryPermission'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -271,19 +274,19 @@ export default function UserDetailScreen() {
         setFirstName(result.user.full_name?.split(' ').slice(-1)[0] || '');
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật hồ sơ thành công',
+          text1: t('profileUpdateSuccess'),
           position: 'top',
           visibilityTime: 2000,
           autoHide: true,
           topOffset: 60,
         });
       } else {
-        throw new Error(result.message || 'Cập nhật hồ sơ thất bại');
+        throw new Error(result.message || t('profileUpdateFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Cập nhật hồ sơ thất bại',
+        text1: e.message || t('profileUpdateFailed'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -311,7 +314,7 @@ export default function UserDetailScreen() {
       if (data.success) {
         Toast.show({
           type: 'info',
-          text1: 'Vui lòng kiểm tra email để xác thực!',
+          text1: t('checkEmailForVerification'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -319,12 +322,12 @@ export default function UserDetailScreen() {
         });
         setShowVerifyModal(true);
       } else {
-        throw new Error(data.message || 'Gửi mã xác thực thất bại');
+        throw new Error(data.message || t('sendVerificationFailed'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Có lỗi khi gửi mã xác thực',
+        text1: e.message || t('errorSendingVerification'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -345,7 +348,7 @@ export default function UserDetailScreen() {
       if (data.success) {
         Toast.show({
           type: 'success',
-          text1: 'Xác thực email thành công!',
+          text1: t('emailVerificationSuccess'),
           position: 'bottom',
           visibilityTime: 2000,
           autoHide: true,
@@ -358,12 +361,12 @@ export default function UserDetailScreen() {
         await AsyncStorage.setItem('user', JSON.stringify({ ...user, email, _id: user?._id || '', username: user?.username || '', full_name: user?.full_name || '', roles: user?.roles || [] }));
         setEmail(user?.email || '');
       } else {
-        throw new Error(data.message || 'Mã xác thực không đúng');
+        throw new Error(data.message || t('verificationCodeIncorrect'));
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.message || 'Có lỗi khi xác thực',
+        text1: e.message || t('errorDuringVerification'),
         position: 'bottom',
         visibilityTime: 2000,
         autoHide: true,
@@ -786,6 +789,7 @@ export default function UserDetailScreen() {
                 }
               }}
             />
+
             
             <Text style={styles.label}>Số điện thoại</Text>
             <View style={[styles.phoneRow, { marginTop: 8 }]}>
@@ -830,7 +834,7 @@ export default function UserDetailScreen() {
                 }}
               />
             </View>
-            
+  
             <Text style={styles.label}>Ngày/tháng/năm</Text>
             <TouchableOpacity onPress={() => setShowDatePicker(true)}>
               <TextInput

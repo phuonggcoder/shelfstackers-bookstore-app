@@ -6,15 +6,21 @@ const API_URL = 'https://server-shelf-stacker-w1ds.onrender.com/auth';
 const USER_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api/users';
 
 const mapUserResponse = (serverResponse: any): AuthResponse => {
-  if (!serverResponse || !serverResponse.token || !serverResponse.user) {
+  if (!serverResponse || !serverResponse.user) {
     throw new Error('Invalid response format from server');
+  }
+
+  // Check for different token field names
+  const token = serverResponse.token || serverResponse.access_token;
+  if (!token) {
+    throw new Error('No token found in server response');
   }
 
   // Map response từ server sang định dạng AuthResponse
   return {
-    token: serverResponse.token,
+    token: token,
     user: {
-      _id: serverResponse.user.id, // Map id -> _id
+      _id: serverResponse.user.id || serverResponse.user._id, // Support both id and _id
       username: serverResponse.user.username,
       email: serverResponse.user.email,
       full_name: serverResponse.user.full_name || '',
@@ -55,7 +61,7 @@ export const authService = {
 
       // Sau khi đăng ký thành công, thực hiện đăng nhập
       const loginResponse = await axios.post(`${API_URL}/login`, {
-        username: data.username,
+        email: data.email,
         password: data.password
       });
 

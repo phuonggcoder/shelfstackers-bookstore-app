@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BookCarousel from "../../components/BookCarousel";
@@ -12,6 +13,7 @@ import api from "../../services/api";
 import { Campaign } from "../../types";
 
 const Index = () => {
+  const { t } = useTranslation();
   const { books, categories, isLoading, refreshData } = useData();
   const { user } = useAuth();
   const router = useRouter();
@@ -102,7 +104,7 @@ const Index = () => {
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
-            <Text style={styles.modalText}>Vui lòng đăng nhập để sử dụng đầy đủ tính năng</Text>
+            <Text style={styles.modalText}>{t('pleaseLoginForFullFeatures')}</Text>
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, styles.skipButton]}
@@ -111,6 +113,8 @@ const Index = () => {
                 }}
               >
                 <Text style={styles.skipButtonText}>Bỏ qua</Text>
+
+                <Text style={styles.skipButtonText}>{t('loginLater')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.loginButton]}
@@ -119,7 +123,7 @@ const Index = () => {
                   router.push('/login');
                 }}
               >
-                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+                <Text style={styles.loginButtonText}>{t('login')}</Text>
               </TouchableOpacity>
             </View>
           </View>

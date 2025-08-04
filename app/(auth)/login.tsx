@@ -1,10 +1,12 @@
 import AvoidKeyboardDummyView from '@/components/AvoidKeyboardDummyView';
 import GoogleSignInWithAccountPicker from '@/components/GoogleSignInWithAccountPicker';
+import OTPLogin from '@/components/OTPLogin';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Alert,
@@ -21,33 +23,46 @@ import { authService } from '../../services/authService';
 import { convertGoogleSignInResponse } from '../../utils/authUtils';
 
 export default function Login() {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'main' | 'otp'>('main');
 
   // Cấu hình Google Sign-In với Firebase
   useEffect(() => {
     configureGoogleSignIn();
   }, []);
 
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      Alert.alert(t('error'), t('pleaseEnterCompleteInformation'));
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await authService.login({ username: email, password });
+      const response = await authService.login({ email: email, password });
       await signIn(response);
-      Alert.alert('Thành công', 'Đăng nhập thành công!', [
+      Alert.alert(t('success'), t('loginSuccess'), [
         { text: 'OK', onPress: () => router.replace('/(tabs)') }
       ]);
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.message || 'Lỗi đăng nhập');
+      Alert.alert(t('loginFailed'), error.message || t('loginError'));
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +73,7 @@ export default function Login() {
     try {
       console.log('✅ Google Sign-In successful:', result);
       
+
       if (result.success && result.user) {
         // Sử dụng utility function để convert format
         const authResponse = convertGoogleSignInResponse(result);
@@ -81,6 +97,47 @@ export default function Login() {
     // Error handling đã được xử lý trong component
   };
 
+  // Hàm xử lý thành công OTP Login
+  const handleOTPLoginSuccess = async (result: any) => {
+    try {
+      console.log('✅ OTP Login successful:', result);
+      
+
+      if (result.success && result.user) {
+        // Convert OTP response to auth format
+        const authResponse = {
+          token: result.access_token, // Use access_token as token
+          user: result.user
+        };
+        
+        await signIn(authResponse);
+        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]);
+      } else {
+        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      console.error('❌ Error after OTP Login:', error);
+      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+    }
+  };
+
+  // Hàm quay lại trang chính
+  const handleBackToMain = () => {
+    setAuthMethod('main');
+  };
+
+  // Hiển thị OTP Login nếu authMethod là 'otp'
+  if (authMethod === 'otp') {
+    return (
+      <OTPLogin
+        onLoginSuccess={handleOTPLoginSuccess}
+        onBack={handleBackToMain}
+      />
+    );
+  }
+
   return (
     <ScrollView style={styles.scrollbox}> 
       
@@ -92,8 +149,8 @@ export default function Login() {
           style={styles.logo}
           contentFit="contain"
         />
-        <Text style={styles.title}>Đăng nhập tài khoản</Text>
-        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+        <Text style={styles.title}>{t('loginAccount')}</Text>
+        <Text style={styles.subtitle}>{t('enterYourInformationBelow')}</Text>
       </View>
 
       <View style={styles.socialContainer}>
@@ -103,22 +160,27 @@ export default function Login() {
           disabled={isLoading}
           style={styles.googleButton}
         />
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../assets/images/applelogo.png')} style={styles.icon} />
-          <Text style={styles.socialText}>Apple</Text>
+        <TouchableOpacity 
+          style={styles.socialButton}
+          onPress={() => setAuthMethod('otp')}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="call-outline" size={24} color="#333" />
+          </View>
+          <Text style={styles.socialText}>Số điện thoại</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.dividerContainer}>
         <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
+        <Text style={styles.dividerText}>{t('orLoginWith')}</Text>
         <View style={styles.dividerLine} />
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('email')}</Text>
         <TextInput
-          placeholder="Nhập email"
+          placeholder={t('enterEmail')}
           style={styles.input}
           value={email}
           onChangeText={setEmail}
@@ -127,10 +189,10 @@ export default function Login() {
           editable={!isLoading}
         />
 
-        <Text style={styles.label}>Mật khẩu</Text>
+        <Text style={styles.label}>{t('password')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Nhập mật khẩu"
+          placeholder={t('enterPassword')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -152,10 +214,10 @@ export default function Login() {
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
               {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
             </View>
-            <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+            <Text style={styles.rememberText}>{t('rememberLogin')}</Text>
           </TouchableOpacity>
           <TouchableOpacity>
-            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+            <Text style={styles.forgotText}>{t('forgotPassword')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -170,20 +232,20 @@ export default function Login() {
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            <Text style={styles.loginButtonText}>{t('login')}</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Chưa có tài khoản?</Text>
+          <Text style={styles.registerText}>{t('dontHaveAccount')}</Text>
           <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.registerLink}> Đăng ký ngay</Text>
+            <Text style={styles.registerLink}> {t('registerNow')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.orContainer}>
           <View style={styles.orLine} />
-          <Text style={styles.orText}>hoặc</Text>
+          <Text style={styles.orText}>{t('or')}</Text>
           <View style={styles.orLine} />
         </View>
 
@@ -192,7 +254,7 @@ export default function Login() {
           onPress={() => router.replace('/(tabs)')}
         >
           <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
-          <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
+          <Text style={styles.skipLoginText}>{t('loginLater')}</Text>
         </TouchableOpacity>
       </View>
      
@@ -260,6 +322,9 @@ const styles = StyleSheet.create({
   icon: {
     width: 24,
     height: 24,
+    marginRight: 8,
+  },
+  iconContainer: {
     marginRight: 8,
   },
   socialText: {

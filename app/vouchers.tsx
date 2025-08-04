@@ -1,23 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getAvailableVouchers, Voucher } from '../services/voucherService';
 
-const TABS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'active', label: 'Có hiệu lực' },
-  { key: 'expired', label: 'Đã hết hạn' },
-];
-
 const VoucherScreen = () => {
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState('all');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const TABS = [
+    { key: 'all', label: t('all') },
+    { key: 'active', label: t('active') },
+    { key: 'expired', label: t('expired') },
+  ];
 
   useEffect(() => {
     fetchVouchers();
@@ -57,26 +59,26 @@ const VoucherScreen = () => {
     return (
       <View style={[styles.voucherBox, expired ? styles.voucherBoxExpired : isCollected ? styles.voucherBoxCollected : styles.voucherBoxActive]}> 
         <View style={styles.voucherHeaderRow}>
-          <Text style={[styles.voucherHeader, expired && { color: '#ccc' }, !expired && !isCollected && { color: '#E14D4D' }]}>Voucher</Text>
+          <Text style={[styles.voucherHeader, expired && { color: '#ccc' }, !expired && !isCollected && { color: '#E14D4D' }]}>{t('voucher')}</Text>
           {expired ? (
-            <Text style={styles.voucherExpiredText}>Expired</Text>
+            <Text style={styles.voucherExpiredText}>{t('expired')}</Text>
           ) : daysLeft <= 3 ? (
             <View style={styles.voucherTimeRow}>
-              <Text style={styles.voucherDaysLeft}>{daysLeft} days left</Text>
-              <Text style={styles.voucherValidUntil}>Valid Until {new Date(v.end_date).toLocaleDateString('en-GB')}</Text>
+              <Text style={styles.voucherDaysLeft}>{t('daysLeft', { count: daysLeft })}</Text>
+              <Text style={styles.voucherValidUntil}>{t('validUntil')} {new Date(v.end_date).toLocaleDateString('en-GB')}</Text>
             </View>
           ) : (
-            <Text style={styles.voucherValidUntil}>Valid Until {new Date(v.end_date).toLocaleDateString('en-GB')}</Text>
+            <Text style={styles.voucherValidUntil}>{t('validUntil')} {new Date(v.end_date).toLocaleDateString('en-GB')}</Text>
           )}
         </View>
         <View style={styles.voucherContentRow}>
           <Ionicons name="gift-outline" size={24} color="#3255FB" style={{ marginRight: 8 }} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.voucherTitle}>{v.title || v.voucher_id || 'Gift From Customer Care'}</Text>
-            <Text style={styles.voucherDesc}>{v.description || (v.voucher_type === 'percentage' ? `${v.discount_value}% off for your next purchase` : `${v.discount_value.toLocaleString()}đ off for your next order`)}</Text>
+            <Text style={styles.voucherTitle}>{v.title || v.voucher_id || t('giftFromCustomerCare')}</Text>
+            <Text style={styles.voucherDesc}>{v.description || (v.voucher_type === 'percentage' ? t('percentageDiscount', { value: v.discount_value }) : t('amountDiscount', { value: v.discount_value.toLocaleString() }))}</Text>
           </View>
           <TouchableOpacity style={[styles.collectedBtn, expired ? styles.collectedBtnExpired : isCollected ? styles.collectedBtnActive : styles.collectedBtnNormal]} disabled>
-            <Text style={styles.collectedBtnText}>{expired ? 'Expired' : isCollected ? 'Collected' : 'Collect'}</Text>
+            <Text style={styles.collectedBtnText}>{expired ? t('expired') : isCollected ? t('collected') : t('collect')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -89,7 +91,7 @@ const VoucherScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Vouchers</Text>
+        <Text style={styles.headerTitle}>{t('vouchers')}</Text>
         <View style={{ width: 24 }} />
       </View>
       <View style={styles.tabRow}>
@@ -104,14 +106,14 @@ const VoucherScreen = () => {
           <Ionicons name="ticket-outline" size={20} color="#3255FB" style={{ marginRight: 6 }} />
           <TextInput
             style={styles.input}
-            placeholder="Nhập mã voucher"
+            placeholder={t('enterVoucherCode')}
             value={search}
             onChangeText={setSearch}
           />
         </View>
         <TouchableOpacity style={styles.findBtn}>
           <Ionicons name="search" size={20} color="#3255FB" />
-          <Text style={styles.findBtnText}>Tìm thêm voucher</Text>
+          <Text style={styles.findBtnText}>{t('findMoreVouchers')}</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -119,7 +121,7 @@ const VoucherScreen = () => {
         keyExtractor={v => v._id}
         renderItem={({ item }) => renderVoucher(item)}
         style={{ marginTop: 10 }}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Không có voucher nào</Text>}
+        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>{t('noVouchers')}</Text>}
         refreshing={loading}
         onRefresh={fetchVouchers}
       />

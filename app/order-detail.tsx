@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewForm from '../components/ReviewForm';
 import ThankYouModal from '../components/ThankYouModal';
@@ -54,6 +55,7 @@ interface OrderDetail {
 const OrderDetailScreen = () => {
   const router = useRouter();
   const { orderId } = useLocalSearchParams();
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,7 @@ const OrderDetailScreen = () => {
       });
     } catch (error) {
       console.error('Error loading order detail:', error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng');
+      Alert.alert(t('error'), t('cannotLoadOrderInfo'));
     } finally {
       setLoading(false);
     }
@@ -115,16 +117,16 @@ const OrderDetailScreen = () => {
 
   const handleCancelOrder = async () => {
     if (!token || !orderId) return;
-    Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
-      { text: 'Không', style: 'cancel' },
-      { text: 'Hủy đơn', style: 'destructive', onPress: async () => {
+    Alert.alert(t('confirm'), t('confirmCancelOrder'), [
+      { text: t('no'), style: 'cancel' },
+      { text: t('cancelOrder'), style: 'destructive', onPress: async () => {
         setCancelling(true);
         try {
-          await cancelOrder(token, orderId as string, 'Khách tự hủy');
-          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
+          await cancelOrder(token, orderId as string, t('customerCancelled'));
+          Alert.alert(t('success'), t('orderCancelled'));
           loadOrderDetail();
         } catch (e) {
-          Alert.alert('Lỗi', 'Không thể hủy đơn hàng.');
+          Alert.alert(t('error'), t('cannotCancelOrder'));
         } finally {
           setCancelling(false);
         }
@@ -234,21 +236,21 @@ const OrderDetailScreen = () => {
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'processing': return 'Đang xử lý';
-      case 'shipped': return 'Đang giao hàng';
-      case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã huỷ';
-      default: return 'Không xác định';
+      case 'pending': return t('pending');
+      case 'processing': return t('processing');
+      case 'shipped': return t('shipped');
+      case 'delivered': return t('delivered');
+      case 'cancelled': return t('cancelled');
+      default: return t('unknown');
     }
   };
 
   const getPaymentStatusText = (status: string) => {
     switch (status) {
-      case 'pending': return 'Chờ xử lý';
-      case 'paid': return 'Đã thanh toán';
-      case 'failed': return 'Thanh toán thất bại';
-      default: return 'Không xác định';
+      case 'pending': return t('paymentPending');
+      case 'paid': return t('paymentPaid');
+      case 'failed': return t('paymentFailed');
+      default: return t('unknown');
     }
   };
 
@@ -269,7 +271,7 @@ const OrderDetailScreen = () => {
         minute: '2-digit',
       });
     } catch {
-      return 'Ngày không xác định';
+      return t('unknownDate');
     }
   };
 
@@ -306,8 +308,16 @@ const OrderDetailScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('orderDetails')}</Text>
+          <View style={{ width: 24 }} />
+        </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Đang tải thông tin đơn hàng...</Text>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>{t('loadingInfo')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -316,8 +326,16 @@ const OrderDetailScreen = () => {
   if (!order) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('orderDetails')}</Text>
+          <View style={{ width: 24 }} />
+        </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+          <Ionicons name="alert-circle-outline" size={64} color="#4A90E2" />
+          <Text style={styles.errorText}>{t('orderNotFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -329,7 +347,7 @@ const OrderDetailScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+        <Text style={styles.headerTitle}>{t('orderDetails')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -344,8 +362,8 @@ const OrderDetailScreen = () => {
               <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
               <Text style={styles.statusDescription}>
                 {isOrderCompleted() 
-                  ? 'Đơn hàng đã được giao thành công. Hãy đánh giá sản phẩm để giúp chúng tôi cải thiện dịch vụ!'
-                  : 'Đơn hàng của bạn đang được xử lý'
+                  ? t('orderDeliveredSuccessfully')
+                  : t('orderProcessing')
                 }
               </Text>
             </View>
@@ -354,20 +372,20 @@ const OrderDetailScreen = () => {
 
         {/* Order Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('orderInformation')}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mã đơn hàng:</Text>
+            <Text style={styles.infoLabel}>{t('orderNumber')}:</Text>
             <Text style={styles.infoValue}>{order.orderCode}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Ngày đặt:</Text>
+            <Text style={styles.infoLabel}>{t('orderDate')}:</Text>
             <Text style={styles.infoValue}>{formatDate(order.createdAt)}</Text>
           </View>
         </View>
 
         {/* Purchased Products */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
+          <Text style={styles.sectionTitle}>{t('purchasedProducts')}</Text>
           {order.items.map((item, index) => (
             <View key={index} style={styles.productItem}>
               <View style={styles.productImageContainer}>
@@ -408,7 +426,7 @@ const OrderDetailScreen = () => {
 
         {/* Shipping Address */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+          <Text style={styles.sectionTitle}>{t('shippingAddress')}</Text>
           <View style={styles.addressContainer}>
             <Ionicons name="location-outline" size={20} color="#667eea" />
             <View style={styles.addressInfo}>
@@ -435,13 +453,13 @@ const OrderDetailScreen = () => {
 
         {/* Payment Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin thanh toán</Text>
+          <Text style={styles.sectionTitle}>{t('paymentInformation')}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Phương thức:</Text>
+            <Text style={styles.infoLabel}>{t('paymentMethod')}:</Text>
             <Text style={styles.infoValue}>{order.paymentMethod}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Trạng thái:</Text>
+            <Text style={styles.infoLabel}>{t('status')}:</Text>
             <Text style={[styles.infoValue, { color: getStatusColor(order.paymentStatus) }]}>
               {getPaymentStatusText(order.paymentStatus)}
             </Text>
@@ -450,26 +468,26 @@ const OrderDetailScreen = () => {
 
         {/* Order Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tóm tắt đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('orderSummary')}</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tạm tính</Text>
+            <Text style={styles.summaryLabel}>{t('subtotal')}</Text>
             <Text style={styles.summaryValue}>{formatPrice(order.subtotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+            <Text style={styles.summaryLabel}>{t('shippingFee')}</Text>
             <Text style={[styles.summaryValue, { color: '#667eea' }]}>
-              {order.shippingFee === 0 ? 'Miễn phí' : formatPrice(order.shippingFee)}
+              {order.shippingFee === 0 ? t('free') : formatPrice(order.shippingFee)}
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={styles.totalLabel}>{t('total')}</Text>
             <Text style={styles.totalValue}>{formatPrice(order.totalAmount)}</Text>
           </View>
         </View>
 
         {/* Order History */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lịch sử đơn hàng</Text>
+          <Text style={styles.sectionTitle}>{t('orderHistory')}</Text>
           {order.orderHistory.map((history, index) => (
             <View key={index} style={styles.historyItem}>
               <View style={[styles.historyIcon, { backgroundColor: getStatusColor(history.status) }]}>
@@ -492,7 +510,7 @@ const OrderDetailScreen = () => {
             onPress={handleReviewOrder}
           >
             <Ionicons name="star-outline" size={20} color="white" />
-            <Text style={styles.reviewButtonText}>Đánh giá đơn hàng</Text>
+            <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
           </TouchableOpacity>
         ) : order.status !== 'cancelled' && order.status !== 'delivered' ? (
           <TouchableOpacity
@@ -501,7 +519,7 @@ const OrderDetailScreen = () => {
             disabled={cancelling}
           >
             <Text style={styles.cancelButtonText}>
-              {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+              {cancelling ? t('cancelling') : t('cancelOrder')}
             </Text>
           </TouchableOpacity>
         ) : null}

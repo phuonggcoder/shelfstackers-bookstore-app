@@ -1,18 +1,45 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com/api';
+const BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 
-export type LocationItem = {
+export interface Province {
+  code: string;
+  name: string;
+}
+
+export interface District {
+  code: string;
+  name: string;
+  provinceCode: string;
+}
+
+export interface Ward {
+  code: string;
+  name: string;
+  districtCode: string;
+}
+
+export interface AddressData {
+  province: Province;
+  district: District;
+  ward: Ward;
+  fullAddress: string;
+  addressCode: {
+    provinceCode: string;
+    districtCode: string;
+    wardCode: string;
+  };
+}
+
+// Interface for user addresses (different from administrative addresses)
+export interface LocationItem {
   id: string;
   name: string;
-  type?: number;
-  typeText?: string;
-  slug?: string;
-  provinceId?: string;
-  districtId?: string;
-};
+  code?: string;
+}
 
-export type AddressData = {
+export interface UserAddress {
+  _id: string;
   receiver_name: string;
   phone_number: string;
   email?: string;
@@ -22,178 +49,292 @@ export type AddressData = {
   street?: string;
   address_detail: string;
   note?: string;
+  type?: string;
   is_default: boolean;
-  type?: 'office' | 'home';
-};
+  createdAt: string;
+  updatedAt: string;
+}
 
-// Autocomplete APIs với open.oapi.vn
-export const getProvinces = async (search?: string, page = 0, size = 30): Promise<LocationItem[]> => {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append('q', search);
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    
-    const url = `${API_BASE_URL}/addresses/autocomplete/province?${params.toString()}`;
-    const response = await axios.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching provinces:', error);
-    return [];
+class AddressService {
+  // Administrative Address APIs (new)
+  static async getAllProvinces(): Promise<{ success: boolean; code: number; data: Province[]; errors: any[] }> {
+    try {
+      console.log('🌐 Fetching provinces from:', `${BASE_URL}/address/all-province`);
+      
+      const response = await axios.get(`${BASE_URL}/address/all-province`);
+      
+      console.log('✅ Provinces API Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error fetching provinces:', error);
+      
+      // Return error response
+      return {
+        success: false,
+        code: error.response?.status || 500,
+        data: [],
+        errors: [error.message || 'Failed to fetch provinces']
+      };
+    }
   }
-};
 
-export const getDistricts = async (provinceId: string, search?: string, page = 0, size = 30): Promise<LocationItem[]> => {
-  try {
-    if (!provinceId) return [];
-    
-    const params = new URLSearchParams();
-    params.append('provinceId', provinceId);
-    if (search) params.append('q', search);
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    
-    const url = `${API_BASE_URL}/addresses/autocomplete/district?${params.toString()}`;
-    const response = await axios.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching districts:', error);
-    return [];
+  static async getDistricts(provinceCode: string): Promise<{ success: boolean; code: number; data: District[]; errors: any[] }> {
+    try {
+      console.log('🌐 Fetching districts for province:', provinceCode);
+      
+      const response = await axios.get(`${BASE_URL}/address/districts`, {
+        params: { 'provice-code': provinceCode }
+      });
+      
+      console.log('✅ Districts API Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error fetching districts:', error);
+      
+      // Return error response
+      return {
+        success: false,
+        code: error.response?.status || 500,
+        data: [],
+        errors: [error.message || 'Failed to fetch districts']
+      };
+    }
   }
-};
 
-export const getWards = async (districtId: string, search?: string, page = 0, size = 30): Promise<LocationItem[]> => {
-  try {
-    if (!districtId) return [];
-    
-    const params = new URLSearchParams();
-    params.append('districtId', districtId);
-    if (search) params.append('q', search);
-    params.append('page', page.toString());
-    params.append('size', size.toString());
-    
-    const url = `${API_BASE_URL}/addresses/autocomplete/ward?${params.toString()}`;
-    const response = await axios.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching wards:', error);
-    return [];
+  static async getWards(districtCode: string, provinceCode?: string): Promise<{ success: boolean; code: number; data: Ward[]; errors: any[] }> {
+    try {
+      console.log('🌐 Fetching wards for district:', districtCode, 'province:', provinceCode);
+      
+      const params: any = { 'districts-code': districtCode };
+      if (provinceCode) {
+        params['province-code'] = provinceCode;
+      }
+      
+      const response = await axios.get(`${BASE_URL}/address/wards`, {
+        params
+      });
+      
+      console.log('✅ Wards API Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error fetching wards:', error);
+      
+      // Return error response
+      return {
+        success: false,
+        code: error.response?.status || 500,
+        data: [],
+        errors: [error.message || 'Failed to fetch wards']
+      };
+    }
   }
-};
 
-export const getStreets = async (search?: string): Promise<LocationItem[]> => {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append('q', search);
-    
-    const url = `${API_BASE_URL}/addresses/autocomplete/street?${params.toString()}`;
-    const response = await axios.get(url);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching streets:', error);
-    return [];
+  static async searchAddress(query: string): Promise<{ success: boolean; code: number; data: any[]; errors: any[] }> {
+    try {
+      console.log('🌐 Searching address with query:', query);
+      
+      const response = await axios.get(`${BASE_URL}/address/search`, {
+        params: { q: query }
+      });
+      
+      console.log('✅ Search API Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error searching address:', error);
+      
+      // Return error response
+      return {
+        success: false,
+        code: error.response?.status || 500,
+        data: [],
+        errors: [error.message || 'Failed to search address']
+      };
+    }
   }
-};
 
-// Address CRUD APIs
-export const createAddress = async (token: string, addressData: AddressData) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/addresses`, addressData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error creating address:', error);
-    throw error;
-  }
-};
-
-export const getAddresses = async (token: string) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/addresses`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    // Đảm bảo luôn trả về array
-    const data = response.data;
-    if (Array.isArray(data)) {
-      return data;
-    } else if (data && Array.isArray(data.addresses)) {
-      return data.addresses;
-    } else if (data && Array.isArray(data.data)) {
-      return data.data;
-    } else {
-      console.log('getAddresses: No valid array found in response:', data);
+  // Legacy methods for backward compatibility (used by AutocompleteInput and other components)
+  static async getProvinces(searchText: string = ''): Promise<LocationItem[]> {
+    try {
+      const response = await this.getAllProvinces();
+      if (response.success) {
+        let provinces = response.data;
+        if (searchText) {
+          provinces = provinces.filter(province => 
+            province.name.toLowerCase().includes(searchText.toLowerCase())
+          );
+        }
+        return provinces.map(province => ({
+          id: province.code,
+          name: province.name,
+          code: province.code
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getProvinces:', error);
       return [];
     }
-  } catch (error) {
-    console.error('Error fetching addresses:', error);
-    return []; // Trả về array rỗng thay vì throw error
   }
-};
 
-export const updateAddress = async (token: string, addressId: string, addressData: Partial<AddressData>) => {
-  try {
-    const response = await axios.put(`${API_BASE_URL}/addresses/${addressId}`, addressData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error updating address:', error);
-    throw error;
+  static async getDistrictsLegacy(provinceId: string, searchText: string = ''): Promise<LocationItem[]> {
+    try {
+      const response = await this.getDistricts(provinceId);
+      if (response.success) {
+        let districts = response.data;
+        if (searchText) {
+          districts = districts.filter(district => 
+            district.name.toLowerCase().includes(searchText.toLowerCase())
+          );
+        }
+        return districts.map(district => ({
+          id: district.code,
+          name: district.name,
+          code: district.code
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getDistrictsLegacy:', error);
+      return [];
+    }
   }
-};
 
-export const deleteAddress = async (token: string, addressId: string) => {
-  try {
-    const response = await axios.delete(`${API_BASE_URL}/addresses/${addressId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error deleting address:', error);
-    throw error;
+  static async getWardsLegacy(districtId: string, searchText: string = '', provinceCode?: string): Promise<LocationItem[]> {
+    try {
+      const response = await this.getWards(districtId, provinceCode);
+      if (response.success) {
+        let wards = response.data;
+        if (searchText) {
+          wards = wards.filter(ward => 
+            ward.name.toLowerCase().includes(searchText.toLowerCase())
+          );
+        }
+        return wards.map(ward => ({
+          id: ward.code,
+          name: ward.name,
+          code: ward.code
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getWardsLegacy:', error);
+      return [];
+    }
   }
-};
 
-export const setDefaultAddress = async (token: string, addressId: string) => {
-  try {
-    // Gửi request với flag để backend tự động xử lý việc set default
-    const response = await axios.put(`${API_BASE_URL}/addresses/${addressId}`, {
-      is_default: true,
-      set_as_default: true // Flag để backend biết đây là thao tác set default
-    }, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error setting default address:', error);
-    throw error;
+  // User Address APIs (for managing user's saved addresses)
+  static async getAddresses(token: string): Promise<UserAddress[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/api/addresses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data.addresses || response.data || [];
+    } catch (error: any) {
+      console.error('Error fetching addresses:', error);
+      throw error;
+    }
   }
-};
 
-export const getAddress = async (token: string, addressId: string) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/addresses/${addressId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching address:', error);
-    throw error;
+  static async addAddress(token: string, addressData: {
+    name: string;
+    phone: string;
+    province: string;
+    district: string;
+    ward: string;
+    address: string;
+    is_default?: boolean;
+  }): Promise<UserAddress> {
+    try {
+      const response = await axios.post(`${BASE_URL}/api/addresses`, addressData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error adding address:', error);
+      throw error;
+    }
   }
-}; 
+
+  static async createAddress(token: string, addressData: {
+    receiver_name: string;
+    phone_number: string;
+    province: string;
+    district: string;
+    ward: string;
+    address_detail: string;
+    is_default?: boolean;
+    type?: string;
+  }): Promise<UserAddress> {
+    try {
+      const response = await axios.post(`${BASE_URL}/api/addresses`, addressData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error adding address:', error);
+      throw error;
+    }
+  }
+
+  static async updateAddress(token: string, addressId: string, addressData: {
+    name?: string;
+    phone?: string;
+    province?: string;
+    district?: string;
+    ward?: string;
+    address?: string;
+    is_default?: boolean;
+  }): Promise<UserAddress> {
+    try {
+      const response = await axios.put(`${BASE_URL}/api/addresses/${addressId}`, addressData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating address:', error);
+      throw error;
+    }
+  }
+
+  static async deleteAddress(token: string, addressId: string): Promise<void> {
+    try {
+      await axios.delete(`${BASE_URL}/api/addresses/${addressId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error: any) {
+      console.error('Error deleting address:', error);
+      throw error;
+    }
+  }
+
+  static async setDefaultAddress(token: string, addressId: string): Promise<void> {
+    try {
+      await axios.patch(`${BASE_URL}/api/addresses/${addressId}/default`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error: any) {
+      console.error('Error setting default address:', error);
+      throw error;
+    }
+  }
+}
+
+export default AddressService; 

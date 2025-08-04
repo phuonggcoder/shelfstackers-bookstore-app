@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
@@ -10,12 +11,14 @@ import CustomLoginDialog from '../../components/BottomAlert';
 import CartAddedDialog from '../../components/CartAddedDialog';
 import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
+import ReviewCard from '../../components/ReviewCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
-import ReviewService, { ReviewSummary } from '../../services/reviewService';
+import { addToCart, addToWishlist, getBookById, getBooksByCategory, getWishlist, removeFromWishlist } from '../../services/api';
+import ReviewService, { Review, ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
 import { formatVND } from '../../utils/format';
+import { getUserId } from '../../utils/reviewUtils';
 
 // Helper function to format publication date
 const formatPublicationDate = (dateString: string) => {
@@ -42,6 +45,7 @@ const truncateText = (text: string, maxLength: number = 25) => {
 };
 
 const BookDetailsScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -52,7 +56,7 @@ const BookDetailsScreen = () => {
 
   const footerAnim = useRef(new Animated.Value(0)).current;
   const lastOffsetY = useRef(0);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [addingCart, setAddingCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
@@ -97,6 +101,11 @@ const BookDetailsScreen = () => {
   // Review summary state
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [loadingReviewSummary, setLoadingReviewSummary] = useState(false);
+  
+  // Review list state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   
   // Description state
   const [descriptionHeight, setDescriptionHeight] = useState(0);
@@ -156,13 +165,12 @@ const BookDetailsScreen = () => {
     if (book && token) {
       const checkFavorite = async () => {
         try {
-          const res = await fetch('https://server-shelf-stacker-w1ds.onrender.com/api/wishlist', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const data = await res.json();
-          const books = Array.isArray(data) ? data : data.books || [];
+          const books = await getWishlist(token);
           setIsFavorite(books.some((b: any) => b._id === book._id));
-        } catch { }
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+          setIsFavorite(false);
+        }
       };
       checkFavorite();
     }
@@ -189,21 +197,31 @@ const BookDetailsScreen = () => {
     }
   }, [book]);
 
-  // Fetch review summary when book is loaded
+  // Fetch review summary and reviews when book is loaded
   useEffect(() => {
     if (book && token) {
-      const fetchReviewSummary = async () => {
+      const fetchReviewData = async () => {
         try {
           setLoadingReviewSummary(true);
+          setLoadingReviews(true);
+          setReviewError(null);
+          
+          // Fetch review summary
           const summary = await ReviewService.getProductReviewSummary(book._id, token);
           setReviewSummary(summary);
+          
+          // Fetch first few reviews
+          const reviewsResponse = await ReviewService.getProductReviews(book._id, 1, 3, token);
+          setReviews(reviewsResponse.reviews);
         } catch (error) {
-          console.error('Error fetching review summary:', error);
+          console.error('Error fetching review data:', error);
+          setReviewError('Không thể tải đánh giá. Vui lòng thử lại sau.');
         } finally {
           setLoadingReviewSummary(false);
+          setLoadingReviews(false);
         }
       };
-      fetchReviewSummary();
+      fetchReviewData();
     }
   }, [book, token]);
 
@@ -300,18 +318,24 @@ const BookDetailsScreen = () => {
       setShowLoginDialog(true);
       return;
     }
-    if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
-      return;
-    }
+
+    
     try {
-      const res = await addToWishlist(token, bookId as string);
-      console.log('Add to wishlist response:', res);
-      setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      if (isFavorite) {
+        // Xóa khỏi wishlist
+        await removeFromWishlist(token, bookId as string);
+        setIsFavorite(false);
+        showToast('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        // Thêm vào wishlist
+        const res = await addToWishlist(token, bookId as string);
+        console.log('Add to wishlist response:', res);
+        setIsFavorite(true);
+        showToast('Đã thêm vào danh sách yêu thích');
+      }
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      showToast('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -353,7 +377,7 @@ const BookDetailsScreen = () => {
         });
       } catch (error) {
         console.error('Error adding book to cart for buy now:', error);
-        Alert.alert('Lỗi', 'Không thể thêm sản phẩm vào giỏ hàng.');
+        Alert.alert(t('error'), t('cannotAddProductToCart'));
       }
     };
     
@@ -375,11 +399,11 @@ const BookDetailsScreen = () => {
   const handleQtyConfirm = () => {
     const val = parseInt(inputQty, 10);
     if (isNaN(val) || val < 1) {
-      setQtyError('Số lượng phải lớn hơn 0');
+      setQtyError(t('quantityMustBeGreaterThanZero'));
       return;
     }
     if (val > maxQty) {
-      setQtyError('Chỉ còn ' + maxQty + ' sản phẩm');
+      setQtyError(t('onlyLeftProducts', { count: maxQty }));
       return;
     }
     setQuantity(val);
@@ -425,7 +449,7 @@ const BookDetailsScreen = () => {
           setShowLoginDialog(false);
           router.push('/(auth)/login');
         }}
-        message="Bạn cần đăng nhập để sử dụng tính năng này."
+        message={t('loginRequiredForFeature')}
       />
       <Stack.Screen
         options={{
@@ -789,14 +813,150 @@ const BookDetailsScreen = () => {
               <Text style={styles.reviewPlaceholderSubtext}>
                 Hãy là người đầu tiên đánh giá sản phẩm này
               </Text>
+              {user && (
+                <TouchableOpacity 
+                  style={styles.writeReviewButtonPlaceholder}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Ionicons name="pencil" size={18} color="white" />
+                  <Text style={styles.writeReviewButtonPlaceholderText}>Viết đánh giá đầu tiên</Text>
+                </TouchableOpacity>
+              )}
             </View>
+          )}
+          
+          {/* Review List */}
+          {loadingReviews ? (
+            <View style={styles.reviewListLoading}>
+              <ActivityIndicator size="small" color="#3255FB" />
+              <Text style={styles.reviewListLoadingText}>Đang tải đánh giá...</Text>
+            </View>
+          ) : reviewError ? (
+            <View style={styles.reviewError}>
+              <Ionicons name="alert-circle-outline" size={24} color="#E53935" />
+              <Text style={styles.reviewErrorText}>{reviewError}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={() => {
+                  if (book && token) {
+                    const fetchReviewData = async () => {
+                      try {
+                        setLoadingReviews(true);
+                        setReviewError(null);
+                        const reviewsResponse = await ReviewService.getProductReviews(book._id, 1, 3, token);
+                        setReviews(reviewsResponse.reviews);
+                      } catch (error) {
+                        console.error('Error retrying review fetch:', error);
+                        setReviewError('Không thể tải đánh giá. Vui lòng thử lại sau.');
+                      } finally {
+                        setLoadingReviews(false);
+                      }
+                    };
+                    fetchReviewData();
+                  }
+                }}
+              >
+                <Text style={styles.retryButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
+          ) : reviews.length > 0 ? (
+            <View style={styles.reviewListContainer}>
+              <Text style={styles.reviewListTitle}>Đánh giá gần đây</Text>
+              {reviews.map((review) => (
+                <View key={review._id} style={styles.reviewItem}>
+                  <ReviewCard 
+                    review={review}
+                    isOwnReview={user?._id === getUserId(review)}
+                  />
+                </View>
+              ))}
+              {reviewSummary && reviewSummary.totalReviews > 3 && (
+                <TouchableOpacity 
+                  style={styles.viewMoreReviewsButton}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Text style={styles.viewMoreReviewsText}>
+                    Xem thêm {reviewSummary.totalReviews - 3} đánh giá khác
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#3255FB" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : reviewSummary && reviewSummary.totalReviews === 0 ? (
+            <View style={styles.reviewEmptyState}>
+              <Ionicons name="chatbubble-outline" size={48} color="#CCC" />
+              <Text style={styles.reviewEmptyStateText}>Chưa có đánh giá nào</Text>
+              <Text style={styles.reviewEmptyStateSubtext}>
+                Hãy là người đầu tiên đánh giá sản phẩm này
+              </Text>
+              {user && (
+                <TouchableOpacity 
+                  style={styles.writeReviewButtonEmpty}
+                  onPress={() => router.push({
+                    pathname: '/product-reviews',
+                    params: { productId: id as string }
+                  })}
+                >
+                  <Ionicons name="pencil" size={18} color="white" />
+                  <Text style={styles.writeReviewButtonEmptyText}>Viết đánh giá đầu tiên</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+          
+          {/* Write Review Button */}
+          {user && reviewSummary && reviewSummary.totalReviews > 0 && !loadingReviews && reviews.length === 0 && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Write Review Button for no reviews case */}
+          {user && !loadingReviewSummary && !reviewSummary && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Write Review Button for error case */}
+          {user && reviewError && (
+            <TouchableOpacity 
+              style={styles.writeReviewButton}
+              onPress={() => router.push({
+                pathname: '/product-reviews',
+                params: { productId: id as string }
+              })}
+            >
+              <Ionicons name="pencil" size={20} color="white" />
+              <Text style={styles.writeReviewButtonText}>Viết đánh giá</Text>
+            </TouchableOpacity>
           )}
         </View>
 
         {/* Sách liên quan */}
         {relatedBooks.length > 0 && (
           <View style={styles.relatedSection}>
-            <Text style={styles.relatedTitle}>Sách liên quan</Text>
+            <Text style={styles.relatedTitle}>{t('relatedBooks')}</Text>
             <FlatList
               data={relatedBooks}
               renderItem={({ item }) => <BookCard book={item} />}
@@ -851,7 +1011,7 @@ const BookDetailsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
-            Thêm vào{"\n"}giỏ hàng
+            {t('addToCart')}{"\n"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -860,7 +1020,7 @@ const BookDetailsScreen = () => {
           disabled={showLoginAlert || outOfStock}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Mua ngay</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{t('buyNow')}</Text>
         </TouchableOpacity>
       </Animated.View>
       {insets.bottom > 0 && (
@@ -1489,6 +1649,155 @@ const styles = StyleSheet.create({
     color: '#666',
     width: 30,
     textAlign: 'right',
+  },
+  // Review List Styles
+  reviewListContainer: {
+    marginTop: 16,
+  },
+  reviewListLoading: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  reviewListLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  reviewError: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  reviewErrorText: {
+    fontSize: 14,
+    color: '#E53935',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#E53935',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  reviewEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  reviewEmptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  reviewEmptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  writeReviewButtonEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  writeReviewButtonEmptyText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  writeReviewButtonPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  writeReviewButtonPlaceholderText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  reviewListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  reviewItem: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  viewMoreReviewsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  viewMoreReviewsText: {
+    fontSize: 14,
+    color: '#3255FB',
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  writeReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  writeReviewButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   fadeOverlay: {
     position: 'absolute',
