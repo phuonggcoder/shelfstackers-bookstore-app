@@ -7,14 +7,14 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
@@ -35,15 +35,26 @@ export default function Login() {
     configureGoogleSignIn();
   }, []);
 
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
       return;
     }
 
+    if (!validateEmail(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await authService.login({ username: email, password });
+      const response = await authService.login({ email: email, password });
       await signIn(response);
       Alert.alert('Thành công', 'Đăng nhập thành công!', [
         { text: 'OK', onPress: () => router.replace('/(tabs)') }
