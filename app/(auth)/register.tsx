@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -26,9 +26,20 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleRegister = async () => {
-    if (!username || !email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
       return;
     }
 
@@ -45,7 +56,8 @@ export default function Register() {
     try {
       setIsLoading(true);
       const response = await authService.register({
-        username,
+        // Always send a valid username (either provided or generated from email, max 10 chars)
+        username: username && username.length <= 20 ? username : email.split('@')[0].substring(0, 10),
         email,
         password,
         full_name: '',
@@ -82,10 +94,10 @@ export default function Register() {
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tên người dùng</Text>
+            <Text style={styles.label}>Tên người dùng <Text style={styles.optionalText}>(tùy chọn)</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập tên người dùng"
+              placeholder="Nhập tên người dùng (để trống sẽ tự động tạo từ email)"
               value={username}
               onChangeText={setUsername}
               editable={!isLoading}
@@ -271,5 +283,10 @@ const styles = StyleSheet.create({
   },
   registerButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  optionalText: {
+    color: '#999',
+    fontSize: 12,
+    fontWeight: 'normal',
   },
 });
