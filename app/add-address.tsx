@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
+import { Switch } from 'react-native';
 
 import {
   Alert,
@@ -14,7 +16,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import AutocompleteInput from '../components/AutocompleteInput';
 import { useAuth } from '../context/AuthContext';
 import AddressService, { LocationItem } from '../services/addressService';
 
@@ -30,25 +31,37 @@ const AddAddress = () => {
   const [district, setDistrict] = useState<LocationItem | null>(null);
   const [ward, setWard] = useState<LocationItem | null>(null);
   const [addressDetail, setAddressDetail] = useState('');
+const [addressMode, setAddressMode] = useState<'34-provinces' | '63-provinces'>('63-provinces');
   const [loading, setLoading] = useState(false);
+  const params = useLocalSearchParams();
 
   useFocusEffect(
-    useCallback(() => {
-      const getLocationFromStorage = async () => {
-        try {
-          const p = await AsyncStorage.getItem('selected_province');
-          const d = await AsyncStorage.getItem('selected_district');
-          const w = await AsyncStorage.getItem('selected_ward');
-          if (p) setProvince(JSON.parse(p));
-          if (d) setDistrict(JSON.parse(d));
-          if (w) setWard(JSON.parse(w));
-        } catch (error) {
-          console.error('Error loading location from storage:', error);
-        }
-      };
-      getLocationFromStorage();
-    }, [])
-  );
+  useCallback(() => {
+    const getLocationFromStorage = async () => {
+      try {
+        const mode = await AsyncStorage.getItem('address_mode');
+        if (mode === '34-provinces' || mode === '63-provinces') setAddressMode(mode);
+        const p = await AsyncStorage.getItem('selected_province');
+        const d = await AsyncStorage.getItem('selected_district');
+        const w = await AsyncStorage.getItem('selected_ward');
+        if (p) setProvince(JSON.parse(p));
+        else setProvince(null);
+        if (d) setDistrict(JSON.parse(d));
+        else setDistrict(null);
+        if (w) setWard(JSON.parse(w));
+        else setWard(null);
+      } catch (error) {
+        console.error('Error loading location from storage:', error);
+      }
+    };
+    getLocationFromStorage();
+  }, [])
+);
+
+  const handleSelectAddress = async () => {
+    // Navigate to address selection
+    router.push('/address-selection?type=province');
+  };
 
   const handleSubmit = async () => {
     if (!token) {
@@ -78,16 +91,21 @@ const AddAddress = () => {
 
     setLoading(true);
     try {
-      await AddressService.createAddress(token, {
-        receiver_name: receiverName.trim(),
-        phone_number: phoneNumber.trim(),
-        province: province.name,
-        district: district.name,
-        ward: ward.name,
-        address_detail: addressDetail.trim(),
-        is_default: false, // luôn là false khi thêm mới
-        type: addressType,
-      });
+      const payload: any = {
+  receiver_name: receiverName.trim(),
+  phone_number: phoneNumber.trim(),
+  province: province?.name ?? '',
+  address_detail: addressDetail.trim(),
+  is_default: false, // luôn là false khi thêm mới
+  type: addressType,
+};
+if (addressMode === '63-provinces') {
+  payload.district = district?.name ?? '';
+  payload.ward = ward?.name ?? '';
+} else {
+  payload.ward = ward?.name ?? '';
+}
+await AddressService.createAddress(token, payload);
 
       // Clear stored location data
       await AsyncStorage.multiRemove([
@@ -125,12 +143,20 @@ const AddAddress = () => {
     return parts.join(', ');
   };
 
+  const formatSelectedAddress = () => {
+    const parts = [];
+    if (province) parts.push(province.name);
+    if (district) parts.push(district.name);
+    if (ward) parts.push(ward.name);
+    return parts.join(', ');
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
               behavior={undefined}
     >
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { marginTop: 24 }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>← {t('goBack')}</Text>
         </TouchableOpacity>
@@ -140,7 +166,7 @@ const AddAddress = () => {
 
       <ScrollView
         style={styles.body}
-        contentContainerStyle={styles.formContainer}
+        contentContainerStyle={[styles.formContainer, { paddingBottom: 40 }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.sectionTitle}>{t('recipientInformation')}</Text>
@@ -161,45 +187,40 @@ const AddAddress = () => {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>{t('address')}</Text>
+        <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
 
-        <View style={styles.inputGroup}>
-          <AutocompleteInput
-            label={t('provinceCity')}
-            placeholder={t('selectProvinceCity')}
-            value={province}
-            onSelect={setProvince}
-            level="province"
-          />
-          
-          <AutocompleteInput
-            label={t('district')}
-            placeholder={t('selectDistrict')}
-            value={district}
-            onSelect={setDistrict}
-            level="district"
-            provinceId={province?.id}
-            disabled={!province}
-          />
-          
-          <AutocompleteInput
-            label={t('ward')}
-            placeholder={t('selectWard')}
-            value={ward}
-            onSelect={setWard}
-            level="ward"
-            districtId={district?.id}
-            disabled={!district}
-          />
-          
-          <TextInput
-            placeholder={t('streetBuildingHouseNumber')}
-            style={styles.input}
-            value={addressDetail}
-            onChangeText={setAddressDetail}
-            multiline
-          />
+
+
+        <View style={styles.addressSelector}>
+          <TouchableOpacity 
+            style={styles.addressSelectorButton}
+            onPress={handleSelectAddress}
+          >
+            <View style={styles.addressSelectorContent}>
+              <Text style={styles.addressSelectorLabel}>
+                {t('selectAddress') || 'Chọn Tỉnh/Thành phố, Quận/Huyện, Phường/Xã'}
+              </Text>
+              {(province || district || ward) ? (
+                <Text style={styles.addressSelectorValue}>
+                  {formatSelectedAddress()}
+                </Text>
+              ) : (
+                <Text style={styles.addressSelectorPlaceholder}>
+                  {t('tapToSelectAddress') || 'Chạm để chọn địa chỉ'}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
         </View>
+
+        <TextInput
+          placeholder={t('streetBuildingHouseNumber')}
+          style={styles.input}
+          value={addressDetail}
+          onChangeText={setAddressDetail}
+          multiline
+        />
 
         {formatAddress() && (
           <View style={styles.addressPreview}>
@@ -316,6 +337,7 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
+
   switchContainer: {
     backgroundColor: '#f9f9f9',
     borderRadius: 12,
@@ -378,6 +400,38 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: 'bold', 
     fontSize: 16 
+  },
+  addressSelector: {
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  addressSelectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+  },
+  addressSelectorContent: {
+    flex: 1,
+  },
+  addressSelectorLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  addressSelectorValue: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+  },
+  addressSelectorPlaceholder: {
+    fontSize: 16,
+    color: '#999',
   },
 });
 

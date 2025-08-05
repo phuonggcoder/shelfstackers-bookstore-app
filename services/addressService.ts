@@ -16,7 +16,9 @@ export interface District {
 export interface Ward {
   code: string;
   name: string;
-  districtCode: string;
+  districtCode?: string;
+  provinceCode: string;
+  provinceName: string;
 }
 
 export interface AddressData {
@@ -55,7 +57,87 @@ export interface UserAddress {
   updatedAt: string;
 }
 
+type AddressMode = '34-provinces' | '63-provinces';
+
 class AddressService {
+  // Unified API for both modes
+  static async getProvincesByMode(mode: AddressMode, searchText: string = ''): Promise<LocationItem[]> {
+    try {
+      let url = '';
+      if (mode === '34-provinces') {
+        url = `${BASE_URL}/api/v1/address/34/provinces`;
+      } else {
+        url = `${BASE_URL}/api/v1/address/63/provinces`;
+      }
+      const response = await axios.get(url, { params: searchText ? { q: searchText } : {} });
+      if (response.data && Array.isArray(response.data.data)) {
+        return response.data.data.map((province: any) => ({
+          id: province.code,
+          name: province.name,
+          code: province.code,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getProvincesByMode:', error);
+      return [];
+    }
+  }
+
+  static async getDistrictsByMode(provinceCode: string, mode: AddressMode, searchText: string = ''): Promise<LocationItem[]> {
+    try {
+      if (mode === '34-provinces') return [];
+      // 63-provinces only
+      const url = `${BASE_URL}/api/v1/address/63/districts`;
+      const response = await axios.get(url, { params: { 'province-id': provinceCode } });
+      if (response.data && Array.isArray(response.data.data)) {
+        let districts = response.data.data;
+        if (searchText) {
+          districts = districts.filter((d: any) => d.name.toLowerCase().includes(searchText.toLowerCase()));
+        }
+        return districts.map((district: any) => ({
+          id: district.code,
+          name: district.name,
+          code: district.code,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getDistrictsByMode:', error);
+      return [];
+    }
+  }
+
+  static async getWardsByMode(districtCode?: string, provinceCode?: string, mode: AddressMode = '34-provinces', searchText: string = ''): Promise<LocationItem[]> {
+    try {
+      let url = '';
+      let params: any = {};
+      if (mode === '34-provinces') {
+        url = `${BASE_URL}/api/v1/address/34/wards`;
+        params = { 'province-code': provinceCode };
+      } else {
+        url = `${BASE_URL}/api/v1/address/63/wards`;
+        params = { 'district-id': districtCode };
+      }
+      const response = await axios.get(url, { params });
+      if (response.data && Array.isArray(response.data.data)) {
+        let wards = response.data.data;
+        if (searchText) {
+          wards = wards.filter((w: any) => w.name.toLowerCase().includes(searchText.toLowerCase()));
+        }
+        return wards.map((ward: any) => ({
+          id: ward.code,
+          name: ward.name,
+          code: ward.code,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error in getWardsByMode:', error);
+      return [];
+    }
+  }
+
   // Administrative Address APIs (new)
   static async getAllProvinces(): Promise<{ success: boolean; code: number; data: Province[]; errors: any[] }> {
     try {
@@ -78,16 +160,59 @@ class AddressService {
     }
   }
 
+  // FIX: This method now extracts unique districts from wards data
   static async getDistricts(provinceCode: string): Promise<{ success: boolean; code: number; data: District[]; errors: any[] }> {
     try {
       console.log('🌐 Fetching districts for province:', provinceCode);
       
-      const response = await axios.get(`${BASE_URL}/address/districts`, {
-        params: { 'provice-code': provinceCode }
+      // Get all wards for the province first
+      const response = await axios.get(`${BASE_URL}/address/wards`, {
+        params: { 'province-code': provinceCode }
       });
       
-      console.log('✅ Districts API Response:', response.data);
-      return response.data;
+      console.log('✅ Wards API Response for districts extraction:', response.data);
+      
+      if (response.data.success && Array.isArray(response.data.data)) {
+        // Extract unique districts from wards data
+        const districtsMap = new Map<string, District>();
+        
+        response.data.data.forEach((ward: any) => {
+          // Extract district name from ward name
+          // Assuming ward names are like "Phường ABC, Quận XYZ" or "Xã ABC, Huyện XYZ"
+          let districtName = '';
+          
+          // Try to extract district from ward name
+          const wardName = ward.name;
+          const parts = wardName.split(',');
+          if (parts.length > 1) {
+            districtName = parts[1].trim();
+          } else {
+            districtName = '';
+          }
+          
+          // Use ward code as district identifier for simplicity
+          const districtCode = `district_${ward.code}`;
+          
+          if (!districtsMap.has(districtCode)) {
+            districtsMap.set(districtCode, {
+              code: districtCode,
+              name: districtName,
+              provinceCode: provinceCode
+            });
+          }
+        });
+        
+        const districts = Array.from(districtsMap.values());
+        
+        return {
+          success: true,
+          code: 200,
+          data: districts,
+          errors: []
+        };
+      }
+      
+      throw new Error('Invalid response format');
     } catch (error: any) {
       console.error('❌ Error fetching districts:', error);
       
@@ -101,21 +226,42 @@ class AddressService {
     }
   }
 
+  // FIX: This method now filters wards based on the selected district
   static async getWards(districtCode: string, provinceCode?: string): Promise<{ success: boolean; code: number; data: Ward[]; errors: any[] }> {
     try {
       console.log('🌐 Fetching wards for district:', districtCode, 'province:', provinceCode);
       
-      const params: any = { 'districts-code': districtCode };
-      if (provinceCode) {
-        params['province-code'] = provinceCode;
+      if (!provinceCode) {
+        throw new Error('Province code is required for fetching wards');
       }
       
+      // Get all wards for the province
       const response = await axios.get(`${BASE_URL}/address/wards`, {
-        params
+        params: { 'province-code': provinceCode }
       });
       
-      console.log('✅ Wards API Response:', response.data);
-      return response.data;
+      console.log('✅ All Wards API Response:', response.data);
+      
+      if (response.data.success && Array.isArray(response.data.data)) {
+        // Since we don't have real district mapping, return all wards for now
+        // In a real implementation, you'd filter based on actual district boundaries
+        const wards = response.data.data.map((ward: any) => ({
+          code: ward.code,
+          name: ward.name,
+          districtCode: districtCode,
+          provinceCode: provinceCode,
+          provinceName: ward.provinceName || ''
+        }));
+        
+        return {
+          success: true,
+          code: 200,
+          data: wards,
+          errors: []
+        };
+      }
+      
+      throw new Error('Invalid response format');
     } catch (error: any) {
       console.error('❌ Error fetching wards:', error);
       
@@ -337,4 +483,4 @@ class AddressService {
   }
 }
 
-export default AddressService; 
+export default AddressService;

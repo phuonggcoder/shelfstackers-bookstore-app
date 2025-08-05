@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
-import { useEffect, useState } from 'react';
+import i18n from 'i18next';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,7 +74,7 @@ const OrderDetailScreen = () => {
 
   // Refresh data when screen comes into focus
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (token && orderId) {
         refreshOrderDetail();
       }
@@ -102,25 +102,25 @@ const OrderDetailScreen = () => {
       if (canRequestRefund(order.status)) {
         // Hoàn tiền cho đơn hàng đã giao
         await requestRefund(token, actualOrderId, reason);
-        Alert.alert('Thành công', 'Yêu cầu hoàn tiền đã được gửi. Admin sẽ xem xét và xử lý.');
+        Alert.alert(t('success'), t('refundRequestSent'));
       } else {
         // Hủy đơn hàng hoặc thay đổi địa chỉ
         if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
           // Gửi yêu cầu thay đổi địa chỉ thay vì hủy đơn hàng
           await cancelOrder(token, actualOrderId, reason, newAddress);
-          Alert.alert('Thành công', 'Yêu cầu thay đổi địa chỉ đã được gửi. Admin sẽ xem xét và xử lý.');
+          Alert.alert(t('success'), t('addressChangeRequestSent'));
         } else {
           // Hủy đơn hàng bình thường
           await cancelOrder(token, actualOrderId, reason);
-          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
+          Alert.alert(t('success'), t('orderCancelled'));
         }
       }
       setShowCancelModal(false);
       refreshOrderDetail();
     } catch (e: any) {
       console.error('Order processing error:', e);
-      const errorMessage = e.message || 'Không thể xử lý yêu cầu.';
-      Alert.alert('Lỗi', errorMessage
+      const errorMessage = e.message || t('cannotProcessRequest');
+      Alert.alert(t('error'), errorMessage);
     } finally {
       setCancelling(false);
     }
@@ -181,7 +181,7 @@ const OrderDetailScreen = () => {
       setExistingReview(null);
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      Alert.alert(t('error'), t('cannotSubmitReview'));
     }
   };
 
@@ -255,7 +255,6 @@ const OrderDetailScreen = () => {
       case 'cancelled': return t('cancelled');
       case 'cancelled_by_user': return t('cancelled');
       case 'cancelled_by_admin': return t('cancelled');
-        return 'Đã huỷ';
       default: return t('unknown');
         
     }
@@ -264,22 +263,21 @@ const OrderDetailScreen = () => {
   const getPaymentStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
-      case 'pending': return 'Chờ xử lý';
-      case 'paid': return 'Đã thanh toán';
-      case 'failed': return 'Thanh toán thất bại';
+      case 'pending': return t('paymentPending');
+      case 'paid': return t('paymentPaid');
+      case 'failed': return t('paymentFailed');
       case 'refunded':
       case 'refund_pending':
       case 'refund_processing':
       case 'refund_completed':
-        return 'Đã hoàn tiền';
+        return t('paymentRefunded');
       case 'partially_refunded':
       case 'partial_refund':
-        return 'Hoàn tiền một phần';
+        return t('paymentPartiallyRefunded');
       case 'cancelled':
       case 'canceled':
-        return 'Đã hủy';
-      default: return 'Không xác định';
-
+        return t('paymentCancelled');
+      default: return t('unknown');
     }
   };
 
@@ -322,7 +320,9 @@ const OrderDetailScreen = () => {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
+    // Use dynamic locale based on current language
+    const locale = i18n.language === 'en' ? 'en-US' : 'vi-VN';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: 'VND'
     }).format(price);
@@ -330,7 +330,9 @@ const OrderDetailScreen = () => {
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('vi-VN', {
+      // Use dynamic locale based on current language
+      const locale = i18n.language === 'en' ? 'en-US' : 'vi-VN';
+      return new Date(dateString).toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -456,7 +458,7 @@ const OrderDetailScreen = () => {
         <View style={styles.section}>
 
           <Text style={styles.sectionTitle}>{t('purchasedProducts')}</Text>
-          {order.items.map((item, index) => (
+          {order.items.map((item: OrderItem, index: number) => (
             <View key={index} style={styles.productItem}>
               <View style={styles.productImageContainer}>
                 <Image
@@ -485,7 +487,7 @@ const OrderDetailScreen = () => {
                   >
                     <Ionicons name="star-outline" size={16} color="#667eea" />
                     <Text style={styles.productReviewButtonText}>
-                      {reviewLoading ? 'Đang tải...' : 'Đánh giá sản phẩm'}
+                      {reviewLoading ? t('loading') : t('reviewProduct')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -569,7 +571,7 @@ const OrderDetailScreen = () => {
         <View style={styles.section}>
 
           <Text style={styles.sectionTitle}>{t('orderHistory')}</Text>
-          {order.orderHistory.map((history, index) => (
+          {order.orderHistory.map((history: { status: string; timestamp: string; description: string }, index: number) => (
             <View key={index} style={styles.historyItem}>
               <View style={[styles.historyIcon, { backgroundColor: getStatusColor(history.status) }]}>
                 <Ionicons name="checkmark" size={16} color="white" />
@@ -592,7 +594,7 @@ const OrderDetailScreen = () => {
               onPress={handleReviewOrder}
             >
               <Ionicons name="star-outline" size={20} color="white" />
-              <Text style={styles.reviewButtonText}>Đánh giá đơn hàng</Text>
+              <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
             </TouchableOpacity>
             {canRequestRefund(order.status) && order.paymentMethod !== 'cod' && (
               <TouchableOpacity
@@ -602,7 +604,7 @@ const OrderDetailScreen = () => {
               >
                 <Ionicons name="card-outline" size={20} color="white" />
                 <Text style={styles.refundButtonText}>
-                  {cancelling ? 'Đang xử lý...' : 'Yêu cầu hoàn tiền'}
+                  {cancelling ? t('processing') : t('requestRefund')}
                 </Text>
               </TouchableOpacity>
             )}

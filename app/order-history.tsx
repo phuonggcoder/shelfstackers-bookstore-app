@@ -3,7 +3,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
-import { useEffect, useState } from 'react';
+import i18n from 'i18next';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,7 +49,7 @@ const OrderHistoryScreen = () => {
 
   // Refresh data when screen comes into focus
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (token) {
         refreshOrders();
       }
@@ -78,22 +79,23 @@ const OrderHistoryScreen = () => {
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'processing': return 'Đang xử lý';
-      case 'shipped': return 'Đang giao hàng';
-      case 'delivered': return 'Đã giao';
+      case 'pending': return t('pending');
+      case 'processing': return t('processing');
+      case 'shipped': return t('shipped');
+      case 'delivered': return t('delivered');
       case 'cancelled':
       case 'canceled':
       case 'cancelled_by_user':
       case 'cancelled_by_admin':
-        return 'Đã huỷ';
-      default: return 'Không xác định';
-
+        return t('cancelled');
+      default: return t('unknown');
     }
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
+    // Use dynamic locale based on current language
+    const locale = i18n.language === 'en' ? 'en-US' : 'vi-VN';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: 'VND'
     }).format(price);
