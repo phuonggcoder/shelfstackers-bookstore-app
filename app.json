@@ -29,7 +29,7 @@
           "launchMode": "most-recent"
         }
       ],
-      "./withNotifeeAndroidFix"
+      "./guide/scriptTest/withNotifeeAndroidFix.js"
 
     ],
     "experiments": {
