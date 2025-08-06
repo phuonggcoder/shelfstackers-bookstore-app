@@ -261,6 +261,7 @@
   "notLoggedIn": "Bạn chưa đăng nhập",
   "pleaseLoginToUseFeature": "Vui lòng đăng nhập để sử dụng tính năng này",
   "skip": "Bỏ qua",
+  "confirm": "Xác nhận",
   "deleteAddress": "Xóa địa chỉ",
   "cannotRestoreDeletedAddress": "Không thể khôi phục địa chỉ đã xóa",
   "keep": "Giữ lại",

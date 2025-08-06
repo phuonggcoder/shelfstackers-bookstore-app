@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import googleAuthService from '../services/googleAuthService';
 
@@ -93,7 +93,7 @@ const GoogleSignInWithAccountPicker: React.FC<GoogleSignInWithAccountPickerProps
             contentFit="contain"
           />
           <Text style={[styles.buttonText, textStyle]}>
-            Chọn tài khoản Google
+            Google
           </Text>
         </View>
       )}

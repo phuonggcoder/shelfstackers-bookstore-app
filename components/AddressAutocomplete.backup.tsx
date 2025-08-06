@@ -1,15 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  TextInput,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
-import debounce from 'lodash/debounce';
-import AddressService, { Province, Ward, AddressData } from '../services/addressService';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import AddressService, { AddressData, Province, Ward } from '../services/addressService';
 
 interface AddressAutocompleteProps {
   onAddressSelect?: (address: AddressData) => void;
@@ -42,16 +33,14 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
     try {
       setLoading(true);
       setError(null);
-      const response = await AddressService.getProvincesMerged(searchQuery);
-      console.log('Loaded provinces:', response.length, 'provinces');
+      const response = await AddressService.getAllProvinces(searchQuery);
 
-      if (response.length > 0) {
-        setProvinces(response);
+      if (response.success) {
+        setProvinces(response.data);
         setShowProvinces(true);
-        console.log('Provinces loaded successfully, showing dropdown');
       } else {
         setError('Không thể tải danh sách tỉnh/thành phố');
-        console.error('Province loading error: No data returned');
+        console.error('Province loading error:', response.errors);
       }
     } catch (err) {
       setError('Không thể tải danh sách tỉnh/thành phố');
@@ -66,15 +55,15 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
     try {
       setLoadingWards(true);
       setError(null);
-      const response = await AddressService.getWardsByProvince(provinceCode);
+      const response = await AddressService.getWardsByProvince(provinceCode, searchQuery);
 
-      if (response.length > 0) {
-        setWards(response);
+      if (response.success) {
+        setWards(response.data);
         setSelectedWard(null);
         setShowWards(true);
       } else {
         setError('Không thể tải danh sách phường/xã');
-        console.error('Wards loading error: No data returned');
+        console.error('Wards loading error:', response.errors);
       }
     } catch (err) {
       setError('Không thể tải danh sách phường/xã');
@@ -363,8 +352,6 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     marginTop: 4,
-    position: 'relative',
-    zIndex: 1000,
   },
   list: {
     maxHeight: 250,
@@ -372,17 +359,6 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     backgroundColor: 'white',
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   item: {
     padding: 12,

@@ -1,12 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
-import { Switch } from 'react-native';
-
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   ScrollView,
@@ -16,51 +12,23 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import AddressSelector from '../components/AddressSelector';
 import { useAuth } from '../context/AuthContext';
-import AddressService, { LocationItem } from '../services/addressService';
+import AddressService, { AddressData } from '../services/addressService';
 
 const AddAddress = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
-  const [isDefault, setIsDefault] = useState(false); // luôn là false
+  const [loading, setLoading] = useState(false);
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [province, setProvince] = useState<LocationItem | null>(null);
-  const [district, setDistrict] = useState<LocationItem | null>(null);
-  const [ward, setWard] = useState<LocationItem | null>(null);
   const [addressDetail, setAddressDetail] = useState('');
-const [addressMode, setAddressMode] = useState<'34-provinces' | '63-provinces'>('63-provinces');
-  const [loading, setLoading] = useState(false);
-  const params = useLocalSearchParams();
+  const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
 
-  useFocusEffect(
-  useCallback(() => {
-    const getLocationFromStorage = async () => {
-      try {
-        const mode = await AsyncStorage.getItem('address_mode');
-        if (mode === '34-provinces' || mode === '63-provinces') setAddressMode(mode);
-        const p = await AsyncStorage.getItem('selected_province');
-        const d = await AsyncStorage.getItem('selected_district');
-        const w = await AsyncStorage.getItem('selected_ward');
-        if (p) setProvince(JSON.parse(p));
-        else setProvince(null);
-        if (d) setDistrict(JSON.parse(d));
-        else setDistrict(null);
-        if (w) setWard(JSON.parse(w));
-        else setWard(null);
-      } catch (error) {
-        console.error('Error loading location from storage:', error);
-      }
-    };
-    getLocationFromStorage();
-  }, [])
-);
-
-  const handleSelectAddress = async () => {
-    // Navigate to address selection
-    router.push('/address-selection?type=province');
+  const handleAddressChange = (address: any) => {
+    setSelectedAddress(address);
   };
 
   const handleSubmit = async () => {
@@ -79,7 +47,7 @@ const [addressMode, setAddressMode] = useState<'34-provinces' | '63-provinces'>(
       return;
     }
 
-    if (!province || !district || !ward) {
+    if (!selectedAddress) {
       Alert.alert(t('error'), t('pleaseSelectCompleteAddress'));
       return;
     }
@@ -91,39 +59,35 @@ const [addressMode, setAddressMode] = useState<'34-provinces' | '63-provinces'>(
 
     setLoading(true);
     try {
-      const payload: any = {
-  receiver_name: receiverName.trim(),
-  phone_number: phoneNumber.trim(),
-  province: province?.name ?? '',
-  address_detail: addressDetail.trim(),
-  is_default: false, // luôn là false khi thêm mới
-  type: addressType,
-};
-if (addressMode === '63-provinces') {
-  payload.district = district?.name ?? '';
-  payload.ward = ward?.name ?? '';
-} else {
-  payload.ward = ward?.name ?? '';
-}
-await AddressService.createAddress(token, payload);
-
-      // Clear stored location data
-      await AsyncStorage.multiRemove([
-        'selected_province',
-        'selected_district',
-        'selected_ward',
-      ]);
-
-      // Set flag to show success alert in address list
-      await AsyncStorage.setItem('address_added', 'true');
+      // Log dữ liệu gửi đi để debug
+      // Đảm bảo selectedAddress có đủ trường autocomplete34 và fullAddress
+      const wardName = selectedAddress?.ward?.name || (selectedAddress as any).autocomplete34?.ward?.name || '';
+      const wardCode = selectedAddress?.ward?.code || (selectedAddress as any).autocomplete34?.ward?.code || '';
+      const provinceName = selectedAddress?.province?.name || '';
+      const provinceCode = selectedAddress?.province?.code || '';
+      const fullAddress =  `${addressDetail}, ${wardName}, ${provinceName}`;
       
+      const addressPayload = {
+        isDefault: false,
+        name: receiverName.trim(),
+        phone: phoneNumber.trim(),
+        province: provinceCode,
+        street: addressDetail.trim(),
+        ward: wardCode,
+        autocomplete34: {
+          ward: {
+            name: wardName,
+            code: wardCode
+          }
+        },
+        fullAddress: `${addressDetail.trim()}, ${wardName}, ${provinceName}`,
+      };
+      console.log('Payload gửi lên API:', addressPayload);
+      await AddressService.addAddress(token, addressPayload);
       Alert.alert(t('success'), t('addressAddedSuccessfully'), [
         {
           text: t('ok'),
-          onPress: () => {
-            // Go back to address list instead of order review
-            router.back();
-          },
+          onPress: () => router.back(),
         },
       ]);
     } catch (error) {
@@ -135,19 +99,12 @@ await AddressService.createAddress(token, payload);
   };
 
   const formatAddress = () => {
-    const parts = [];
-    if (addressDetail) parts.push(addressDetail);
-    if (ward) parts.push(ward.name);
-    if (district) parts.push(district.name);
-    if (province) parts.push(province.name);
-    return parts.join(', ');
-  };
-
-  const formatSelectedAddress = () => {
-    const parts = [];
-    if (province) parts.push(province.name);
-    if (district) parts.push(district.name);
-    if (ward) parts.push(ward.name);
+    if (!selectedAddress) return '';
+    const parts = [
+      addressDetail,
+      selectedAddress.ward.name,
+      selectedAddress.province.name
+    ].filter(Boolean);
     return parts.join(', ');
   };
 
@@ -191,36 +148,19 @@ await AddressService.createAddress(token, payload);
 
 
 
-        <View style={styles.addressSelector}>
-          <TouchableOpacity 
-            style={styles.addressSelectorButton}
-            onPress={handleSelectAddress}
-          >
-            <View style={styles.addressSelectorContent}>
-              <Text style={styles.addressSelectorLabel}>
-                {t('selectAddress') || 'Chọn Tỉnh/Thành phố, Quận/Huyện, Phường/Xã'}
-              </Text>
-              {(province || district || ward) ? (
-                <Text style={styles.addressSelectorValue}>
-                  {formatSelectedAddress()}
-                </Text>
-              ) : (
-                <Text style={styles.addressSelectorPlaceholder}>
-                  {t('tapToSelectAddress') || 'Chạm để chọn địa chỉ'}
-                </Text>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+        <View style={styles.section}>
+          <AddressSelector onChange={handleAddressChange} />
         </View>
 
-        <TextInput
-          placeholder={t('streetBuildingHouseNumber')}
-          style={styles.input}
-          value={addressDetail}
-          onChangeText={setAddressDetail}
-          multiline
-        />
+        <View style={styles.section}>
+          <TextInput
+            placeholder={t('streetBuildingHouseNumber')}
+            style={styles.input}
+            value={addressDetail}
+            onChangeText={setAddressDetail}
+            multiline
+          />
+        </View>
 
         {formatAddress() && (
           <View style={styles.addressPreview}>
@@ -252,17 +192,23 @@ await AddressService.createAddress(token, payload);
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          <Text style={styles.submitText}>
-            {loading ? t('adding') : t('complete')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3255FB" />
+        </View>
+      ) : (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.submitText}>
+              {t('complete')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -297,6 +243,19 @@ const styles = StyleSheet.create({
   },
   formContainer: { 
     padding: 16 
+  },
+  section: {
+    marginBottom: 24,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   sectionTitle: { 
     fontSize: 16, 

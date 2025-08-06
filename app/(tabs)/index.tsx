@@ -112,7 +112,6 @@ const Index = () => {
                   setModalVisible(!modalVisible);
                 }}
               >
-                <Text style={styles.skipButtonText}>Bỏ qua</Text>
 
                 <Text style={styles.skipButtonText}>{t('loginLater')}</Text>
               </TouchableOpacity>

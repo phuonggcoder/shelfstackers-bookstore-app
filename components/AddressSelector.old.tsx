@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState, memo, useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -6,9 +7,8 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AddressService, { AddressData, Province } from '../services/addressService';
@@ -18,7 +18,6 @@ interface Ward {
   name: string;
   provinceCode: string;
   provinceName: string;
-  mergeWith?: string;
 }
 
 interface AddressSelectorProps {
@@ -31,14 +30,14 @@ interface AddressSelectorProps {
   style?: any;
 }
 
-const AddressItem = memo(({ 
+const AddressItemComponent = memo(({ 
   item, 
   isSelected, 
   onSelect 
-}: {
-  item: Province | Ward;
-  isSelected: boolean;
-  onSelect: () => void;
+}: { 
+  item: Province | Ward; 
+  isSelected: boolean; 
+  onSelect: () => void; 
 }) => (
   <TouchableOpacity
     style={styles.item}
@@ -46,40 +45,54 @@ const AddressItem = memo(({
     activeOpacity={0.7}
   >
     <View style={styles.itemContent}>
-      <View style={styles.itemTextContainer}>
-        <Text style={styles.itemText}>{item.name}</Text>
-        {item.mergeWith && (
-          <Text style={styles.mergeWithText}>{item.mergeWith}</Text>
-        )}
-      </View>
+      <Text style={styles.itemText}>{item.name}</Text>
       {isSelected && <Ionicons name="checkmark-circle" size={24} color="#3255FB" />}
     </View>
   </TouchableOpacity>
 ));
 
-AddressItem.displayName = 'AddressItem';
+AddressItemComponent.displayName = 'AddressItemComponent';
 
-const AddressSelector = memo(({
+const AddressSelector: React.FC<AddressSelectorProps> = ({
   value,
   onChange,
   label = 'Địa chỉ',
   placeholder = 'Chọn địa chỉ',
   required = false,
   disabled = false,
-  style,
-}: AddressSelectorProps) => {
+  style
+}) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
+  const [currentArea, setCurrentArea] = useState<string>('');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredProvinces, setFilteredProvinces] = useState<Province[]>([]);
-  const [filteredWards, setFilteredWards] = useState<Ward[]>([]);
 
-  const loadProvinces = useCallback(async () => {
+  useEffect(() => {
+    if (modalVisible) {
+      loadProvinces();
+    }
+  }, [modalVisible]);
+
+  useEffect(() => {
+    let area = 'Khu vực đang chọn: ';
+    if (selectedProvince) {
+      area += selectedProvince.name;
+      if (selectedWard) {
+        area += ', ' + selectedWard.name;
+      }
+    } else {
+      area += 'Chưa chọn';
+    }
+    setCurrentArea(area);
+  }, [selectedProvince, selectedWard]);
+
+  const loadProvinces = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -94,14 +107,15 @@ const AddressSelector = memo(({
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  const loadWards = useCallback(async (provinceCode: string) => {
+  const loadWards = async (provinceCode: string) => {
     try {
       setLoading(true);
       setError(null);
       const response = await AddressService.getWards(provinceCode);
       if (response && Array.isArray(response)) {
+        // Lọc bỏ các ward trùng lặp dựa trên code
         const uniqueWards = response.reduce((acc: Ward[], ward) => {
           if (!acc.find(w => w.code === ward.code)) {
             acc.push({
@@ -122,13 +136,13 @@ const AddressSelector = memo(({
     } finally {
       setLoading(false);
     }
-  }, [selectedProvince]);
+  };
 
   const handleProvinceSelect = useCallback(async (province: Province) => {
     setSelectedProvince(province);
     setSelectedWard(null);
     await loadWards(province.code);
-  }, [loadWards]);
+  }, []);
 
   const handleWardSelect = useCallback((ward: Ward) => {
     setSelectedWard(ward);
@@ -139,67 +153,49 @@ const AddressSelector = memo(({
       Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
       return;
     }
-
+    
     if (onChange) {
+      // Tạo địa chỉ đầy đủ từ phường và tỉnh đã chọn
       const fullAddress = `${selectedWard.name}, ${selectedProvince.name}`;
-      const addressData: AddressData & {
-        autocomplete34: { ward: { name: string; code: string } };
-        fullAddress: string;
-      } = {
+      
+      const addressData: AddressData = {
         province: selectedProvince,
         ward: selectedWard,
         fullAddress,
         addressCode: {
           provinceCode: selectedProvince.code,
           wardCode: selectedWard.code
-        },
-        autocomplete34: {
-          ward: {
-            name: selectedWard.name,
-            code: selectedWard.code
-          }
         }
       };
+      
+      // Cập nhật state và gọi onChange
       onChange(addressData);
     }
     setModalVisible(false);
-  }, [selectedProvince, selectedWard, onChange]);
+  };
 
-  useEffect(() => {
-    if (modalVisible) {
-      loadProvinces();
-      setSearchQuery('');
-    }
-  }, [modalVisible, loadProvinces]);
-
-  // Effect xử lý tìm kiếm
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProvinces(provinces);
-      setFilteredWards(wards);
-      return;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    
-    if (!selectedProvince) {
-      // Tìm kiếm trong danh sách tỉnh/thành
-      const results = provinces.filter(province => {
-        const matchName = province.name.toLowerCase().includes(query);
-        const matchMergeWith = province.mergeWith?.toLowerCase().includes(query);
-        return matchName || matchMergeWith;
-      });
-      setFilteredProvinces(results);
-    } else {
-      // Tìm kiếm trong danh sách phường/xã
-      const results = wards.filter(ward => {
-        const matchName = ward.name.toLowerCase().includes(query);
-        const matchMergeWith = ward.mergeWith?.toLowerCase().includes(query);
-        return matchName || matchMergeWith;
-      });
-      setFilteredWards(results);
-    }
-  }, [searchQuery, provinces, wards, selectedProvince]);
+  const AddressItem = memo(function AddressItem({ 
+    item, 
+    type,
+    isSelected,
+    onSelect
+  }: { 
+    item: Province | Ward; 
+    type: 'province' | 'ward';
+    isSelected: boolean;
+    onSelect: () => void;
+  }) => (
+    <TouchableOpacity
+      style={styles.item}
+      onPress={onSelect}
+      activeOpacity={0.7}
+    >
+      <View style={styles.itemContent}>
+        <Text style={styles.itemText}>{item.name}</Text>
+        {isSelected && <Ionicons name="checkmark-circle" size={24} color="#3255FB" />}
+      </View>
+    </TouchableOpacity>
+  ));
 
   const renderItem = useCallback(({ item, type }: { item: Province | Ward; type: 'province' | 'ward' }) => {
     const isSelected = type === 'province' 
@@ -216,13 +212,13 @@ const AddressSelector = memo(({
 
     return (
       <AddressItem
-        key={`${type}-${item.code}`}
         item={item}
+        type={type}
         isSelected={isSelected}
         onSelect={onSelect}
       />
     );
-  }, [selectedProvince, selectedWard, handleProvinceSelect, handleWardSelect]);
+  }, [selectedProvince?.code, selectedWard?.code]);
 
   return (
     <View style={[styles.container, style]}>
@@ -232,26 +228,24 @@ const AddressSelector = memo(({
         </Text>
       )}
       
-      <TouchableOpacity
-        style={[styles.selector, disabled && styles.disabled]}
-        onPress={() => !disabled && setModalVisible(true)}
-        disabled={disabled}
-      >
-        <Text style={[styles.selectorText, !value?.fullAddress && styles.placeholder]}>
-          {(() => {
-            if (value?.fullAddress) {
-              return value.fullAddress;
-            }
-            if (selectedProvince && selectedWard) {
-              return `${selectedWard.name}, ${selectedProvince.name}`;
-            }
-            return placeholder;
-          })()}
-        </Text>
-        <Text style={styles.arrow}>▼</Text>
-      </TouchableOpacity>
-
-      <Modal
+        <TouchableOpacity
+          style={[styles.selector, disabled && styles.disabled]}
+          onPress={() => !disabled && setModalVisible(true)}
+          disabled={disabled}
+        >
+          <Text style={[styles.selectorText, !value?.fullAddress && styles.placeholder]}>
+            {(() => {
+              if (value?.fullAddress) {
+                return value.fullAddress;
+              }
+              if (selectedProvince && selectedWard) {
+                return `${selectedWard.name}, ${selectedProvince.name}`;
+              }
+              return placeholder;
+            })()}
+          </Text>
+          <Text style={styles.arrow}>▼</Text>
+        </TouchableOpacity>      <Modal
         visible={modalVisible}
         animationType="slide"
         transparent={true}
@@ -261,7 +255,7 @@ const AddressSelector = memo(({
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity
-                style={{ width: 40 }}
+                style={styles.backButton}
                 onPress={() => setModalVisible(false)}
               >
                 <Ionicons name="close" size={24} color="#666" />
@@ -270,77 +264,46 @@ const AddressSelector = memo(({
               <View style={{ width: 40 }} />
             </View>
 
+            <View style={styles.currentArea}>
+              <Text style={styles.currentAreaText}>{currentArea}</Text>
+            </View>
+
             <View style={styles.modalBody}>
               {loading ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#3255FB" />
                 </View>
               ) : error ? (
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: '#FF3B30', marginBottom: 12 }}>{error}</Text>
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#FF3B30', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
-                    onPress={loadProvinces}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Thử lại</Text>
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                  <TouchableOpacity style={styles.retryButton} onPress={loadProvinces}>
+                    <Text style={styles.retryText}>Thử lại</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <>
-                  {/* Hiển thị khu vực đã chọn */}
-                  {selectedProvince && (
-                    <View style={styles.selectedArea}>
-                      <Text style={styles.selectedAreaText}>
-                        Khu vực đang chọn: {selectedProvince.name}
-                        {selectedWard ? `, ${selectedWard.name}` : ''}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Search box */}
-                  <View style={styles.searchContainer}>
-                    <View style={styles.searchBox}>
-                      <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder={`Tìm nhanh ${selectedProvince ? 'phường xã' : 'tỉnh thành'}`}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                      />
-                      {searchQuery ? (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                          <Ionicons name="close-circle" size={20} color="#666" />
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  </View>
-
+                <View style={styles.listsContainer}>
                   <View style={styles.tabContainer}>
                     <TouchableOpacity 
                       style={[styles.tab, !selectedProvince && styles.activeTab]}
                       onPress={() => selectedProvince && setSelectedProvince(null)}
                     >
-                      <Text style={[styles.tabText, !selectedProvince && styles.activeTabText]}>
-                        Tỉnh/Thành
-                      </Text>
+                      <Text style={[styles.tabText, !selectedProvince && styles.activeTabText]}>Tỉnh/Thành</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.tab, selectedProvince && styles.activeTab]}
                       disabled={!selectedProvince}
                     >
-                      <Text style={[styles.tabText, selectedProvince && styles.activeTabText]}>
-                        Phường/Xã
-                      </Text>
+                      <Text style={[styles.tabText, selectedProvince && styles.activeTabText]}>Phường/Xã</Text>
                     </TouchableOpacity>
                   </View>
 
                   {!selectedProvince ? (
                     <View style={styles.listContainer}>
                       <FlatList
-                        data={filteredProvinces}
-                        keyExtractor={item => `province-${item.code}`}
-                        renderItem={props => renderItem({ ...props, type: 'province' })}
-                        style={{ flex: 1 }}
+                        data={provinces}
+                        keyExtractor={(item) => `province-${item.code}-${Date.now()}`}
+                        renderItem={(props) => renderItem({ ...props, type: 'province' })}
+                        style={styles.list}
                         windowSize={5}
                         initialNumToRender={10}
                         maxToRenderPerBatch={10}
@@ -349,17 +312,17 @@ const AddressSelector = memo(({
                   ) : (
                     <View style={styles.listContainer}>
                       <FlatList
-                        data={filteredWards}
-                        keyExtractor={item => `ward-${selectedProvince.code}-${item.code}`}
-                        renderItem={props => renderItem({ ...props, type: 'ward' })}
-                        style={{ flex: 1 }}
+                        data={wards}
+                        keyExtractor={(item) => `ward-${selectedProvince?.code}-${item.code}-${Date.now()}`}
+                        renderItem={(props) => renderItem({ ...props, type: 'ward' })}
+                        style={styles.list}
                         windowSize={5}
                         initialNumToRender={10}
                         maxToRenderPerBatch={10}
                       />
                     </View>
                   )}
-                </>
+                </View>
               )}
             </View>
 
@@ -386,42 +349,11 @@ const AddressSelector = memo(({
       </Modal>
     </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
-  },
-  selectedArea: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  selectedAreaText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  searchContainer: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 8,
-    fontSize: 16,
-    color: '#333',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -449,28 +381,6 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-  },
-  item: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  itemContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-  },
-  itemTextContainer: {
-    flex: 1,
-  },
-  itemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  mergeWithText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
   },
   label: {
     fontSize: 16,
@@ -526,12 +436,83 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  backButton: {
+    width: 40,
+    alignItems: 'center',
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
+  currentArea: {
+    backgroundColor: '#f8f8f8',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  currentAreaText: {
+    fontSize: 14,
+    color: '#666',
+  },
   modalBody: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FF3B30',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  listsContainer: {
+    flex: 1,
+  },
+  section: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    padding: 12,
+    backgroundColor: '#f8f8f8',
+  },
+  list: {
+    flex: 1,
+  },
+  item: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  itemContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+  },
+  itemText: {
+    fontSize: 16,
+    color: '#333',
     flex: 1,
   },
   modalFooter: {
@@ -539,6 +520,19 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#eee',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   confirmButton: {
     flex: 1,
@@ -556,21 +550,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
 });
-
-AddressSelector.displayName = 'AddressSelector';
 
 export default AddressSelector;

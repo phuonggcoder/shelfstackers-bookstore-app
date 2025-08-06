@@ -280,6 +280,7 @@
   "notLoggedIn": "You are not logged in",
   "pleaseLoginToUseFeature": "Please log in to use this feature",
   "skip": "Skip",
+  "confirm": "Confirm",
   "deleteAddress": "Delete Address",
   "cannotRestoreDeletedAddress": "Cannot restore deleted address",
   "keep": "Keep",

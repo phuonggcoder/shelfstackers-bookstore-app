@@ -45,37 +45,26 @@ class AddressService {
   static async getProvinces(searchText: string = ''): Promise<Province[]> {
     try {
       const response = await axios.get(`${BASE_URL}/api/v1/address/34/provinces`, {
-        params: searchText ? { q: searchText } : {},
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
+        params: searchText ? { q: searchText } : {}
       });
-      
-      if (!response.data) {
-        throw new Error('Không có dữ liệu từ server');
-      }
-
-      const provinces = response.data?.data || response.data;
-      if (!Array.isArray(provinces)) {
-        throw new Error('Dữ liệu không đúng định dạng');
-      }
-
-      return provinces;
+      return response.data?.data || [];
     } catch (error) {
       console.error('Error in getProvinces:', error);
-      throw error;
+      return [];
     }
   }
 
-  static async getWards(provinceCode: string): Promise<Ward[]> {
+  static async getWards(provinceCode: string, searchText: string = ''): Promise<Ward[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/address/wards`, {
-        params: { 'province-code': provinceCode }
+      const response = await axios.get(`${BASE_URL}/api/v1/address/34/wards`, {
+        params: {
+          'province-code': provinceCode,
+          ...(searchText ? { q: searchText } : {})
+        }
       });
-      return response.data.data || [];
+      return response.data?.data || [];
     } catch (error) {
-      console.error('Error fetching wards:', error);
+      console.error('Error in getWards:', error);
       return [];
     }
   }
@@ -129,11 +118,8 @@ class AddressService {
         }
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding address:', error);
-      if (error.response) {
-        console.error('API error response:', error.response.data);
-      }
       throw error;
     }
   }
