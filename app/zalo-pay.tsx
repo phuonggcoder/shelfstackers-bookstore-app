@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { getOrderDetail } from '../services/orderService';
 import { updatePaymentStatus } from '../services/paymentService';
 import { formatVND } from '../utils/format';
@@ -12,6 +14,7 @@ import { formatVND } from '../utils/format';
 export default function ZaloPayScreen() {
   const { orderId } = useLocalSearchParams();
   const { token } = useAuth();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -31,7 +34,7 @@ export default function ZaloPayScreen() {
         const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
         setOrder({ ...orderData, zaloPay, payment, paymentUrl });
       } catch (e) {
-        Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng.');
+        showAlert('Lỗi', 'Không thể tải thông tin đơn hàng.', 'error');
       } finally {
         setLoading(false);
       }
@@ -56,7 +59,7 @@ export default function ZaloPayScreen() {
   const handleCopyOrderUrl = async () => {
     if (paymentUrl) {
       await Clipboard.setStringAsync(paymentUrl);
-      Alert.alert('Đã copy', 'Đã copy link thanh toán vào clipboard!');
+      showAlert('Đã copy', 'Đã copy link thanh toán vào clipboard!', 'success');
     }
   };
 
@@ -66,7 +69,7 @@ export default function ZaloPayScreen() {
     setConfirming(true);
     try {
       await updatePaymentStatus(token || '', orderId as string, { payment_status: 'Completed' });
-      Alert.alert('Thành công', 'Đã xác nhận thanh toán.');
+      showAlert('Thành công', 'Đã xác nhận thanh toán.', 'success');
       // Fetch lại đơn hàng để cập nhật trạng thái
       const response = await getOrderDetail(token || '', orderId as string);
       let orderData = response.order || {};
@@ -75,7 +78,7 @@ export default function ZaloPayScreen() {
       const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
       setOrder({ ...orderData, zaloPay, payment, paymentUrl });
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể xác nhận thanh toán.');
+      showAlert('Lỗi', 'Không thể xác nhận thanh toán.', 'error');
     } finally {
       setConfirming(false);
     }
@@ -140,10 +143,10 @@ export default function ZaloPayScreen() {
                   if (supported) {
                     await Linking.openURL(paymentUrl);
                   } else {
-                    Alert.alert('Không thể mở app ZaloPay', 'Thiết bị của bạn không hỗ trợ mở link này.');
+                    showAlert('Không thể mở app ZaloPay', 'Thiết bị của bạn không hỗ trợ mở link này.', 'error');
                   }
                 } catch (e) {
-                  Alert.alert('Không thể mở trang thanh toán', String(e));
+                  showAlert('Không thể mở trang thanh toán', String(e), 'error');
                 }
               }}
             >
@@ -191,6 +194,17 @@ export default function ZaloPayScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </SafeAreaView>
   );
 }

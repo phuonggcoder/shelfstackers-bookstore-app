@@ -3,14 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import AddressService, { UserAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
   const { token } = useAuth();
   const { from } = useLocalSearchParams();
+  const { showAlert: showUnifiedAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,7 +123,7 @@ const AddressListScreen = () => {
         fetchAddresses();
       } catch (error) {
         console.error('Error setting default address:', error);
-        Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+        showUnifiedAlert('Lỗi', 'Không thể đặt địa chỉ mặc định', 'error');
       }
     }
   };
@@ -140,10 +143,10 @@ const AddressListScreen = () => {
       // Sau đó set địa chỉ mới thành true
       await AddressService.setDefaultAddress(token, defaultChangeData.newId);
       fetchAddresses();
-    } catch (error) {
-      console.error('Error setting default address:', error);
-      Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
-    } finally {
+          } catch (error) {
+        console.error('Error setting default address:', error);
+        showUnifiedAlert('Lỗi', 'Không thể đặt địa chỉ mặc định', 'error');
+      } finally {
       setLoading(false);
       setDefaultChangeData(null);
     }
@@ -151,7 +154,7 @@ const AddressListScreen = () => {
 
   const handleConfirm = () => {
     if (!selected) {
-      Alert.alert('Lỗi', 'Vui lòng chọn một địa chỉ');
+      showUnifiedAlert('Lỗi', 'Vui lòng chọn một địa chỉ', 'error');
       return;
     }
     
@@ -384,6 +387,15 @@ const AddressListScreen = () => {
           </TouchableOpacity>
         </View>
       )}
+      <UnifiedCustomComponent
+        type="alert"
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        mode={alertConfig.mode as any}
+        buttonText={alertConfig.buttonText}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };

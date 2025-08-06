@@ -3,10 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import VoucherValidationPopup from '../components/VoucherValidationPopup';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
@@ -16,6 +18,7 @@ import { formatVND, getBookImageUrl } from '../utils/format';
 
 export default function OrderReviewScreen() {
   const { token } = useAuth();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const { bookId, ids, cartItems: cartItemsParam, totalAmount, itemCount } = useLocalSearchParams();
   const [book, setBook] = useState<any>(null);
   const [cartItems, setCartItems] = useState<any[]>([]); // For multi-item checkout
@@ -263,7 +266,7 @@ export default function OrderReviewScreen() {
       await addToCart(token, book._id, 1);
       router.replace('/cart');
     } catch {
-      Alert.alert('Lỗi', 'Không thể thêm vào giỏ hàng.');
+      showAlert('Lỗi', 'Không thể thêm vào giỏ hàng.', 'error');
     }
   };
 
@@ -279,23 +282,23 @@ export default function OrderReviewScreen() {
 
   const handleConfirm = async () => {
     if (!token) {
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      showAlert('Lỗi', 'Vui lòng đăng nhập lại.', 'error');
       return;
     }
 
     if (!address) {
-      Alert.alert('Lỗi', 'Vui lòng chọn địa chỉ giao hàng.');
+      showAlert('Lỗi', 'Vui lòng chọn địa chỉ giao hàng.', 'error');
       return;
     }
 
     if (!selectedPaymentMethod) {
-      Alert.alert('Lỗi', 'Vui lòng chọn phương thức thanh toán.');
+      showAlert('Lỗi', 'Vui lòng chọn phương thức thanh toán.', 'error');
       return;
     }
 
     // Check if we have items to order (either cart items or single book)
     if ((!cartItems || cartItems.length === 0) && !book) {
-      Alert.alert('Lỗi', 'Không có sản phẩm để đặt hàng. Vui lòng thêm sản phẩm vào giỏ hàng.');
+      showAlert('Lỗi', 'Không có sản phẩm để đặt hàng. Vui lòng thêm sản phẩm vào giỏ hàng.', 'error');
       return;
     }
 
@@ -303,7 +306,7 @@ export default function OrderReviewScreen() {
     if (cartItems.length > 0) {
       const invalidItems = cartItems.filter(item => !item.book || !item.book._id);
       if (invalidItems.length > 0) {
-        Alert.alert('Lỗi', 'Một số sản phẩm trong giỏ hàng không hợp lệ. Vui lòng thử lại.');
+        showAlert('Lỗi', 'Một số sản phẩm trong giỏ hàng không hợp lệ. Vui lòng thử lại.', 'error');
         return;
       }
       
@@ -318,14 +321,14 @@ export default function OrderReviewScreen() {
         const outOfStockMessage = outOfStockItems.map(item => 
           `${item.book.title}: Còn ${item.book.stock}, Yêu cầu ${item.quantity}`
         ).join('\n');
-        Alert.alert('Hết hàng', `Một số sản phẩm không đủ số lượng:\n${outOfStockMessage}`);
+        showAlert('Hết hàng', `Một số sản phẩm không đủ số lượng:\n${outOfStockMessage}`, 'warning');
         return;
       }
     }
     
     // For single book, check stock
     if (book && (!book.stock || book.stock < 1)) {
-      Alert.alert('Hết hàng', 'Sản phẩm này hiện đã hết hàng.');
+      showAlert('Hết hàng', 'Sản phẩm này hiện đã hết hàng.', 'warning');
       return;
     }
 
@@ -348,7 +351,7 @@ export default function OrderReviewScreen() {
           console.log('Voucher validation result:', voucherValidation);
           
           if (!voucherValidation.valid) {
-            Alert.alert('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.');
+            showAlert('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.', 'error');
             return;
           }
         } catch (error: any) {
@@ -362,7 +365,7 @@ export default function OrderReviewScreen() {
             voucherErrorMsg = 'Giá trị đơn hàng không đủ để áp dụng voucher. Vui lòng thêm sản phẩm hoặc chọn voucher khác.';
           }
           
-          Alert.alert('Lỗi voucher', voucherErrorMsg);
+          showAlert('Lỗi voucher', voucherErrorMsg, 'error');
           return;
         }
       }
@@ -463,7 +466,7 @@ export default function OrderReviewScreen() {
         }
       }
       
-      Alert.alert('Lỗi', errorMessage);
+      showAlert('Lỗi', errorMessage, 'error');
     }
   };
 
@@ -896,6 +899,17 @@ export default function OrderReviewScreen() {
         voucher={voucherValidationPopup.voucher}
         subtotal={voucherValidationPopup.subtotal}
         onClose={closeVoucherValidationPopup}
+      />
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
       />
 
     </SafeAreaView>

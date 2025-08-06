@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { storageHelper } from '../config/storage';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { authService } from '../services/authService';
 import { createOrUpdateSession, listenFcmTokenRefresh, removeFcmToken, syncFcmToken, updateSessionFcmToken } from '../services/fcmService';
 import googleAuthService from '../services/googleAuthService';
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [tokenExpiredAlertVisible, setTokenExpiredAlertVisible] = useState(false);
   const [fcmSyncAttempted, setFcmSyncAttempted] = useState(false);
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
 
   useEffect(() => {
     loadStoredAuth();
@@ -202,12 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       listenFcmTokenRefresh(userData.user._id, deviceId);
-      Alert.alert('Thành công', 'Đăng nhập thành công!');
+      showAlert('Thành công', 'Đăng nhập thành công!', 'success');
     } catch (error) {
       console.error('Error saving auth:', error);
-      Alert.alert(
+      showAlert(
         'Lỗi xác thực',
-        'Không thể hoàn thành quá trình xác thực. Vui lòng thử lại.'
+        'Không thể hoàn thành quá trình xác thực. Vui lòng thử lại.',
+        'error'
       );
       throw error;
     }
@@ -242,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Sign out completed successfully');
     } catch (error) {
       console.error('Error signing out:', error);
-      Alert.alert('Lỗi', 'Không thể đăng xuất đúng cách');
+      showAlert('Lỗi', 'Không thể đăng xuất đúng cách', 'error');
     }
   };
 
@@ -260,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authService.register(data);
       await signIn(res); // Đăng nhập luôn sau khi đăng ký thành công
     } catch (error) {
-      Alert.alert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
+      showAlert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.', 'error');
       throw error;
     } finally {
       setIsLoading(false);
@@ -277,9 +281,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRes = await authService.getMe(token);
       setUser(userRes.user || userRes);
       await AsyncStorage.setItem('user', JSON.stringify(userRes.user || userRes));
-      Alert.alert('Thành công', 'Cập nhật thông tin thành công!');
+      showAlert('Thành công', 'Cập nhật thông tin thành công!', 'success');
     } catch (error) {
-      Alert.alert('Lỗi', 'Cập nhật thông tin thất bại');
+      showAlert('Lỗi', 'Cập nhật thông tin thất bại', 'error');
       throw error;
     } finally {
       setIsLoading(false);
@@ -302,6 +306,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser // Thêm vào Provider
     }}>
       {children}
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </AuthContext.Provider>
   );
 }

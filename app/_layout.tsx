@@ -4,7 +4,7 @@
 import { useFCMListener } from '@/hooks/useFCMListener';
 import { FontAwesome } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { RootSiblingParent } from 'react-native-root-siblings';
@@ -108,6 +108,7 @@ function RootLayoutNav() {
             animation: 'fade',
           }} 
         />
+
       </Stack>
       <TokenExpiredAlert 
         visible={tokenExpiredAlertVisible}

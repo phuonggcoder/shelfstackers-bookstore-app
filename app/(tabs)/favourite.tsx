@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, View as RNView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, FlatList, Image, Modal, View as RNView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../../components/UnifiedCustomComponent';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedComponent } from '../../hooks/useUnifiedComponent';
 import { getWishlist, removeFromWishlist } from '../../services/api';
 
 const { width, height } = Dimensions.get('window');
@@ -192,6 +194,7 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const menuButtonRef = useRef<RNView>(null);
   const { token } = useAuth();
+  const { showDialog, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
 
   const openMenu = () => {
     if (menuButtonRef.current) {
@@ -207,21 +210,17 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
   const handleRemove = async () => {
     setMenuVisible(false);
     if (!token) return;
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (!window.confirm('Bạn có chắc muốn xóa sách này khỏi danh sách yêu thích?')) return;
-    } else if (typeof Alert !== 'undefined') {
-      // Nếu là React Native, dùng Alert
-      Alert.alert('Xác nhận', 'Bạn có chắc muốn xóa sách này khỏi danh sách yêu thích?', [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Xóa', style: 'destructive', onPress: async () => {
-          await removeFromWishlist(token, item._id || item.id);
-          onRemove();
-        }}
-      ]);
-      return;
+    showDialog('Xác nhận', 'Bạn có chắc muốn xóa sách này khỏi danh sách yêu thích?', 'warning', 'Xóa', 'Hủy');
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!token) return;
+    try {
+      await removeFromWishlist(token, item._id || item.id);
+      onRemove();
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
     }
-    await removeFromWishlist(token, item._id || item.id);
-    onRemove();
   };
 
   const handlePay = () => {
@@ -287,6 +286,19 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Unified Custom Component for dialogs */}
+      <UnifiedCustomComponent
+        type="dialog"
+        mode={dialogConfig.mode as any}
+        visible={dialogVisible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={handleConfirmRemove}
+        onCancel={hideDialog}
+      />
     </TouchableOpacity>
   );
 }

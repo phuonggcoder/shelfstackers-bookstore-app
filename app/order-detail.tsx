@@ -2,11 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewForm from '../components/ReviewForm';
 import ThankYouModal from '../components/ThankYouModal';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { cancelOrder, getOrderDetail } from '../services/orderService';
 import ReviewService from '../services/reviewService';
 
@@ -55,6 +57,7 @@ const OrderDetailScreen = () => {
   const router = useRouter();
   const { orderId } = useLocalSearchParams();
   const { token } = useAuth();
+  const { showAlert, showDialog, alertVisible, alertConfig, hideAlert, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -107,7 +110,7 @@ const OrderDetailScreen = () => {
       });
     } catch (error) {
       console.error('Error loading order detail:', error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng');
+      showAlert('Lỗi', 'Không thể tải thông tin đơn hàng', 'error');
     } finally {
       setLoading(false);
     }
@@ -115,21 +118,22 @@ const OrderDetailScreen = () => {
 
   const handleCancelOrder = async () => {
     if (!token || !orderId) return;
-    Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
-      { text: 'Không', style: 'cancel' },
-      { text: 'Hủy đơn', style: 'destructive', onPress: async () => {
-        setCancelling(true);
-        try {
-          await cancelOrder(token, orderId as string, 'Khách tự hủy');
-          Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
-          loadOrderDetail();
-        } catch (e) {
-          Alert.alert('Lỗi', 'Không thể hủy đơn hàng.');
-        } finally {
-          setCancelling(false);
-        }
-      }}
-    ]);
+    showDialog('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', 'warning', 'Hủy đơn', 'Không');
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!token || !orderId) return;
+    setCancelling(true);
+    try {
+      await cancelOrder(token, orderId as string, 'Khách tự hủy');
+      showAlert('Thành công', 'Đơn hàng đã được hủy.', 'success');
+      loadOrderDetail();
+    } catch (e) {
+      showAlert('Lỗi', 'Không thể hủy đơn hàng.', 'error');
+    } finally {
+      setCancelling(false);
+      hideDialog();
+    }
   };
 
   const handleReviewProduct = async (product: OrderItem) => {
@@ -182,7 +186,7 @@ const OrderDetailScreen = () => {
       setExistingReview(null);
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      showAlert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -525,6 +529,29 @@ const OrderDetailScreen = () => {
         onClose={handleCloseThankYouModal}
         onGoHome={handleGoHome}
         isUpdate={isUpdateReview}
+      />
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
+
+      <UnifiedCustomComponent
+        type="dialog"
+        mode={dialogConfig.mode as any}
+        visible={dialogVisible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={handleConfirmCancel}
+        onCancel={hideDialog}
       />
     </SafeAreaView>
   );

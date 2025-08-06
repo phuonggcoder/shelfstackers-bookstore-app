@@ -1,14 +1,15 @@
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import googleAuthService from '../services/googleAuthService';
+import UnifiedCustomComponent from './UnifiedCustomComponent';
 
 interface GoogleSignInButtonProps {
   onSuccess?: (result: any) => void;
@@ -25,6 +26,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [loading, setLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
@@ -43,7 +45,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       } else {
         const error = new Error(result.message || 'Đăng nhập Google thất bại');
         onError?.(error);
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showAlert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra', 'error');
       }
     } catch (error: any) {
       console.error('❌ Google Sign-In error:', error);
@@ -53,13 +55,13 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         console.log('User cancelled Google Sign-In');
         // Không hiển thị alert cho user cancel
       } else if (error.message?.includes('PLAY_SERVICES_NOT_AVAILABLE')) {
-        Alert.alert('Lỗi', 'Google Play Services không khả dụng. Vui lòng cập nhật Google Play Services.');
+        showAlert('Lỗi', 'Google Play Services không khả dụng. Vui lòng cập nhật Google Play Services.', 'error');
       } else if (error.message?.includes('Không thể lấy ID token')) {
-        Alert.alert('Lỗi', 'Không thể xác thực với Google. Vui lòng thử lại.');
+        showAlert('Lỗi', 'Không thể xác thực với Google. Vui lòng thử lại.', 'error');
       } else if (error.message?.includes('Network')) {
-        Alert.alert('Lỗi mạng', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet.');
+        showAlert('Lỗi mạng', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet.', 'error');
       } else {
-        Alert.alert('Lỗi', error.message || 'Đăng nhập Google thất bại');
+        showAlert('Lỗi', error.message || 'Đăng nhập Google thất bại', 'error');
       }
       
       onError?.(error);
@@ -69,31 +71,43 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        disabled || loading ? styles.buttonDisabled : null,
-        style,
-      ]}
-      onPress={handleGoogleSignIn}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color="#ffffff" size="small" />
-      ) : (
-        <View style={styles.buttonContent}>
-          <Image
-            source={require('../assets/images/google.png')}
-            style={styles.icon}
-            contentFit="contain"
-          />
-          <Text style={[styles.buttonText, textStyle]}>
-            Đăng nhập với Google
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          disabled || loading ? styles.buttonDisabled : null,
+          style,
+        ]}
+        onPress={handleGoogleSignIn}
+        disabled={disabled || loading}
+        activeOpacity={0.8}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" size="small" />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Image
+              source={require('../assets/images/google.png')}
+              style={styles.icon}
+              contentFit="contain"
+            />
+            <Text style={[styles.buttonText, textStyle]}>
+              Đăng nhập với Google
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      
+      <UnifiedCustomComponent
+        type="alert"
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        mode={alertConfig.mode as any}
+        buttonText={alertConfig.buttonText}
+        onClose={hideAlert}
+      />
+    </>
   );
 };
 

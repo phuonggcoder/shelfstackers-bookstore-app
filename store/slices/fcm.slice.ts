@@ -36,7 +36,7 @@ const fcmSlice = createSlice({
       })
       .addCase(updateFcmToken.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message || 'Failed to update FCM token';
+        state.error = action.error.message || 'Không thể cập nhật FCM token';
       });
   },
 });

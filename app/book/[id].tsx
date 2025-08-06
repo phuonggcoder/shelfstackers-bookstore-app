@@ -7,10 +7,11 @@ import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleS
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import CustomLoginDialog from '../../components/BottomAlert';
-import CartAddedDialog from '../../components/CartAddedDialog';
+
 import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import ReviewCard from '../../components/ReviewCard';
+import UnifiedCustomComponent from '../../components/UnifiedCustomComponent';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { addToCart, addToWishlist, getBookById, getBooksByCategory } from '../../services/api';
@@ -66,7 +67,9 @@ const BookDetailsScreen = () => {
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   const [isFavorite, setIsFavorite] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean, message: string }>({ visible: false, message: '' });
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
 
   const [outOfStock, setOutOfStock] = useState(false);
   const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
@@ -307,9 +310,11 @@ const BookDetailsScreen = () => {
 
   const truncatedHtml = isExpanded ? book.description : book.description.slice(0, 200) + '...';
 
-  const showToast = (message: string) => {
-    setToast({ visible: true, message });
-    setTimeout(() => setToast({ visible: false, message: '' }), 1500);
+  const displayToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 1500);
   };
 
   const handleFavorite = async (bookId: string | string[] | undefined) => {
@@ -318,17 +323,17 @@ const BookDetailsScreen = () => {
       return;
     }
     if (isFavorite) {
-      showToast('Đã thêm vào danh sách yêu thích');
+      displayToast('Đã thêm vào danh sách yêu thích');
       return;
     }
     try {
       const res = await addToWishlist(token, bookId as string);
       console.log('Add to wishlist response:', res);
       setIsFavorite(true);
-      showToast('Đã thêm vào danh sách yêu thích');
+      displayToast('Đã thêm vào danh sách yêu thích');
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Không thể thêm vào danh sách yêu thích');
+      displayToast('Không thể thêm vào danh sách yêu thích', 'error');
     }
   };
 
@@ -1029,16 +1034,25 @@ const BookDetailsScreen = () => {
           }}
         />
       )}
-      {toast.visible && (
-        <View style={{ position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center', zIndex: 100 }}>
-          <View style={{ backgroundColor: '#5E5CE6', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 }}>
-            <Ionicons name="checkmark" size={24} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={{ color: '#fff', fontSize: 16 }}>{toast.message}</Text>
-          </View>
-        </View>
-      )}
+             <UnifiedCustomComponent
+         type="toast"
+         mode={toastType}
+         visible={showToast}
+         text1={toastMessage}
+         position="bottom"
+         duration={1500}
+         onClose={() => setShowToast(false)}
+       />
       <CustomOutOfStockAlert visible={outOfStock} onClose={() => router.back()} />
-      <CartAddedDialog visible={showCartDialog} onHide={() => setShowCartDialog(false)} />
+      <UnifiedCustomComponent
+        type="toast"
+        mode="success"
+        visible={showCartDialog}
+        text1="Đã thêm vào giỏ hàng"
+        position="center"
+        duration={1500}
+        onClose={() => setShowCartDialog(false)}
+      />
       
       {/* Fullscreen Image Modal */}
       <Modal

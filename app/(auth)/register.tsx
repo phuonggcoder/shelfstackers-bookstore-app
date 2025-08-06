@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,11 +12,14 @@ import {
     View,
 } from 'react-native';
 import AvoidKeyboardDummyView from '../../components/AvoidKeyboardDummyView';
+import UnifiedCustomComponent from '../../components/UnifiedCustomComponent';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedComponent } from '../../hooks/useUnifiedComponent';
 import { authService } from '../../services/authService';
 
 export default function Register() {
   const { signIn } = useAuth();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,22 +36,22 @@ export default function Register() {
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc');
+      showAlert('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc', 'error');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      showAlert('Lỗi', 'Email không hợp lệ', 'error');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu không khớp');
+      showAlert('Lỗi', 'Mật khẩu không khớp', 'error');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      showAlert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự', 'error');
       return;
     }
 
@@ -64,15 +66,29 @@ export default function Register() {
       });
 
       await signIn(response);
-      Alert.alert('Thành công', 'Đăng ký thành công!', [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(tabs)'),
-        },
-      ]);
+      showAlert('Thành công', 'Đăng ký thành công!', 'success', 'OK');
+      setTimeout(() => router.replace('/(tabs)'), 1500);
     } catch (error: any) {
-      const errorMessage = error.message || 'Đã xảy ra lỗi khi đăng ký';
-      Alert.alert('Đăng ký thất bại', errorMessage);
+      // Dịch các lỗi phổ biến sang tiếng Việt
+      let errorMessage = 'Đã xảy ra lỗi khi đăng ký';
+      if (error.message) {
+        const message = error.message.toLowerCase();
+        if (message.includes('email already exists') || message.includes('email already registered')) {
+          errorMessage = 'Email đã tồn tại trong hệ thống';
+        } else if (message.includes('username already exists')) {
+          errorMessage = 'Tên người dùng đã tồn tại';
+        } else if (message.includes('invalid email')) {
+          errorMessage = 'Email không hợp lệ';
+        } else if (message.includes('password') && message.includes('weak')) {
+          errorMessage = 'Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn';
+        } else if (message.includes('network') || message.includes('connection')) {
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng thử lại';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showAlert('Đăng ký thất bại', errorMessage, 'error');
       console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
@@ -80,112 +96,125 @@ export default function Register() {
   };
 
   return (
-    <ScrollView style={styles.scrollbox}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Image
-            source={require('../../assets/images/icon.png')}
-            style={styles.logo}
-            contentFit="contain"
-          />
-          <Text style={styles.title}>Đăng ký tài khoản</Text>
-          <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tên người dùng <Text style={styles.optionalText}>(tùy chọn)</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập tên người dùng (để trống sẽ tự động tạo từ email)"
-              value={username}
-              onChangeText={setUsername}
-              editable={!isLoading}
+    <>
+      <ScrollView style={styles.scrollbox}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/icon.png')}
+              style={styles.logo}
+              contentFit="contain"
             />
+            <Text style={styles.title}>Đăng ký tài khoản</Text>
+            <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!isLoading}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Mật khẩu</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập mật khẩu"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={24}
-                color="#999"
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Tên người dùng <Text style={styles.optionalText}>(tùy chọn)</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập tên người dùng (để trống sẽ tự động tạo từ email)"
+                value={username}
+                onChangeText={setUsername}
+                editable={!isLoading}
               />
-            </TouchableOpacity>
-          </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nhập lại mật khẩu</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập lại mật khẩu"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={24}
-                color="#999"
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!isLoading}
               />
-            </TouchableOpacity>
-          </View>
+            </View>
 
-          <TouchableOpacity
-            style={[
-              styles.registerButton,
-              isLoading && styles.registerButtonDisabled,
-            ]}
-            onPress={handleRegister}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.registerButtonText}>Đăng ký</Text>
-            )}
-          </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập mật khẩu"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!isLoading}
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={24}
+                  color="#999"
+                />
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Đã có tài khoản?</Text>
-            <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.loginLink}>Đăng nhập</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nhập lại mật khẩu</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập lại mật khẩu"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                editable={!isLoading}
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={24}
+                  color="#999"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.registerButton,
+                isLoading && styles.registerButtonDisabled,
+              ]}
+              onPress={handleRegister}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.registerButtonText}>Đăng ký</Text>
+              )}
             </TouchableOpacity>
+
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Đã có tài khoản?</Text>
+              <TouchableOpacity onPress={() => router.push('/login')}>
+                <Text style={styles.loginLink}>Đăng nhập</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-      <AvoidKeyboardDummyView minHeight={0} maxHeight={300} />
-    </ScrollView>
+        <AvoidKeyboardDummyView minHeight={0} maxHeight={300} />
+      </ScrollView>
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
+    </>
   );
 }
 

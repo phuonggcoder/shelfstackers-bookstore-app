@@ -3,10 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { getCart, removeFromCart, updateCartQuantity } from '../services/api';
 
 interface CartItem {
@@ -26,10 +28,13 @@ const CartScreen = () => {
   const router = useRouter();
   const { cartCount, fetchCartCount } = useCart();
   const { user, token } = useAuth();
+  const { showAlert, showDialog, alertVisible, alertConfig, hideAlert, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -106,7 +111,7 @@ const CartScreen = () => {
       await fetchCartCount(token);
     } catch (error) {
       console.error('Error updating quantity:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+      showAlert('Lỗi', 'Không thể cập nhật số lượng', 'error');
     } finally {
       setLoading(false);
     }
@@ -115,31 +120,27 @@ const CartScreen = () => {
   const handleRemoveItem = async (bookId: string) => {
     if (!token) return;
     
-    Alert.alert(
-      'Xác nhận',
-      'Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await removeFromCart(token, bookId);
-              await loadCart();
-              await fetchCartCount(token);
-              setSelectedItems(prev => prev.filter(id => id !== bookId));
-            } catch (error) {
-              console.error('Error removing item:', error);
-              Alert.alert('Lỗi', 'Không thể xóa sản phẩm');
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    setItemToDelete(bookId);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!token || !itemToDelete) return;
+    
+    try {
+      setLoading(true);
+      await removeFromCart(token, itemToDelete);
+      await loadCart();
+      await fetchCartCount(token);
+      setSelectedItems(prev => prev.filter(id => id !== itemToDelete));
+    } catch (error) {
+      console.error('Error removing item:', error);
+      showAlert('Lỗi', 'Không thể xóa sản phẩm', 'error');
+    } finally {
+      setLoading(false);
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
+    }
   };
 
   const calculateTotal = () => {
@@ -164,7 +165,7 @@ const CartScreen = () => {
     
     if (selectedItems.length === 0) {
       console.log('No items selected, showing alert');
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán');
+      showAlert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán', 'warning');
       return;
     }
     
@@ -199,7 +200,7 @@ const CartScreen = () => {
       console.log('✅ Navigation successful');
     } catch (error) {
       console.error('❌ Error storing data or navigating:', error);
-      Alert.alert('Lỗi', 'Không thể chuyển đến trang thanh toán');
+      showAlert('Lỗi', 'Không thể chuyển đến trang thanh toán', 'error');
     }
     
     console.log('=== CHECKOUT PROCESS END ===');
@@ -374,6 +375,31 @@ const CartScreen = () => {
           </View>
         </>
       )}
+
+      <UnifiedCustomComponent
+        type="dialog"
+        mode="warning"
+        visible={showDeleteDialog}
+        title="Xác nhận xóa sản phẩm"
+        message="Bạn có chắc chắn muốn xóa sản phẩm này khỏi giỏ hàng?"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        onConfirm={confirmDeleteItem}
+        onCancel={() => {
+          setShowDeleteDialog(false);
+          setItemToDelete(null);
+        }}
+      />
+
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </SafeAreaView>
   );
 };

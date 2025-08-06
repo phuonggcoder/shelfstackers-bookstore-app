@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -11,7 +10,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import OTPService from '../services/otpService';
+import UnifiedCustomComponent from './UnifiedCustomComponent';
 
 interface OTPLoginProps {
   onLoginSuccess: (result: any) => void;
@@ -19,6 +20,7 @@ interface OTPLoginProps {
 }
 
 const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isRequestingOTP, setIsRequestingOTP] = useState(false);
@@ -39,7 +41,7 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
   // Request OTP
   const handleRequestOTP = async () => {
     if (!phone || phone.length < 10) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại hợp lệ');
+      showAlert('Lỗi', 'Vui lòng nhập số điện thoại hợp lệ', 'error');
       return;
     }
 
@@ -49,15 +51,15 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
       if (result.success) {
         setOtpSent(true);
         setCountdown(180); // 3 phút
-        Alert.alert('Thành công', 'Mã OTP đã được gửi đến số điện thoại của bạn');
+        showAlert('Thành công', 'Mã OTP đã được gửi đến số điện thoại của bạn', 'success');
         setTimeout(() => {
           otpInputRef.current?.focus();
         }, 500);
       } else {
-        Alert.alert('Lỗi', result.msg || 'Không thể gửi OTP. Vui lòng thử lại');
+        showAlert('Lỗi', result.msg || 'Không thể gửi OTP. Vui lòng thử lại', 'error');
       }
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Không thể gửi OTP. Vui lòng thử lại');
+      showAlert('Lỗi', error.message || 'Không thể gửi OTP. Vui lòng thử lại', 'error');
     } finally {
       setIsRequestingOTP(false);
     }
@@ -66,7 +68,7 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
   // Verify OTP
   const handleVerifyOTP = async () => {
     if (!otp || otp.length !== 4) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mã OTP 4 số');
+      showAlert('Lỗi', 'Vui lòng nhập mã OTP 4 số', 'error');
       return;
     }
 
@@ -74,11 +76,11 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
     try {
       const result = await OTPService.verifyOTP(phone, otp);
       if (result.success) {
-        Alert.alert('Thành công', 'Đăng nhập thành công!');
+        showAlert('Thành công', 'Đăng nhập thành công!', 'success');
         onLoginSuccess(result);
       }
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Mã OTP không đúng. Vui lòng thử lại');
+      showAlert('Lỗi', error.message || 'Mã OTP không đúng. Vui lòng thử lại', 'error');
     } finally {
       setIsVerifyingOTP(false);
     }
@@ -175,6 +177,17 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </KeyboardAvoidingView>
   );
 };

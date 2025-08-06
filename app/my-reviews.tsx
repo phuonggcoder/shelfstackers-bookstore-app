@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -13,13 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../components/ReviewCard';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import ReviewService, { Review } from '../services/reviewService';
 import { getProductId } from '../utils/reviewUtils';
 
 const MyReviewsScreen = () => {
   const { user, token } = useAuth();
   const router = useRouter();
+  const { showAlert, showDialog, alertVisible, alertConfig, hideAlert, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
+  const [currentReviewId, setCurrentReviewId] = useState<string>('');
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +67,7 @@ const MyReviewsScreen = () => {
       setPage(pageNum);
     } catch (error) {
       console.error('Error loading reviews:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đánh giá');
+      showAlert('Lỗi', 'Không thể tải danh sách đánh giá', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,27 +115,21 @@ const MyReviewsScreen = () => {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa đánh giá này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await ReviewService.deleteReview(reviewId, token || undefined);
-              Alert.alert('Thành công', 'Đánh giá đã được xóa');
-              handleRefresh();
-            } catch (error) {
-              console.error('Error deleting review:', error);
-              Alert.alert('Lỗi', 'Không thể xóa đánh giá');
-            }
-          },
-        },
-      ]
-    );
+    setCurrentReviewId(reviewId);
+    showDialog('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa đánh giá này?', 'delete', 'Xóa', 'Hủy');
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await ReviewService.deleteReview(currentReviewId, token || undefined);
+      showAlert('Thành công', 'Đánh giá đã được xóa', 'success');
+      handleRefresh();
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      showAlert('Lỗi', 'Không thể xóa đánh giá', 'error');
+    } finally {
+      hideDialog();
+    }
   };
 
   const renderReviewItem = ({ item }: { item: Review }) => (
@@ -213,6 +210,29 @@ const MyReviewsScreen = () => {
         }
         ListEmptyComponent={renderEmptyState()}
         ListFooterComponent={renderFooter()}
+      />
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
+
+      <UnifiedCustomComponent
+        type="dialog"
+        mode={dialogConfig.mode as any}
+        visible={dialogVisible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={handleConfirmDelete}
+        onCancel={hideDialog}
       />
     </SafeAreaView>
   );

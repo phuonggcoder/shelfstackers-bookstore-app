@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react';
 
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,13 +15,16 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import UnifiedCustomComponent from '../../components/UnifiedCustomComponent';
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedComponent } from '../../hooks/useUnifiedComponent';
 import { authService } from '../../services/authService';
 import { convertGoogleSignInResponse } from '../../utils/authUtils';
 
 export default function Login() {
   const { signIn } = useAuth();
+  const { showAlert, showDialog, alertVisible, alertConfig, hideAlert, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,12 +45,12 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin', 'error');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      showAlert('Lỗi', 'Email không hợp lệ', 'error');
       return;
     }
 
@@ -56,11 +58,29 @@ export default function Login() {
       setIsLoading(true);
       const response = await authService.login({ email: email, password });
       await signIn(response);
-      Alert.alert('Thành công', 'Đăng nhập thành công!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      showAlert('Thành công', 'Đăng nhập thành công!', 'success', 'OK');
+      setTimeout(() => router.replace('/(tabs)'), 1500);
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.message || 'Lỗi đăng nhập');
+      // Dịch các lỗi phổ biến sang tiếng Việt
+      let errorMessage = 'Lỗi đăng nhập';
+      if (error.message) {
+        const message = error.message.toLowerCase();
+        if (message.includes('invalid credentials') || message.includes('email or password is incorrect')) {
+          errorMessage = 'Email hoặc mật khẩu không đúng';
+        } else if (message.includes('user not found') || message.includes('email not found')) {
+          errorMessage = 'Email không tồn tại trong hệ thống';
+        } else if (message.includes('password') && message.includes('incorrect')) {
+          errorMessage = 'Mật khẩu không đúng';
+        } else if (message.includes('unauthorized') || message.includes('401')) {
+          errorMessage = 'Thông tin đăng nhập không hợp lệ';
+        } else if (message.includes('network') || message.includes('connection')) {
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng thử lại';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showAlert('Đăng nhập thất bại', errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -76,15 +96,14 @@ export default function Login() {
         const authResponse = convertGoogleSignInResponse(result);
         
         await signIn(authResponse);
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        showAlert('Đăng nhập thành công', 'Chào mừng bạn!', 'success', 'OK');
+        setTimeout(() => router.replace('/(tabs)'), 1500);
       } else {
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showAlert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra', 'error');
       }
     } catch (error: any) {
       console.error('❌ Error after Google Sign-In:', error);
-      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+      showAlert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập', 'error');
     }
   };
 
@@ -107,15 +126,14 @@ export default function Login() {
         };
         
         await signIn(authResponse);
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        showAlert('Đăng nhập thành công', 'Chào mừng bạn!', 'success', 'OK');
+        setTimeout(() => router.replace('/(tabs)'), 1500);
       } else {
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showAlert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra', 'error');
       }
     } catch (error: any) {
       console.error('❌ Error after OTP Login:', error);
-      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+      showAlert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập', 'error');
     }
   };
 
@@ -135,130 +153,143 @@ export default function Login() {
   }
 
   return (
-    <ScrollView style={styles.scrollbox}> 
-      
-   
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require('../../assets/images/logo.png')}
-          style={styles.logo}
-          contentFit="contain"
-        />
-        <Text style={styles.title}>Đăng nhập tài khoản</Text>
-        <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
-      </View>
-
-      <View style={styles.socialContainer}>
-        <GoogleSignInWithAccountPicker
-          onSuccess={handleGoogleSignInSuccess}
-          onError={handleGoogleSignInError}
-          disabled={isLoading}
-          style={styles.googleButton}
-        />
-        <TouchableOpacity 
-          style={styles.socialButton}
-          onPress={() => setAuthMethod('otp')}
-        >
-          <View style={styles.iconContainer}>
-            <Ionicons name="call-outline" size={24} color="#333" />
-          </View>
-          <Text style={styles.socialText}>Số điện thoại</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.dividerContainer}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          placeholder="Nhập email"
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          editable={!isLoading}
-        />
-
-        <Text style={styles.label}>Mật khẩu</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nhập mật khẩu"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          editable={!isLoading}
-        />
-        <TouchableOpacity
-          style={styles.eyeIcon}
-          onPress={() => setShowPassword(!showPassword)}
-        >
-          <Ionicons
-            name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-            size={24}
-            color="#999"
-          />
-        </TouchableOpacity>
-
-        <View style={styles.optionsRow}>
-          <TouchableOpacity style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
-            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-            <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.loginButton,
-            (!email || !password || isLoading) && styles.loginButtonDisabled
-          ]}
-          onPress={handleLogin}
-          disabled={!email || !password || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Chưa có tài khoản?</Text>
-          <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.registerLink}> Đăng ký ngay</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.orContainer}>
-          <View style={styles.orLine} />
-          <Text style={styles.orText}>hoặc</Text>
-          <View style={styles.orLine} />
-        </View>
-
-        <TouchableOpacity 
-          style={styles.skipLoginContainer}
-          onPress={() => router.replace('/(tabs)')}
-        >
-          <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
-          <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
-        </TouchableOpacity>
-      </View>
+    <>
+      <ScrollView style={styles.scrollbox}> 
+        
      
-    </View>
-     <AvoidKeyboardDummyView minHeight={0} maxHeight={300}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logo}
+            contentFit="contain"
+          />
+          <Text style={styles.title}>Đăng nhập tài khoản</Text>
+          <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+        </View>
 
-     </AvoidKeyboardDummyView>
-     </ScrollView>
+        <View style={styles.socialContainer}>
+          <GoogleSignInWithAccountPicker
+            onSuccess={handleGoogleSignInSuccess}
+            onError={handleGoogleSignInError}
+            disabled={isLoading}
+            style={styles.googleButton}
+          />
+          <TouchableOpacity 
+            style={styles.socialButton}
+            onPress={() => setAuthMethod('otp')}
+          >
+            <View style={styles.iconContainer}>
+              <Ionicons name="call-outline" size={24} color="#333" />
+            </View>
+            <Text style={styles.socialText}>Số điện thoại</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>Hoặc đăng nhập bằng</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.form}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            placeholder="Nhập email"
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            editable={!isLoading}
+          />
+
+          <Text style={styles.label}>Mật khẩu</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nhập mật khẩu"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            editable={!isLoading}
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+              size={24}
+              color="#999"
+            />
+          </TouchableOpacity>
+
+          <View style={styles.optionsRow}>
+            <TouchableOpacity style={styles.checkboxRow} onPress={() => setRememberMe(!rememberMe)}>
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+            </TouchableOpacity>
+            <TouchableOpacity>
+              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              (!email || !password || isLoading) && styles.loginButtonDisabled
+            ]}
+            onPress={handleLogin}
+            disabled={!email || !password || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>Chưa có tài khoản?</Text>
+            <TouchableOpacity onPress={() => router.push('/register')}>
+              <Text style={styles.registerLink}> Đăng ký ngay</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.orContainer}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>hoặc</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.skipLoginContainer}
+            onPress={() => router.replace('/(tabs)')}
+          >
+            <Ionicons name="arrow-forward-outline" size={20} color="#3255FB" />
+            <Text style={styles.skipLoginText}>Đăng nhập sau</Text>
+          </TouchableOpacity>
+        </View>
+       
+      </View>
+       <AvoidKeyboardDummyView minHeight={0} maxHeight={300}>
+
+       </AvoidKeyboardDummyView>
+       </ScrollView>
+
+       {/* Unified Components */}
+       <UnifiedCustomComponent
+         type="alert"
+         mode={alertConfig.mode as any}
+         visible={alertVisible}
+         title={alertConfig.title}
+         description={alertConfig.description}
+         buttonText={alertConfig.buttonText}
+         onButtonPress={hideAlert}
+       />
+    </>
   );
 }
 

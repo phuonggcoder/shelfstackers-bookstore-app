@@ -906,22 +906,22 @@ export default function UserDetailScreen() {
       )}
 
       {/* Date Picker */}
-                  {showDatePicker && (
-              <DateTimePicker
-                value={birthday ? parseDate(birthday) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  setShowDatePicker(false);
-                  if (event.type === 'set' && date) {
-                    const d = date;
-                    const formatted = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-                    setBirthday(formatted);
-                    updateBirthday(formatted);
-                  }
-                }}
-              />
-            )}
+      {showDatePicker && (
+        <DateTimePicker
+          value={birthday ? parseDate(birthday) : new Date()}
+          mode="date"
+          display="default"
+          onChange={(event, date) => {
+            setShowDatePicker(false);
+            if (event.type === 'set' && date) {
+              const d = date;
+              const formatted = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+              setBirthday(formatted);
+              updateBirthday(formatted);
+            }
+          }}
+        />
+      )}
 
       {/* Gender Selection Modal */}
       {showGenderModal && (

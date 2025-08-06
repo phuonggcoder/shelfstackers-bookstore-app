@@ -1,24 +1,26 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  SafeAreaView,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { useState } from 'react';
+import {
+    ActivityIndicator,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { authService } from '../services/authService'; // ✅ Đảm bảo đường dẫn đúng
 
 const ChangePassword = () => {
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,17 +32,17 @@ const ChangePassword = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin', 'error');
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải có ít nhất 6 ký tự');
+      showAlert('Lỗi', 'Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới và xác nhận không khớp');
+      showAlert('Lỗi', 'Mật khẩu mới và xác nhận không khớp', 'error');
       return;
     }
 
@@ -48,16 +50,36 @@ const ChangePassword = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        Alert.alert('Lỗi', 'Không tìm thấy token người dùng. Vui lòng đăng nhập lại.');
+        showAlert('Lỗi', 'Không tìm thấy token người dùng. Vui lòng đăng nhập lại.', 'error');
         return;
       }
 
       const message = await authService.changePassword(currentPassword, newPassword, token);
-      Alert.alert('Thành công', message);
-      navigation.goBack();
+      showAlert('Thành công', message, 'success');
+      setTimeout(() => navigation.goBack(), 1500);
     } catch (err: any) {
       console.log('Lỗi đổi mật khẩu:', err.message);
-      Alert.alert('Thất bại', err.message || 'Đã có lỗi xảy ra');
+      
+      // Dịch các lỗi phổ biến sang tiếng Việt
+      let errorMessage = 'Đã có lỗi xảy ra';
+      if (err.message) {
+        const message = err.message.toLowerCase();
+        if (message.includes('current password is incorrect') || message.includes('mật khẩu hiện tại không đúng')) {
+          errorMessage = 'Mật khẩu hiện tại không đúng';
+        } else if (message.includes('password') && message.includes('incorrect')) {
+          errorMessage = 'Mật khẩu không đúng';
+        } else if (message.includes('invalid') && message.includes('password')) {
+          errorMessage = 'Mật khẩu không hợp lệ';
+        } else if (message.includes('unauthorized') || message.includes('401')) {
+          errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại';
+        } else if (message.includes('network') || message.includes('connection')) {
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng thử lại';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      showAlert('Thất bại', errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -122,6 +144,17 @@ const ChangePassword = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </SafeAreaView>
   );
 };

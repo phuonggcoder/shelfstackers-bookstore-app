@@ -176,12 +176,12 @@ export const authService = {
         },
       });
 
-      return response.data.message || 'Password changed successfully';
+      return response.data.message || 'Đổi mật khẩu thành công';
     } catch (error: any) {
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       }
-      throw new Error(error.message || 'Password change failed');
+      throw new Error(error.message || 'Đổi mật khẩu thất bại');
     }
   },
 

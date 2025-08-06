@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -19,8 +18,10 @@ import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
 import ReviewSummary from '../components/ReviewSummary';
 import ThankYouModal from '../components/ThankYouModal';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import UserReviewSection from '../components/UserReviewSection';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { useUserReview } from '../hooks/useUserReview';
 import ReviewService, { Review, ReviewSummary as ReviewSummaryType } from '../services/reviewService';
 import { getUserId } from '../utils/reviewUtils';
@@ -35,6 +36,8 @@ const ProductReviewsScreen = () => {
   }>();
   const { user, token } = useAuth();
   const router = useRouter();
+  const { showAlert, showDialog, alertVisible, alertConfig, hideAlert, dialogVisible, dialogConfig, hideDialog } = useUnifiedComponent();
+  const [currentReviewId, setCurrentReviewId] = useState<string>('');
 
   // Parse items from order if available
   const orderItems = items ? JSON.parse(items) : [];
@@ -111,7 +114,7 @@ const ProductReviewsScreen = () => {
       console.log('ProductReviews - loadReviews - Set reviews count:', response.reviews?.length || 0);
     } catch (error) {
       console.error('ProductReviews - Error loading reviews:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đánh giá');
+      showAlert('Lỗi', 'Không thể tải danh sách đánh giá', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,7 +162,7 @@ const ProductReviewsScreen = () => {
       handleRefresh();
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      showAlert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -212,11 +215,11 @@ const ProductReviewsScreen = () => {
     
     try {
       await ReviewService.deleteReview(pendingDeleteReviewId, token || undefined);
-      Alert.alert('Thành công', 'Đánh giá đã được xóa');
+      showAlert('Thành công', 'Đánh giá đã được xóa', 'success');
       handleRefresh();
     } catch (error) {
       console.error('Error deleting review:', error);
-      Alert.alert('Lỗi', 'Không thể xóa đánh giá');
+      showAlert('Lỗi', 'Không thể xóa đánh giá', 'error');
     } finally {
       setShowDeleteConfirmModal(false);
       setPendingDeleteReviewId(null);
@@ -481,6 +484,17 @@ const ProductReviewsScreen = () => {
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
         type="danger"
+      />
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
       />
     </SafeAreaView>
   );

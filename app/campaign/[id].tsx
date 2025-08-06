@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import Header from '../../components/Header';
+import UnifiedCustomComponent from '../../components/UnifiedCustomComponent';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedComponent } from '../../hooks/useUnifiedComponent';
 import api, { getBooks } from '../../services/api';
 import { Voucher } from '../../services/voucherService';
 import { Book, Campaign } from '../../types';
@@ -13,6 +15,7 @@ import { Book, Campaign } from '../../types';
 const CampaignDetailScreen = () => {
   const router = useRouter();
   const { id, name } = useLocalSearchParams();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [books, setBooks] = useState<Book[]>([]);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,12 +57,12 @@ const CampaignDetailScreen = () => {
   // Xử lý khi user muốn dùng voucher
   const handleUseVoucher = (voucher: Voucher) => {
     if (!token) {
-      Alert.alert('Bạn cần đăng nhập để sử dụng voucher!');
+      showAlert('Bạn cần đăng nhập để sử dụng voucher!', '', 'warning');
       // Có thể chuyển hướng sang màn hình đăng nhập nếu muốn
       return;
     }
     // Logic apply voucher ở đây (tạm thời chỉ alert)
-    Alert.alert('Thành công', `Bạn đã chọn voucher: ${voucher.title || voucher.voucher_id}`);
+    showAlert('Thành công', `Bạn đã chọn voucher: ${voucher.title || voucher.voucher_id}`, 'success');
   };
 
   // Lấy sách gợi ý (random 4 cuốn)
@@ -233,6 +236,17 @@ const CampaignDetailScreen = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </SafeAreaView>
   );
 };

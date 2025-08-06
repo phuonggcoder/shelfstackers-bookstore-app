@@ -5,17 +5,20 @@ import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import { getOrderDetail } from '../services/orderService';
 import { formatVND } from '../utils/format';
 
 export default function OrderSuccessScreen() {
   const { token } = useAuth();
   const { orderId } = useLocalSearchParams();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -37,7 +40,7 @@ export default function OrderSuccessScreen() {
         }
       } catch (error) {
         console.error('Error loading order detail:', error);
-        Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng. Vui lòng thử lại.');
+        showAlert('Lỗi', 'Không thể tải thông tin đơn hàng. Vui lòng thử lại.', 'error');
       } finally {
         setLoading(false);
       }
@@ -80,7 +83,7 @@ export default function OrderSuccessScreen() {
         await Sharing.shareAsync(fileUri, { mimeType: 'image/png' });
       });
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải ảnh QR.');
+      showAlert('Lỗi', 'Không thể tải ảnh QR.', 'error');
     }
   };
 
@@ -88,7 +91,7 @@ export default function OrderSuccessScreen() {
   const handleCopyOrderUrl = async () => {
     if (qrValue) {
       await Clipboard.setStringAsync(qrValue);
-      Alert.alert('Đã copy', 'Đã copy link thanh toán vào clipboard!');
+      showAlert('Đã copy', 'Đã copy link thanh toán vào clipboard!', 'success');
     }
   };
 
@@ -198,6 +201,17 @@ export default function OrderSuccessScreen() {
         </>
         )}
       </ScrollView>
+
+      {/* Unified Components */}
+      <UnifiedCustomComponent
+        type="alert"
+        mode={alertConfig.mode as any}
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        buttonText={alertConfig.buttonText}
+        onButtonPress={hideAlert}
+      />
     </SafeAreaView>
   );
 }

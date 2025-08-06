@@ -10,6 +10,7 @@ import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useAuth } from '../../context/AuthContext';
 import { useAvatar } from '../../context/AvatarContext';
 
@@ -115,6 +116,7 @@ const SettingsScreen = () => {
   const [localDetail, setLocalDetail] = React.useState<any>(null);
   const [displayName, setDisplayName] = useState('');
 
+
   useEffect(() => {
     const loadName = async () => {
       const lastName = await AsyncStorage.getItem('user_lastName');
@@ -206,17 +208,20 @@ const SettingsScreen = () => {
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Đổi mật khẩu</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
+
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
+            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Bảo mật tài khoản</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
             <Ionicons name="help-circle-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Quên mật khẩu</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
-          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => {}}>
-            <Ionicons name="shield-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
-            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Bảo mật</Text>
-            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
-          </TouchableOpacity>
         </View>
+
+
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cài đặt chung</Text>
@@ -233,10 +238,14 @@ const SettingsScreen = () => {
           <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
+
+
         
         {/* Spacer to ensure button is not hidden */}
         <View style={{ height: 20 }} />
       </View>
+
+
     </ScrollView>
   );
 };

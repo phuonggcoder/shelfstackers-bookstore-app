@@ -3,7 +3,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     ScrollView,
     StyleSheet,
@@ -13,12 +12,15 @@ import {
     View
 } from 'react-native';
 import AutocompleteInput from '../components/AutocompleteInput';
+import UnifiedCustomComponent from '../components/UnifiedCustomComponent';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedComponent } from '../hooks/useUnifiedComponent';
 import AddressService, { LocationItem } from '../services/addressService';
 
 const AddAddress = () => {
   const router = useRouter();
   const { token } = useAuth();
+  const { showAlert, alertVisible, alertConfig, hideAlert } = useUnifiedComponent();
   const [isDefault, setIsDefault] = useState(false); // luôn là false
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
@@ -49,27 +51,27 @@ const AddAddress = () => {
 
   const handleSubmit = async () => {
     if (!token) {
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm địa chỉ');
+      showAlert('Lỗi', 'Vui lòng đăng nhập để thêm địa chỉ', 'error');
       return;
     }
 
     if (!receiverName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập họ và tên');
+      showAlert('Lỗi', 'Vui lòng nhập họ và tên', 'error');
       return;
     }
 
     if (!phoneNumber.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      showAlert('Lỗi', 'Vui lòng nhập số điện thoại', 'error');
       return;
     }
 
     if (!province || !district || !ward) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ địa chỉ');
+      showAlert('Lỗi', 'Vui lòng chọn đầy đủ địa chỉ', 'error');
       return;
     }
 
     if (!addressDetail.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      showAlert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết', 'error');
       return;
     }
 
@@ -96,18 +98,13 @@ const AddAddress = () => {
       // Set flag to show success alert in address list
       await AsyncStorage.setItem('address_added', 'true');
       
-      Alert.alert('Thành công', 'Địa chỉ đã được thêm thành công', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Go back to address list instead of order review
-            router.back();
-          },
-        },
-      ]);
+      showAlert('Thành công', 'Địa chỉ đã được thêm thành công', 'success');
+      setTimeout(() => {
+        router.back();
+      }, 1500);
     } catch (error) {
       console.error('Create address failed:', error);
-      Alert.alert('Lỗi', 'Không thể thêm địa chỉ. Vui lòng thử lại.');
+      showAlert('Lỗi', 'Không thể thêm địa chỉ. Vui lòng thử lại.', 'error');
     } finally {
       setLoading(false);
     }
@@ -239,6 +236,16 @@ const AddAddress = () => {
           </Text>
         </TouchableOpacity>
       </View>
+      
+      <UnifiedCustomComponent
+        type="alert"
+        visible={alertVisible}
+        title={alertConfig.title}
+        description={alertConfig.description}
+        mode={alertConfig.mode as any}
+        buttonText={alertConfig.buttonText}
+        onClose={hideAlert}
+      />
     </KeyboardAvoidingView>
   );
 };
