@@ -119,10 +119,10 @@ export default function UnifiedCustomComponent({
         };
       case 'warning':
         return {
-          backgroundColor: '#F44336',
+          backgroundColor: '#FF9800',
           iconColor: '#fff',
           icon: 'warning',
-          borderColor: '#F44336',
+          borderColor: '#FF9800',
         };
       case 'info':
         return {

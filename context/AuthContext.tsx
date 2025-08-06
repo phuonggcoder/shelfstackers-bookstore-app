@@ -205,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       listenFcmTokenRefresh(userData.user._id, deviceId);
-      showAlert('Thành công', 'Đăng nhập thành công!', 'success');
+      // Không hiển thị thông báo ở đây, để component gọi signIn hiển thị
     } catch (error) {
       console.error('Error saving auth:', error);
       showAlert(

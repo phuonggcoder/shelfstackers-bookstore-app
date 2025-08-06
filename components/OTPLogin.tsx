@@ -76,7 +76,7 @@ const OTPLogin: React.FC<OTPLoginProps> = ({ onLoginSuccess, onBack }) => {
     try {
       const result = await OTPService.verifyOTP(phone, otp);
       if (result.success) {
-        showAlert('Thành công', 'Đăng nhập thành công!', 'success');
+        // Không hiển thị thông báo ở đây, để login.tsx hiển thị
         onLoginSuccess(result);
       }
     } catch (error: any) {
