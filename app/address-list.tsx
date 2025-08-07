@@ -28,6 +28,10 @@ const AddressListScreen = () => {
   } | null>(null);
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // State for storing province and ward names
+  const [provinceNames, setProvinceNames] = useState<{[key: string]: string}>({});
+  const [wardNames, setWardNames] = useState<{[key: string]: string}>({});
 
   const isFromOrderReview = from === 'order-review';
 
@@ -55,11 +59,44 @@ const AddressListScreen = () => {
         const defaultAddr = arr.find((a: any) => a.is_default);
         setSelected(defaultAddr ? defaultAddr._id : arr[0]._id);
       }
+      // Resolve address names after fetching addresses
+      if (arr.length > 0) {
+        await resolveAddressNames(arr);
+      }
     } catch (e) {
       setAddresses([]);
       console.error('Error fetching addresses:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to resolve province and ward names
+  const resolveAddressNames = async (addressList: any[]) => {
+    try {
+      // Get all provinces
+      const provinces = await AddressService.getProvinces();
+      const provinceMap: {[key: string]: string} = {};
+      provinces.forEach(p => {
+        provinceMap[p.code] = p.name;
+      });
+      setProvinceNames(provinceMap);
+
+      // Get wards for all provinces used in addresses
+      const wardMap: {[key: string]: string} = {};
+      const uniqueProvinces = [...new Set(addressList.map((addr: any) => addr.province))];
+      
+      for (const provinceCode of uniqueProvinces) {
+        if (provinceCode) {
+          const wards = await AddressService.getWards(provinceCode);
+          wards.forEach(w => {
+            wardMap[w.code] = w.name;
+          });
+        }
+      }
+      setWardNames(wardMap);
+    } catch (error) {
+      console.error('Error resolving address names:', error);
     }
   };
 
@@ -110,9 +147,9 @@ const AddressListScreen = () => {
     const newDefault = addrArr.find((a) => a._id === id);
     if (currentDefault && newDefault && currentDefault._id !== id) {
       setDefaultChangeData({
-        currentName: currentDefault.receiver_name,
-        newName: newDefault.receiver_name,
-        newId: id
+        currentName: currentDefault ? currentDefault.fullName : t('noDefaultAddress'),
+        newName: newDefault.fullName,
+        newId: id,
       });
       setShowDefaultModal(true);
     } else if (!currentDefault && newDefault) {
@@ -163,16 +200,6 @@ const AddressListScreen = () => {
       AsyncStorage.setItem('selected_address', JSON.stringify(selectedAddress));
       router.back();
     }
-  };
-
-  const formatAddress = (addr: any) => {
-    const parts = [];
-    if (addr.address_detail) parts.push(addr.address_detail);
-    if (addr.street) parts.push(addr.street);
-    if (addr.ward) parts.push(addr.ward);
-    if (addr.district) parts.push(addr.district);
-    if (addr.province) parts.push(addr.province);
-    return parts.join(', ');
   };
 
   return (
@@ -312,21 +339,19 @@ const AddressListScreen = () => {
                     </View>
                     <View style={styles.addressInfo}>
                       <View style={styles.nameRow}>
-                        <Text style={styles.name}>{addr.receiver_name}</Text>
-                        <Text style={styles.phone}>{addr.phone_number}</Text>
-                        {/* Chỉ hiển thị Mặc định cho địa chỉ mặc định thực sự */}
+                        <Text style={styles.name}>{addr.fullName} <Text style={styles.phone}>| {addr.phone}</Text></Text>
                         {addr.is_default && (
                           <View style={styles.defaultTag}>
                             <Text style={styles.defaultText}>{t('default')}</Text>
                           </View>
                         )}
                       </View>
-                      <Text style={styles.addressText}>{formatAddress(addr)}</Text>
+                      <Text style={styles.addressText}>{addr.street}, {wardNames[addr.ward] || ''}, {provinceNames[addr.province] || ''}</Text>
                       {/* Hiển thị loại địa chỉ */}
                       <View style={styles.addressTypeRow}>
                         <View style={styles.typeTag}>
                           <Text style={styles.typeText}>
-                            {addr.type === 'office' ? t('office') : t('home')}
+                            {addr.type === 'office' ? t('home'):  t('office') }
                           </Text>
                         </View>
                       </View>
@@ -481,6 +506,7 @@ const styles = StyleSheet.create({
   phone: { 
     color: '#666', 
     fontSize: 14,
+    fontWeight: 'normal',
   },
   defaultTag: { 
     backgroundColor: '#e8f4fd', 

@@ -1,133 +1,147 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
-import AddressService from '../services/addressService';
+import AddressService, { District, UserAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { t } = useTranslation();
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
-  // Form data
-  const [formData, setFormData] = useState({
-    receiver_name: '',
-    phone_number: '',
-    email: '',
+
+  const [selectedProvince, setSelectedProvince] = useState({ code: '', name: '' });
+  const [selectedDistrict, setSelectedDistrict] = useState({ code: '', name: '' });
+  const [selectedWard, setSelectedWard] = useState({ code: '', name: '' });
+
+  const [formData, setFormData] = useState<Partial<UserAddress>>({
+    fullName: '',
+    phone: '',
     province: '',
     district: '',
     ward: '',
     street: '',
-    address_detail: '',
     note: '',
     is_default: false,
-    type: 'office' as 'office' | 'home', // Thêm type
+    type: 'office',
   });
 
-  useEffect(() => {
-    if (id && token) {
-      fetchAddress();
-    }
-  }, [id, token]);
-
-  const fetchAddress = async () => {
+  const fetchAddress = useCallback(async () => {
     if (!id || !token) return;
     try {
       setLoading(true);
-      console.log('Fetching address with id:', id, 'token:', token);
-      
-      // Lấy danh sách địa chỉ và tìm địa chỉ cần edit
       const addresses = await AddressService.getAddresses(token);
-      const address = addresses.find((addr: any) => addr._id === id);
-      
-      if (!address) {
-        Alert.alert(t('error'), t('addressNotFoundOrDeleted'));
+      const addressToEdit = addresses.find(addr => addr._id === id);
+
+      if (addressToEdit) {
+        setFormData(addressToEdit);
+        await resolveAddressNames(addressToEdit);
+      } else {
+        Alert.alert(t('error'), t('addressNotFound'));
         router.back();
-        return;
       }
-      
-      console.log('Found address:', address);
-      
-      setFormData({
-        receiver_name: address.receiver_name || '',
-        phone_number: address.phone_number || '',
-        email: address.email || '',
-        province: address.province || '',
-        district: address.district || '',
-        ward: address.ward || '',
-        street: address.street || '',
-        address_detail: address.address_detail || '',
-        note: address.note || '',
-        is_default: address.is_default || false,
-        type: (address.type as 'home' | 'office') || 'office', // Thêm type
-      });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching address:', error);
       Alert.alert(t('error'), t('cannotLoadAddressInfo'));
-      router.back();
     } finally {
       setLoading(false);
+    }
+  }, [id, token, t, router]);
+
+  useEffect(() => {
+    fetchAddress();
+  }, [fetchAddress]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const getSelectedAddress = async () => {
+        try {
+          const provinceData = await AsyncStorage.getItem('selected_province');
+          const districtData = await AsyncStorage.getItem('selected_district');
+          const wardData = await AsyncStorage.getItem('selected_ward');
+
+          if (provinceData && districtData && wardData) {
+            const province = JSON.parse(provinceData);
+            const district = JSON.parse(districtData);
+            const ward = JSON.parse(wardData);
+
+            setSelectedProvince(province);
+            setSelectedDistrict(district);
+            setSelectedWard(ward);
+
+            setFormData(prev => ({
+              ...prev,
+              province: province.code,
+              district: district.code,
+              ward: ward.code,
+            }));
+
+            await AsyncStorage.multiRemove(['selected_province', 'selected_district', 'selected_ward']);
+          }
+        } catch (error) {
+          console.error('Error processing selected address:', error);
+        }
+      };
+
+      getSelectedAddress();
+    }, [])
+  );
+
+  const resolveAddressNames = async (address: Partial<UserAddress>) => {
+    if (!address.province) return;
+    try {
+      const provinces = await AddressService.getProvinces();
+      const province = provinces.find(p => p.code === address.province);
+      if (province) setSelectedProvince(province);
+
+      const districts = await AddressService.getDistricts(address.province);
+      const district = districts.find((d: District) => d.code === address.district);
+      if (district) setSelectedDistrict(district);
+
+      const wards = await AddressService.getWards(address.province);
+      const ward = wards.find(w => w.code === address.ward);
+      if (ward) setSelectedWard(ward);
+
+    } catch (error) {
+      console.error('Error resolving address names:', error);
     }
   };
 
   const handleSubmit = async () => {
     if (!token || !id) return;
 
-    // Validation
-    if (!formData.receiver_name.trim()) {
-      Alert.alert(t('error'), t('pleaseEnterReceiverName'));
-      return;
-    }
-    if (!formData.phone_number.trim()) {
-      Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
-      return;
-    }
-    if (!formData.province) {
-      Alert.alert(t('error'), t('pleaseEnterProvinceCity'));
-      return;
-    }
-    if (!formData.district) {
-      Alert.alert(t('error'), t('pleaseEnterDistrict'));
-      return;
-    }
-    if (!formData.ward) {
-      Alert.alert(t('error'), t('pleaseEnterWard'));
-      return;
-    }
-    if (!formData.address_detail.trim()) {
-      Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
+    const requiredFields: (keyof UserAddress)[] = ['fullName', 'phone', 'street', 'province', 'district', 'ward'];
+    const isFormValid = requiredFields.every(field => formData[field] && String(formData[field]).trim());
+
+    if (!isFormValid) {
+      Alert.alert(t('error'), t('pleaseFillAllRequiredFields'));
       return;
     }
 
+    setSaving(true);
     try {
-      setSaving(true);
-              await AddressService.updateAddress(token, id as string, formData);
-      
-      // Show success alert
+      await AddressService.updateAddress(token, id.toString(), formData);
       Alert.alert(t('success'), t('addressUpdatedSuccessfully'), [
         {
           text: t('ok'),
-          onPress: () => {
-            // Set flag to show alert in address list
-            AsyncStorage.setItem('address_added', 'true');
-            // Go back to address list
-            router.back();
+          onPress: async () => {
+            await AsyncStorage.setItem('address_updated', 'true');
+            router.push('/address-list');
           },
         },
       ]);
     } catch (error) {
       console.error('Error updating address:', error);
-      Alert.alert(t('error'), t('cannotUpdateAddress'));
+      Alert.alert(t('error'), t('cannotUpdateAddressPleaseTryAgain'));
     } finally {
       setSaving(false);
     }
@@ -135,12 +149,10 @@ const EditAddressScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>{t('loadingAddressInfo')}</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3255FB" />
+        <Text style={styles.loadingText}>{t('loadingAddress')}</Text>
+      </View>
     );
   }
 
@@ -154,121 +166,97 @@ const EditAddressScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Success alert will be shown via Alert.alert */}
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('recipientInformation')}</Text>
-          
+          <Text style={styles.sectionTitle}>{t('contactInformation')}</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('receiverName')} *</Text>
+            <Text style={styles.label}>{t('fullName')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.receiver_name}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, receiver_name: text }))}
-              placeholder={t('enterReceiverName')}
+              value={formData.fullName}
+              onChangeText={text => setFormData(prev => ({ ...prev, fullName: text }))}
+              placeholder={t('enterFullName')}
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('phoneNumber')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.phone_number}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, phone_number: text }))}
+              value={formData.phone}
+              onChangeText={text => setFormData(prev => ({ ...prev, phone: text }))}
               placeholder={t('enterPhoneNumber')}
               keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('email')}</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.email}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
-              placeholder={t('enterEmailOptional')}
-              keyboardType="email-address"
             />
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('shippingAddress')}</Text>
-          
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('provinceCity')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.province}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, province: text }))}
-              placeholder={t('enterProvinceCity')}
-            />
+            <Text style={styles.label}>{t('address')} *</Text>
+            <TouchableOpacity
+              style={styles.addressSelector}
+              onPress={() => router.push('/address-selection')}
+            >
+              <Text style={styles.addressText} numberOfLines={1}>
+                {selectedProvince.name && selectedDistrict.name && selectedWard.name
+                  ? `${selectedWard.name}, ${selectedDistrict.name}, ${selectedProvince.name}`
+                  : t('selectAddress')}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#666" />
+            </TouchableOpacity>
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('district')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.district}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, district: text }))}
-              placeholder={t('enterDistrict')}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('ward')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.ward}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, ward: text }))}
-              placeholder={t('enterWard')}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('street')}</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.street}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, street: text }))}
-              placeholder={t('enterStreetOptional')}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('detailedAddress')} *</Text>
+            <Text style={styles.label}>{t('street')} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              value={formData.address_detail}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, address_detail: text }))}
-              placeholder={t('houseNumberBuildingName')}
+              value={formData.street}
+              onChangeText={text => setFormData(prev => ({ ...prev, street: text }))}
+              placeholder={t('enterStreet')}
               multiline
-              numberOfLines={3}
             />
           </View>
+        </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings')}</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('note')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={formData.note}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, note: text }))}
-              placeholder={t('deliveryNoteOptional')}
+              onChangeText={text => setFormData(prev => ({ ...prev, note: text }))}
+              placeholder={t('noteForShipper')}
               multiline
-              numberOfLines={2}
             />
           </View>
-
-          {/* Thêm phần chọn loại địa chỉ */}
+          <TouchableOpacity
+            style={styles.defaultToggle}
+            onPress={() => setFormData(prev => ({ ...prev, is_default: !prev.is_default }))}
+          >
+            <Ionicons
+              name={formData.is_default ? 'checkbox' : 'square-outline'}
+              size={24}
+              color={formData.is_default ? '#3255FB' : '#666'}
+            />
+            <Text style={styles.defaultText}>{t('setAsDefaultAddress')}</Text>
+          </TouchableOpacity>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('addressType')}</Text>
             <View style={styles.typeButtons}>
               <TouchableOpacity
-                style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
+                style={[
+                  styles.typeButton,
+                  formData.type === 'office' && styles.typeButtonActive,
+                ]}
                 onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
               >
-                <Text style={[styles.typeText, formData.type === 'office' && styles.typeTextActive]}>
+                <Text
+                  style={[
+                    styles.typeText,
+                    formData.type === 'office' && styles.typeTextActive,
+                  ]}
+                >
                   {t('office')}
                 </Text>
               </TouchableOpacity>
@@ -276,15 +264,18 @@ const EditAddressScreen = () => {
                 style={[styles.typeButton, formData.type === 'home' && styles.typeButtonActive]}
                 onPress={() => setFormData(prev => ({ ...prev, type: 'home' }))}
               >
-                <Text style={[styles.typeText, formData.type === 'home' && styles.typeTextActive]}>
+                <Text
+                  style={[
+                    styles.typeText,
+                    formData.type === 'home' && styles.typeTextActive,
+                  ]}
+                >
                   {t('home')}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-
-        {/* Xóa phần toggle star (mặc định) khỏi UI */}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -372,6 +363,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  addressSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+  },
+  addressText: {
+    fontSize: 16,
+    color: '#333',
+    flexShrink: 1,
   },
   textArea: {
     minHeight: 80,
