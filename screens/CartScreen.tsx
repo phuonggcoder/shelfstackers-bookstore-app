@@ -4,9 +4,10 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getBooksByCategory, getCart, removeFromCart, updateCartQuantity } from '../services/api';
 import { Book } from '../types';
 import { formatVND, getBookImageUrl } from '../utils/format';
@@ -72,6 +73,7 @@ const CartScreen = () => {
   const router = useRouter();
   const { t } = useTranslation();
   const { token, isLoading } = useAuth();
+  const { showErrorToast } = useUnifiedModal();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -165,14 +167,14 @@ const CartScreen = () => {
   const updateQuantity = async (bookId: string, increment: boolean) => {
     if (!token) {
       console.error('No token available for updateQuantity');
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      showErrorToast('Lỗi', 'Vui lòng đăng nhập lại.');
       return;
     }
     
     const item = cartItems.find(i => i.book._id === bookId);
     if (!item) {
       console.error('Item not found for updateQuantity:', bookId);
-      Alert.alert('Lỗi', 'Không tìm thấy sản phẩm trong giỏ hàng.');
+      showErrorToast('Lỗi', 'Không tìm thấy sản phẩm trong giỏ hàng.');
       return;
     }
     
@@ -197,7 +199,7 @@ const CartScreen = () => {
       
       // Show user-friendly error message
       const errorMessage = error.message || 'Không thể cập nhật số lượng. Vui lòng thử lại.';
-      Alert.alert('Lỗi', errorMessage);
+      showErrorToast('Lỗi', errorMessage);
     }
   };
 
@@ -221,7 +223,7 @@ const CartScreen = () => {
     } catch (error) {
       console.error('Error removing item from cart:', error);
       // Show user-friendly error message
-      Alert.alert('Lỗi', 'Không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại.');
+      showErrorToast('Lỗi', 'Không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại.');
     }
   };
 

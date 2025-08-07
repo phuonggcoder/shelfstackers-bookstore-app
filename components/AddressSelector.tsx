@@ -1,7 +1,7 @@
-import React, { useEffect, useState, memo, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { memo, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { AddressData, Province } from '../services/addressService';
 
 interface Ward {
@@ -68,6 +68,7 @@ const AddressSelector = memo(({
   disabled = false,
   style,
 }: AddressSelectorProps) => {
+  const { showErrorToast } = useUnifiedModal();
   const [modalVisible, setModalVisible] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
@@ -136,7 +137,7 @@ const AddressSelector = memo(({
 
   const handleConfirm = useCallback(() => {
     if (!selectedProvince || !selectedWard) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
+      showErrorToast('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
       return;
     }
 

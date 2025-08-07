@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { storageHelper } from '../config/storage';
 import { authService } from '../services/authService';
 import { createOrUpdateSession, listenFcmTokenRefresh, removeFcmToken, syncFcmToken, updateSessionFcmToken } from '../services/fcmService';
 import googleAuthService from '../services/googleAuthService';
 import { AuthResponse, User } from '../types/auth';
+import { useUnifiedModal } from './UnifiedModalContext';
 
 interface AuthContextType {
   user: User | null;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [tokenExpiredAlertVisible, setTokenExpiredAlertVisible] = useState(false);
   const [fcmSyncAttempted, setFcmSyncAttempted] = useState(false);
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
 
   useEffect(() => {
     loadStoredAuth();
@@ -202,10 +204,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       listenFcmTokenRefresh(userData.user._id, deviceId);
-      Alert.alert('Thành công', 'Đăng nhập thành công!');
+      showSuccessToast('Thành công', 'Đăng nhập thành công!', 2000);
     } catch (error) {
       console.error('Error saving auth:', error);
-      Alert.alert(
+      showErrorToast(
         'Lỗi xác thực',
         'Không thể hoàn thành quá trình xác thực. Vui lòng thử lại.'
       );
@@ -242,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Sign out completed successfully');
     } catch (error) {
       console.error('Error signing out:', error);
-      Alert.alert('Lỗi', 'Không thể đăng xuất đúng cách');
+      showErrorToast('Lỗi', 'Không thể đăng xuất đúng cách');
     }
   };
 
@@ -260,7 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authService.register(data);
       await signIn(res); // Đăng nhập luôn sau khi đăng ký thành công
     } catch (error) {
-      Alert.alert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
+      showErrorToast('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
       throw error;
     } finally {
       setIsLoading(false);
@@ -277,9 +279,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRes = await authService.getMe(token);
       setUser(userRes.user || userRes);
       await AsyncStorage.setItem('user', JSON.stringify(userRes.user || userRes));
-      Alert.alert('Thành công', 'Cập nhật thông tin thành công!');
+      showSuccessToast('Thành công', 'Cập nhật thông tin thành công!', 2000);
     } catch (error) {
-      Alert.alert('Lỗi', 'Cập nhật thông tin thất bại');
+      showErrorToast('Lỗi', 'Cập nhật thông tin thất bại');
       throw error;
     } finally {
       setIsLoading(false);

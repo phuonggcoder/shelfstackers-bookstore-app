@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import OrderStatusService, { OrderStatusChange } from '../services/orderStatusService';
 
 export const useOrderStatusMonitor = (orderId?: string) => {
   const [statusChange, setStatusChange] = useState<OrderStatusChange | null>(null);
   const [showAlert, setShowAlert] = useState(false);
+  const { showAlert: showUnifiedAlert } = useUnifiedModal();
 
   const handleStatusChange = useCallback((change: OrderStatusChange) => {
     // Chỉ xử lý nếu là đơn hàng hiện tại hoặc không có orderId cụ thể
@@ -13,26 +14,19 @@ export const useOrderStatusMonitor = (orderId?: string) => {
       setShowAlert(true);
       
       // Hiển thị thông báo
-      Alert.alert(
+      showUnifiedAlert(
         'Cập nhật trạng thái đơn hàng',
         `Trạng thái đơn hàng đã được cập nhật từ "${getStatusText(change.previousStatus)}" thành "${getStatusText(change.currentStatus)}"`,
-        [
-          {
-            text: 'Làm mới',
-            onPress: () => {
-              setShowAlert(false);
-              // Trigger refresh callback nếu có
-            }
-          },
-          {
-            text: 'Đóng',
-            style: 'cancel',
-            onPress: () => setShowAlert(false)
-          }
-        ]
+        'Làm mới',
+        'Đóng',
+        'info',
+        () => {
+          setShowAlert(false);
+          // Trigger refresh callback nếu có
+        }
       );
     }
-  }, [orderId]);
+  }, [orderId, showUnifiedAlert]);
 
   useEffect(() => {
     // Đăng ký listener

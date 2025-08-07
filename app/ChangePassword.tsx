@@ -4,23 +4,24 @@ import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { authService } from '../services/authService'; // ✅ Đảm bảo đường dẫn đúng
 
 const ChangePassword = () => {
   const { t } = useTranslation();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -32,17 +33,17 @@ const ChangePassword = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert(t('error'), t('pleaseEnterAllInformation'));
+      showErrorToast(t('error'), t('pleaseEnterAllInformation'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert(t('error'), t('newPasswordMinLength'));
+      showErrorToast(t('error'), t('newPasswordMinLength'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert(t('error'), t('passwordsDoNotMatch'));
+      showErrorToast(t('error'), t('passwordsDoNotMatch'));
       return;
     }
 
@@ -50,16 +51,16 @@ const ChangePassword = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        Alert.alert(t('error'), t('userTokenNotFound'));
+        showErrorToast(t('error'), t('userTokenNotFound'));
         return;
       }
 
       const message = await authService.changePassword(currentPassword, newPassword, token);
-      Alert.alert(t('success'), message);
+      showSuccessToast(t('success'), message, 2000);
       navigation.goBack();
     } catch (err: any) {
       console.log(t('passwordChangeError'), err.message);
-      Alert.alert(t('failure'), err.message || t('anErrorOccurred'));
+      showErrorToast(t('failure'), err.message || t('anErrorOccurred'));
     } finally {
       setLoading(false);
     }

@@ -5,22 +5,23 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import AvoidKeyboardDummyView from '../../components/AvoidKeyboardDummyView';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedModal } from '../../context/UnifiedModalContext';
 import { authService } from '../../services/authService';
 
 export default function Register() {
   const { t } = useTranslation();
   const { signIn } = useAuth();
+  const { showErrorToast, showSuccessToast, showAlert } = useUnifiedModal();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,22 +39,22 @@ export default function Register() {
   const handleRegister = async () => {
 
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc');
+      showErrorToast('Lỗi', 'Vui lòng nhập đầy đủ các trường bắt buộc');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      showErrorToast('Lỗi', 'Email không hợp lệ');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(t('error'), t('passwordsDoNotMatch'));
+      showErrorToast(t('error'), t('passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert(t('error'), t('passwordMinLength'));
+      showErrorToast(t('error'), t('passwordMinLength'));
       return;
     }
 
@@ -68,15 +69,11 @@ export default function Register() {
       });
 
       await signIn(response);
-      Alert.alert(t('success'), t('registrationSuccess'), [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(tabs)'),
-        },
-      ]);
+      showAlert('Đăng ký thành công', 'Chào mừng bạn!', 'OK', 'success');
+      router.replace('/(tabs)');
     } catch (error: any) {
       const errorMessage = error.message || t('registrationError');
-      Alert.alert(t('registrationFailed'), errorMessage);
+      showErrorToast(t('registrationFailed'), errorMessage);
       console.error('Registration error:', error);
     } finally {
       setIsLoading(false);

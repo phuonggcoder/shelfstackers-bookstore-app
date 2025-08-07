@@ -3,15 +3,14 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfirmModal from '../components/ConfirmModal';
@@ -21,6 +20,7 @@ import ReviewSummary from '../components/ReviewSummary';
 import ThankYouModal from '../components/ThankYouModal';
 import UserReviewSection from '../components/UserReviewSection';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useUserReview } from '../hooks/useUserReview';
 import ReviewService, { Review, ReviewSummary as ReviewSummaryType } from '../services/reviewService';
 import { getUserId } from '../utils/reviewUtils';
@@ -34,6 +34,7 @@ const ProductReviewsScreen = () => {
     editMode?: string;
   }>();
   const { user, token } = useAuth();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const router = useRouter();
 
   // Parse items from order if available
@@ -111,7 +112,7 @@ const ProductReviewsScreen = () => {
       console.log('ProductReviews - loadReviews - Set reviews count:', response.reviews?.length || 0);
     } catch (error) {
       console.error('ProductReviews - Error loading reviews:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đánh giá');
+      showErrorToast('Lỗi', 'Không thể tải danh sách đánh giá');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,7 +160,7 @@ const ProductReviewsScreen = () => {
       handleRefresh();
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      showErrorToast('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
     } finally {
       setSubmitting(false);
     }
@@ -212,11 +213,11 @@ const ProductReviewsScreen = () => {
     
     try {
       await ReviewService.deleteReview(pendingDeleteReviewId, token || undefined);
-      Alert.alert('Thành công', 'Đánh giá đã được xóa');
+      showSuccessToast('Thành công', 'Đánh giá đã được xóa', 2000);
       handleRefresh();
     } catch (error) {
       console.error('Error deleting review:', error);
-      Alert.alert('Lỗi', 'Không thể xóa đánh giá');
+      showErrorToast('Lỗi', 'Không thể xóa đánh giá');
     } finally {
       setShowDeleteConfirmModal(false);
       setPendingDeleteReviewId(null);

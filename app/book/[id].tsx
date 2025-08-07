@@ -4,16 +4,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
-import CustomLoginDialog from '../../components/BottomAlert';
-import CartAddedDialog from '../../components/CartAddedDialog';
+
+// CartAddedDialog removed - using UnifiedCustomComponent instead
 import CartIconWithBadge from '../../components/CartIconWithBadge';
 import CustomOutOfStockAlert from '../../components/CustomOutOfStockAlert';
 import ReviewCard from '../../components/ReviewCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useUnifiedModal } from '../../context/UnifiedModalContext';
 import { addToCart, addToWishlist, getBookById, getBooksByCategory, getWishlist, removeFromWishlist } from '../../services/api';
 import ReviewService, { Review, ReviewSummary } from '../../services/reviewService';
 import { Book } from '../../types';
@@ -57,18 +58,17 @@ const BookDetailsScreen = () => {
   const footerAnim = useRef(new Animated.Value(0)).current;
   const lastOffsetY = useRef(0);
   const { token, user } = useAuth();
+  const { showLoginPopup, showErrorToast, showSuccessToast } = useUnifiedModal();
   const [addingCart, setAddingCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const router = useRouter();
-  const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   // Animated overlay state
   const [overlayVisible, setOverlayVisible] = useState(false);
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   const [isFavorite, setIsFavorite] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean, message: string }>({ visible: false, message: '' });
 
   const [outOfStock, setOutOfStock] = useState(false);
   const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
@@ -88,7 +88,7 @@ const BookDetailsScreen = () => {
   };
 
   const { cartCount, cartJustAdded, setCartJustAdded, fetchCartCount, hasFetched } = useCart();
-  const [showCartDialog, setShowCartDialog] = useState(false);
+  // showCartDialog state removed - using UnifiedCustomComponent instead
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState(0);
 
@@ -308,14 +308,14 @@ const BookDetailsScreen = () => {
 
   const truncatedHtml = isExpanded ? book.description : book.description.slice(0, 200) + '...';
 
-  const showToast = (message: string) => {
-    setToast({ visible: true, message });
-    setTimeout(() => setToast({ visible: false, message: '' }), 1500);
-  };
+
 
   const handleFavorite = async (bookId: string | string[] | undefined) => {
     if (!token || !bookId) {
-      setShowLoginDialog(true);
+      showLoginPopup(
+        () => router.push('/(auth)/login'),
+        () => console.log('User skipped login')
+      );
       return;
     }
 
@@ -325,34 +325,45 @@ const BookDetailsScreen = () => {
         // Xóa khỏi wishlist
         await removeFromWishlist(token, bookId as string);
         setIsFavorite(false);
-        showToast('Đã xóa khỏi danh sách yêu thích');
+        showSuccessToast(t('unifiedModal.removedFromFavoriteSuccess'), '', 2000);
       } else {
         // Thêm vào wishlist
         const res = await addToWishlist(token, bookId as string);
         console.log('Add to wishlist response:', res);
         setIsFavorite(true);
-        showToast('Đã thêm vào danh sách yêu thích');
+        showSuccessToast(t('unifiedModal.addedToFavoriteSuccess'), '', 2000);
       }
     } catch (e: any) {
       console.error('Favorite error:', e);
-      showToast('Có lỗi xảy ra, vui lòng thử lại');
+      showErrorToast(t('error'), t('pleaseTryAgain'));
     }
   };
 
   // Thêm vào giỏ hàng
   const handleAddToCart = async () => {
     if (!token) {
-      setShowLoginDialog(true);
+      showLoginPopup(
+        () => router.push('/(auth)/login'),
+        () => console.log('User skipped login')
+      );
       return;
     }
     if (!book) return;
+    
+    // Show success toast immediately for better UX (shorter duration for better UX)
+            showSuccessToast(t('unifiedModal.addedToCartSuccess'), '', 2000);
+    setCartJustAdded(true);
+    setTimeout(() => setCartJustAdded(false), 500);
+    
     setAddingCart(true);
     try {
       await addToCart(token, book._id, quantity);
-      setShowCartDialog(true);
       fetchCartCount(token);
-      setCartJustAdded(true);
-      setTimeout(() => setCartJustAdded(false), 500);
+    } catch (error) {
+      // If the API call fails, show error toast
+      showErrorToast(t('error'), t('cannotAddProductToCart'));
+      // Reset cart just added state since it failed
+      setCartJustAdded(false);
     } finally {
       setAddingCart(false);
     }
@@ -361,7 +372,10 @@ const BookDetailsScreen = () => {
   // Buy now: sang trang order review
   const handleBuyNow = () => {
     if (!token) {
-      setShowLoginDialog(true);
+      showLoginPopup(
+        () => router.push('/(auth)/login'),
+        () => console.log('User skipped login')
+      );
       return;
     }
     if (!book) return;
@@ -377,7 +391,7 @@ const BookDetailsScreen = () => {
         });
       } catch (error) {
         console.error('Error adding book to cart for buy now:', error);
-        Alert.alert(t('error'), t('cannotAddProductToCart'));
+        showErrorToast(t('error'), t('cannotAddProductToCart'));
       }
     };
     
@@ -423,7 +437,7 @@ const BookDetailsScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
-      {/* Overlay: phủ toàn màn hình, click vào sẽ tắt alert, nằm dưới BottomAlert */}
+
       {overlayVisible && (
         <TouchableWithoutFeedback onPress={() => setShowLoginAlert(false)}>
           <Animated.View
@@ -441,16 +455,7 @@ const BookDetailsScreen = () => {
           />
         </TouchableWithoutFeedback>
       )}
-      {/* BottomAlert nằm trên overlay */}
-      <CustomLoginDialog
-        visible={showLoginDialog}
-        onClose={() => setShowLoginDialog(false)}
-        onLogin={() => {
-          setShowLoginDialog(false);
-          router.push('/(auth)/login');
-        }}
-        message={t('loginRequiredForFeature')}
-      />
+
       <Stack.Screen
         options={{
           title: '',
@@ -1036,16 +1041,9 @@ const BookDetailsScreen = () => {
           }}
         />
       )}
-      {toast.visible && (
-        <View style={{ position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center', zIndex: 100 }}>
-          <View style={{ backgroundColor: '#5E5CE6', borderRadius: 12, paddingVertical: 16, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 }}>
-            <Ionicons name="checkmark" size={24} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={{ color: '#fff', fontSize: 16 }}>{toast.message}</Text>
-          </View>
-        </View>
-      )}
+
       <CustomOutOfStockAlert visible={outOfStock} onClose={() => router.back()} />
-      <CartAddedDialog visible={showCartDialog} onHide={() => setShowCartDialog(false)} />
+      {/* CartAddedDialog removed - using UnifiedCustomComponent instead */}
       
       {/* Fullscreen Image Modal */}
       <Modal

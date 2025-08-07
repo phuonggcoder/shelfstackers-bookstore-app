@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 
 interface CancelOrderModalProps {
   visible: boolean;
@@ -29,6 +29,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
   paymentMethod = 'cod',
   isRefund = false,
 }) => {
+  const { showErrorToast } = useUnifiedModal();
   const [reason, setReason] = useState('');
   const [selectedReason, setSelectedReason] = useState('');
   const [newAddress, setNewAddress] = useState('');
@@ -44,13 +45,13 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
 
   const handleConfirm = () => {
     if (!reason.trim() && !selectedReason) {
-      Alert.alert('Lỗi', 'Vui lòng nhập lý do hủy đơn hàng');
+      showErrorToast('Lỗi', 'Vui lòng nhập lý do hủy đơn hàng');
       return;
     }
 
     // Kiểm tra nếu chọn "Cần thay đổi địa chỉ" thì phải nhập địa chỉ mới
     if (selectedReason === 'Cần thay đổi địa chỉ' && !newAddress.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ mới');
+      showErrorToast('Lỗi', 'Vui lòng nhập địa chỉ mới');
       return;
     }
 

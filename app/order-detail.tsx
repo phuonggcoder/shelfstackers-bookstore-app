@@ -5,13 +5,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import i18n from 'i18next';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CancelOrderModal from '../components/CancelOrderModal';
 import RefundStatusNotification from '../components/RefundStatusNotification';
 import ReviewForm from '../components/ReviewForm';
 import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useOrderDetail } from '../hooks/useOrders';
 import { cancelOrder, requestRefund } from '../services/orderService';
 import ReviewService from '../services/reviewService';
@@ -62,6 +63,7 @@ const OrderDetailScreen = () => {
   const { orderId } = useLocalSearchParams();
   const { t } = useTranslation();
   const { token } = useAuth();
+  const { showSuccessToast, showErrorToast } = useUnifiedModal();
   const { order, loading, refreshOrderDetail } = useOrderDetail(orderId as string);
   const [cancelling, setCancelling] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -102,17 +104,17 @@ const OrderDetailScreen = () => {
       if (canRequestRefund(order.status)) {
         // Hoàn tiền cho đơn hàng đã giao
         await requestRefund(token, actualOrderId, reason);
-        Alert.alert(t('success'), t('refundRequestSent'));
+        showSuccessToast(t('success'), t('refundRequestSent'), 2000);
       } else {
         // Hủy đơn hàng hoặc thay đổi địa chỉ
         if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
           // Gửi yêu cầu thay đổi địa chỉ thay vì hủy đơn hàng
           await cancelOrder(token, actualOrderId, reason, newAddress);
-          Alert.alert(t('success'), t('addressChangeRequestSent'));
+          showSuccessToast(t('success'), t('addressChangeRequestSent'), 2000);
         } else {
           // Hủy đơn hàng bình thường
           await cancelOrder(token, actualOrderId, reason);
-          Alert.alert(t('success'), t('orderCancelled'));
+          showSuccessToast(t('success'), t('orderCancelled'), 2000);
         }
       }
       setShowCancelModal(false);
@@ -120,7 +122,7 @@ const OrderDetailScreen = () => {
     } catch (e: any) {
       console.error('Order processing error:', e);
       const errorMessage = e.message || t('cannotProcessRequest');
-      Alert.alert(t('error'), errorMessage);
+      showErrorToast(t('error'), errorMessage);
     } finally {
       setCancelling(false);
     }
@@ -181,7 +183,7 @@ const OrderDetailScreen = () => {
       setExistingReview(null);
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert(t('error'), t('cannotSubmitReview'));
+      showErrorToast(t('error'), t('cannotSubmitReview'));
     }
   };
 

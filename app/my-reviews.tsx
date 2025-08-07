@@ -3,18 +3,18 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../components/ReviewCard';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import ReviewService, { Review } from '../services/reviewService';
 import { getProductId } from '../utils/reviewUtils';
 
@@ -22,6 +22,7 @@ const MyReviewsScreen = () => {
   const { t } = useTranslation();
   const { user, token } = useAuth();
   const router = useRouter();
+  const { showErrorToast, showSuccessToast, showDeleteDialog } = useUnifiedModal();
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ const MyReviewsScreen = () => {
       setPage(pageNum);
     } catch (error) {
       console.error('Error loading reviews:', error);
-      Alert.alert(t('error'), t('myReviews.cannotLoadReviews'));
+      showErrorToast(t('error'), t('myReviews.cannotLoadReviews'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,26 +115,17 @@ const MyReviewsScreen = () => {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    Alert.alert(
-      t('myReviews.confirmDelete'),
-      t('myReviews.confirmDeleteMessage'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await ReviewService.deleteReview(reviewId, token || undefined);
-              Alert.alert(t('success'), t('myReviews.reviewDeleted'));
-              handleRefresh();
-            } catch (error) {
-              console.error('Error deleting review:', error);
-              Alert.alert(t('error'), t('myReviews.cannotDeleteReview'));
-            }
-          },
-        },
-      ]
+    showDeleteDialog(
+      async () => {
+        try {
+          await ReviewService.deleteReview(reviewId, token || undefined);
+          showSuccessToast(t('success'), t('myReviews.reviewDeleted'), 2000);
+          handleRefresh();
+        } catch (error) {
+          console.error('Error deleting review:', error);
+          showErrorToast(t('error'), t('myReviews.cannotDeleteReview'));
+        }
+      }
     );
   };
 

@@ -7,16 +7,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getOrderDetail } from '../services/orderService';
 import { formatVND } from '../utils/format';
 
 export default function OrderSuccessScreen() {
   const { t } = useTranslation();
   const { token } = useAuth();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const { orderId } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function OrderSuccessScreen() {
         }
       } catch (error) {
         console.error('Error loading order detail:', error);
-        Alert.alert(t('error'), t('cannotLoadOrderInfo'));
+        showErrorToast(t('error'), t('cannotLoadOrderInfo'));
       } finally {
         setLoading(false);
       }
@@ -82,7 +84,7 @@ export default function OrderSuccessScreen() {
         await Sharing.shareAsync(fileUri, { mimeType: 'image/png' });
       });
     } catch (e) {
-      Alert.alert(t('error'), t('cannotDownloadQR'));
+      showErrorToast(t('error'), t('cannotDownloadQR'));
     }
   };
 
@@ -90,7 +92,7 @@ export default function OrderSuccessScreen() {
   const handleCopyOrderUrl = async () => {
     if (qrValue) {
       await Clipboard.setStringAsync(qrValue);
-      Alert.alert(t('copied'), t('paymentLinkCopied'));
+      showSuccessToast(t('copied'), t('paymentLinkCopied'), 2000);
     }
   };
 
