@@ -20,16 +20,14 @@ const EditAddressScreen = () => {
   const [saving, setSaving] = useState(false);
 
   const [selectedProvince, setSelectedProvince] = useState({ code: '', name: '' });
-  const [selectedDistrict, setSelectedDistrict] = useState({ code: '', name: '' });
   const [selectedWard, setSelectedWard] = useState({ code: '', name: '' });
 
   const [formData, setFormData] = useState<Partial<UserAddress>>({
-    fullName: '',
-    phone: '',
+    receiver_name: '',
+    phone_number: '',
     province: '',
-    district: '',
     ward: '',
-    street: '',
+    address_detail: '',
     note: '',
     is_default: false,
     type: 'office',
@@ -65,28 +63,24 @@ const EditAddressScreen = () => {
     useCallback(() => {
       const getSelectedAddress = async () => {
         try {
-          const provinceData = await AsyncStorage.getItem('selected_province');
-          const districtData = await AsyncStorage.getItem('selected_district');
-          const wardData = await AsyncStorage.getItem('selected_ward');
+            const provinceData = await AsyncStorage.getItem('selected_province');
+            const wardData = await AsyncStorage.getItem('selected_ward');
 
-          if (provinceData && districtData && wardData) {
-            const province = JSON.parse(provinceData);
-            const district = JSON.parse(districtData);
-            const ward = JSON.parse(wardData);
+            if (provinceData && wardData) {
+              const province = JSON.parse(provinceData);
+              const ward = JSON.parse(wardData);
 
-            setSelectedProvince(province);
-            setSelectedDistrict(district);
-            setSelectedWard(ward);
+              setSelectedProvince(province);
+              setSelectedWard(ward);
 
-            setFormData(prev => ({
-              ...prev,
-              province: province.code,
-              district: district.code,
-              ward: ward.code,
-            }));
+              setFormData(prev => ({
+                ...prev,
+                province: province.code,
+                ward: ward.code,
+              }));
 
-            await AsyncStorage.multiRemove(['selected_province', 'selected_district', 'selected_ward']);
-          }
+              await AsyncStorage.multiRemove(['selected_province', 'selected_ward']);
+            }
         } catch (error) {
           console.error('Error processing selected address:', error);
         }
@@ -103,10 +97,6 @@ const EditAddressScreen = () => {
       const province = provinces.find(p => p.code === address.province);
       if (province) setSelectedProvince(province);
 
-      const districts = await AddressService.getDistricts(address.province);
-      const district = districts.find((d: District) => d.code === address.district);
-      if (district) setSelectedDistrict(district);
-
       const wards = await AddressService.getWards(address.province);
       const ward = wards.find(w => w.code === address.ward);
       if (ward) setSelectedWard(ward);
@@ -119,17 +109,27 @@ const EditAddressScreen = () => {
   const handleSubmit = async () => {
     if (!token || !id) return;
 
-    const requiredFields: (keyof UserAddress)[] = ['fullName', 'phone', 'street', 'province', 'district', 'ward'];
+    // Chỉ lấy province và ward bằng name, không lấy district, kiểm tra lại họ tên, sdt, địa chỉ chi tiết
+    const requiredFields: (keyof UserAddress)[] = ['receiver_name', 'phone_number', 'province', 'ward', 'address_detail'];
     const isFormValid = requiredFields.every(field => formData[field] && String(formData[field]).trim());
-
     if (!isFormValid) {
       Alert.alert(t('error'), t('pleaseFillAllRequiredFields'));
       return;
     }
-
     setSaving(true);
     try {
-      await AddressService.updateAddress(token, id.toString(), formData);
+      const updatePayload = {
+        receiver_name: formData.receiver_name?.trim() || '',
+        phone_number: formData.phone_number?.trim() || '',
+        province: selectedProvince.name,
+        ward: selectedWard.name,
+        address_detail: formData.address_detail?.trim() || '',
+        fullAddress: `${formData.address_detail?.trim() || ''}, ${selectedWard.name}, ${selectedProvince.name}`,
+        is_default: formData.is_default,
+        note: formData.note,
+        type: formData.type,
+      };
+      await AddressService.updateAddress(token, id.toString(), updatePayload);
       Alert.alert(t('success'), t('addressUpdatedSuccessfully'), [
         {
           text: t('ok'),
@@ -173,8 +173,8 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('fullName')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.fullName}
-              onChangeText={text => setFormData(prev => ({ ...prev, fullName: text }))}
+              value={formData.receiver_name}
+              onChangeText={text => setFormData(prev => ({ ...prev, receiver_name: text }))}
               placeholder={t('enterFullName')}
             />
           </View>
@@ -182,8 +182,8 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('phoneNumber')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.phone}
-              onChangeText={text => setFormData(prev => ({ ...prev, phone: text }))}
+              value={formData.phone_number}
+              onChangeText={text => setFormData(prev => ({ ...prev, phone_number: text }))}
               placeholder={t('enterPhoneNumber')}
               keyboardType="phone-pad"
             />
@@ -199,9 +199,9 @@ const EditAddressScreen = () => {
               onPress={() => router.push('/address-selection')}
             >
               <Text style={styles.addressText} numberOfLines={1}>
-                {selectedProvince.name && selectedDistrict.name && selectedWard.name
-                  ? `${selectedWard.name}, ${selectedDistrict.name}, ${selectedProvince.name}`
-                  : t('selectAddress')}
+            {selectedProvince.name && selectedWard.name
+              ? `${selectedWard.name}, ${selectedProvince.name}`
+              : t('selectAddress')}
               </Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>
@@ -210,8 +210,8 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('street')} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              value={formData.street}
-              onChangeText={text => setFormData(prev => ({ ...prev, street: text }))}
+              value={formData.address_detail}
+              onChangeText={text => setFormData(prev => ({ ...prev, address_detail: text }))}
               placeholder={t('enterStreet')}
               multiline
             />

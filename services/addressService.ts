@@ -14,14 +14,8 @@ export interface Ward {
   provinceName: string;
 }
 
-export interface District {
-  code: string;
-  name: string;
-}
-
 export interface AddressData {
   province: Province;
-  district: District;
   ward: Ward;
   fullAddress: string;
   addressCode: {
@@ -32,13 +26,13 @@ export interface AddressData {
 
 export interface UserAddress {
   _id: string;
-  fullName: string;
-  phone: string;
+  receiver_name: string;
+  phone_number: string;
   email?: string;
   province: string;
-  district?: string;
   ward: string;
-  street: string;
+  street?: string;
+  address_detail: string;
   note?: string;
   type?: string;
   is_default: boolean;
@@ -74,18 +68,6 @@ class AddressService {
     }
   }
 
-  static async getDistricts(provinceCode: string): Promise<District[]> {
-    try {
-      const response = await axios.get(`${BASE_URL}/api/v1/address/34/districts`, {
-        params: { 'province-code': provinceCode },
-      });
-      return response.data?.data || [];
-    } catch (error) {
-      console.error('Error fetching districts:', error);
-      return [];
-    }
-  }
-
   static async getWards(provinceCode: string): Promise<Ward[]> {
     try {
       const response = await axios.get(`${BASE_URL}/address/wards`, {
@@ -111,6 +93,8 @@ class AddressService {
     }
   }
 
+
+
   // User Address Management APIs
   static async getAddresses(token: string): Promise<UserAddress[]> {
     try {
@@ -128,12 +112,11 @@ class AddressService {
   }
 
   static async addAddress(token: string, addressData: {
-    fullName: string;
-    phone: string;
+    receiver_name: string;
+    phone_number: string;
     province: string;
-    district: string;
     ward: string;
-    street: string;
+    address_detail: string;
     is_default?: boolean;
   }): Promise<UserAddress> {
     try {
