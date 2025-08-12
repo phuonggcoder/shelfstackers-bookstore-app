@@ -3,9 +3,10 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getOrderDetail } from '../services/orderService';
 import { updatePaymentStatus } from '../services/paymentService';
 import { formatVND } from '../utils/format';
@@ -14,6 +15,7 @@ export default function ZaloPayScreen() {
   const { t } = useTranslation();
   const { orderId } = useLocalSearchParams();
   const { token } = useAuth();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function ZaloPayScreen() {
         const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
         setOrder({ ...orderData, zaloPay, payment, paymentUrl });
       } catch (e) {
-        Alert.alert(t('error'), t('cannotLoadOrderInfo'));
+        showErrorToast(t('error'), t('cannotLoadOrderInfo'));
       } finally {
         setLoading(false);
       }
@@ -58,7 +60,7 @@ export default function ZaloPayScreen() {
   const handleCopyOrderUrl = async () => {
     if (paymentUrl) {
       await Clipboard.setStringAsync(paymentUrl);
-      Alert.alert(t('copied'), t('paymentLinkCopied'));
+      showSuccessToast(t('copied'), t('paymentLinkCopied'), 2000);
     }
   };
 
@@ -68,7 +70,7 @@ export default function ZaloPayScreen() {
     setConfirming(true);
     try {
       await updatePaymentStatus(token || '', orderId as string, { payment_status: 'Completed' });
-      Alert.alert(t('success'), t('paymentConfirmed'));
+      showSuccessToast(t('success'), t('paymentConfirmed'), 2000);
       // Fetch lại đơn hàng để cập nhật trạng thái
       const response = await getOrderDetail(token || '', orderId as string);
       let orderData = response.order || {};
@@ -77,7 +79,7 @@ export default function ZaloPayScreen() {
       const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
       setOrder({ ...orderData, zaloPay, payment, paymentUrl });
     } catch (e) {
-      Alert.alert(t('error'), t('cannotConfirmPayment'));
+      showErrorToast(t('error'), t('cannotConfirmPayment'));
     } finally {
       setConfirming(false);
     }
@@ -142,10 +144,10 @@ export default function ZaloPayScreen() {
                   if (supported) {
                     await Linking.openURL(paymentUrl);
                   } else {
-                    Alert.alert(t('cannotOpenZaloPay'), t('deviceNotSupportLink'));
+                    showErrorToast(t('cannotOpenZaloPay'), t('deviceNotSupportLink'));
                   }
                 } catch (e) {
-                  Alert.alert(t('cannotOpenPaymentPage'), String(e));
+                  showErrorToast(t('cannotOpenPaymentPage'), String(e));
                 }
               }}
             >

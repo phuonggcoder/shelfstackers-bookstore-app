@@ -2,24 +2,25 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import AddressSelector from '../components/AddressSelector';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { AddressData } from '../services/addressService';
 
 const AddAddress = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
+  const { showErrorToast } = useUnifiedModal();
   const [loading, setLoading] = useState(false);
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
@@ -33,9 +34,10 @@ const AddAddress = () => {
 
   const handleSubmit = async () => {
     if (!token) {
-      Alert.alert(t('error'), t('pleaseLoginToAddAddress'));
+      showErrorToast(t('error'), t('pleaseLoginToAddAddress'));
       return;
     }
+
 
     if (!receiverName.trim()) {
       Alert.alert(t('error'), t('pleaseEnterFullName'));
@@ -48,9 +50,10 @@ const AddAddress = () => {
     }
 
     if (!selectedAddress) {
-      Alert.alert(t('error'), t('pleaseSelectCompleteAddress'));
+      showErrorToast(t('error'), t('pleaseSelectCompleteAddress'));
       return;
     }
+
 
     if (!addressDetail.trim()) {
       Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
@@ -84,7 +87,7 @@ const AddAddress = () => {
       ]);
     } catch (error) {
       console.error('Create address failed:', error);
-      Alert.alert(t('error'), t('cannotAddAddressPleaseTryAgain'));
+      showErrorToast(t('error'), t('cannotAddAddressPleaseTryAgain'));
     } finally {
       setLoading(false);
     }

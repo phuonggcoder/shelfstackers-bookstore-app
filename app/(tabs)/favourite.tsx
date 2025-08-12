@@ -3,9 +3,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, View as RNView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, FlatList, Image, Modal, View as RNView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedModal } from '../../context/UnifiedModalContext';
 import { getWishlist, removeFromWishlist } from '../../services/api';
 
 const { width, height } = Dimensions.get('window');
@@ -73,6 +74,7 @@ const FavouriteScreen = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
+  const { showDeleteDialog, showDialog, hideModal } = useUnifiedModal();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -166,7 +168,7 @@ const FavouriteScreen = () => {
       <FlatList
         data={favorites}
         keyExtractor={(item) => item._id || item.id || Math.random().toString()}
-        renderItem={({ item }) => <WishlistItem item={item} router={router} onRemove={fetchWishlist} />}
+                    renderItem={({ item }) => <WishlistItem item={item} router={router} onRemove={fetchWishlist} showDeleteDialog={showDeleteDialog} showDialog={showDialog} hideModal={hideModal} />}
         contentContainerStyle={{ paddingBottom: 32 }}
         refreshing={refreshing}
         onRefresh={onRefresh}
@@ -189,7 +191,7 @@ function getBookImage(item: any) {
   return img;
 }
 
-function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRemove: () => void }) {
+function WishlistItem({ item, router, onRemove, showDeleteDialog, showDialog, hideModal }: { item: any, router: any, onRemove: () => void, showDeleteDialog: any, showDialog: any, hideModal: any }) {
   const { t } = useTranslation();
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -212,15 +214,20 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
     if (!token) return;
     if (typeof window !== 'undefined' && window.confirm) {
       if (!window.confirm(t('confirmRemoveFromWishlist'))) return;
-    } else if (typeof Alert !== 'undefined') {
-      // Nếu là React Native, dùng Alert
-      Alert.alert(t('confirm'), t('confirmRemoveFromWishlist'), [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('remove'), style: 'destructive', onPress: async () => {
-          await removeFromWishlist(token, item._id || item.id);
-          onRemove();
-        }}
-      ]);
+    } else {
+      // Sử dụng UnifiedModal
+      showDeleteDialog(
+        async () => {
+          try {
+            await removeFromWishlist(token, item._id || item.id);
+            onRemove();
+            hideModal(); // Explicitly hide the modal after successful deletion
+          } catch (error) {
+            console.error('Error removing from wishlist:', error);
+            hideModal(); // Hide modal even on error
+          }
+        }
+      );
       return;
     }
     await removeFromWishlist(token, item._id || item.id);
@@ -229,16 +236,17 @@ function WishlistItem({ item, router, onRemove }: { item: any, router: any, onRe
 
   const handlePay = () => {
     setMenuVisible(false);
-    Alert.alert(
+    showDialog(
       t('confirmPayment'),
       t('confirmPaymentMessage'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('pay'), style: 'default', onPress: () => {
-          // Chuyển sang màn hình order review, truyền thông tin sách
-          router.push({ pathname: '/order-review', params: { bookId: item._id || item.id } });
-        } }
-      ]
+      t('pay'),
+      t('cancel'),
+      'info',
+      () => {
+        // Chuyển sang màn hình order review, truyền thông tin sách
+        router.push({ pathname: '/order-review', params: { bookId: item._id || item.id } });
+        hideModal(); // Explicitly hide the modal after navigation
+      }
     );
   };
 

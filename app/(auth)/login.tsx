@@ -8,23 +8,24 @@ import { useEffect, useState } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { configureGoogleSignIn } from '../../config/googleSignIn';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedModal } from '../../context/UnifiedModalContext';
 import { authService } from '../../services/authService';
 import { convertGoogleSignInResponse } from '../../utils/authUtils';
 
 export default function Login() {
   const { t } = useTranslation();
   const { signIn } = useAuth();
+  const { showErrorToast, showSuccessToast, showAlert } = useUnifiedModal();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,12 +46,12 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert(t('error'), t('pleaseEnterCompleteInformation'));
+      showErrorToast(t('error'), t('pleaseEnterCompleteInformation'));
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      showErrorToast('Lỗi', 'Email không hợp lệ');
       return;
     }
 
@@ -58,11 +59,10 @@ export default function Login() {
       setIsLoading(true);
       const response = await authService.login({ email: email, password });
       await signIn(response);
-      Alert.alert(t('success'), t('loginSuccess'), [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      showAlert('Đăng nhập thành công', 'Chào mừng bạn!', 'OK', 'success');
+      router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert(t('loginFailed'), error.message || t('loginError'));
+      showErrorToast(t('loginFailed'), error.message || t('loginError'));
     } finally {
       setIsLoading(false);
     }
@@ -79,15 +79,14 @@ export default function Login() {
         const authResponse = convertGoogleSignInResponse(result);
         
         await signIn(authResponse);
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        showAlert('Đăng nhập thành công', 'Chào mừng bạn!', 'OK', 'success');
+        router.replace('/(tabs)');
       } else {
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showErrorToast('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
       }
     } catch (error: any) {
       console.error('❌ Error after Google Sign-In:', error);
-      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+      showErrorToast('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
     }
   };
 
@@ -111,15 +110,14 @@ export default function Login() {
         };
         
         await signIn(authResponse);
-        Alert.alert('Đăng nhập thành công', 'Chào mừng bạn!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        showAlert('Đăng nhập thành công', 'Chào mừng bạn!', 'OK', 'success');
+        router.replace('/(tabs)');
       } else {
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showErrorToast('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
       }
     } catch (error: any) {
       console.error('❌ Error after OTP Login:', error);
-      Alert.alert('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
+      showErrorToast('Lỗi', 'Không thể hoàn tất quá trình đăng nhập');
     }
   };
 

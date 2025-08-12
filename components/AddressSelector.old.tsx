@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState, memo, useCallback } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AddressService, { AddressData, Province } from '../services/addressService';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 
 interface Ward {
   code: string;
@@ -72,6 +72,7 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showErrorToast } = useUnifiedModal();
 
   useEffect(() => {
     if (modalVisible) {
@@ -150,7 +151,7 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
 
   const handleConfirm = useCallback(() => {
     if (!selectedProvince || !selectedWard) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
+      showErrorToast('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
       return;
     }
     

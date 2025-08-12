@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import api, { getBookById } from '../services/api';
 import { Book } from '../types';
 
@@ -9,6 +10,7 @@ const OrderPaymentScreen = () => {
   const { token } = useAuth();
   const { bookId } = useLocalSearchParams();
   const router = useRouter();
+  const { showSuccessToast, showErrorToast } = useUnifiedModal();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -37,10 +39,10 @@ const OrderPaymentScreen = () => {
       const address_id = 'default-address-id';
       const order = await api.createOrder(token, address_id);
       await api.createPayment(token, order._id, 'COD', book.price, 'VND', 'Thanh toán khi nhận hàng');
-      Alert.alert('Thành công', 'Đặt hàng và thanh toán thành công!');
+      showSuccessToast('Thành công', 'Đặt hàng và thanh toán thành công!', 2000);
       router.replace({ pathname: '/order' });
     } catch {
-      Alert.alert('Lỗi', 'Không thể đặt hàng/thanh toán.');
+      showErrorToast('Lỗi', 'Không thể đặt hàng/thanh toán.');
     } finally {
       setPaying(false);
     }

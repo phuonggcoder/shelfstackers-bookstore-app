@@ -2,12 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLanguage } from '../context/LanguageContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 
 const LanguageScreen = () => {
   const { t } = useTranslation();
   const { currentLanguage, changeLanguage, isLoading } = useLanguage();
+  const { showSuccessToast, showErrorToast } = useUnifiedModal();
   const [selectedLanguage, setSelectedLanguage] = useState(currentLanguage);
 
   const languages = [
@@ -25,18 +27,10 @@ const LanguageScreen = () => {
       await changeLanguage(lang);
       
       // Show success message
-      Alert.alert(
-        t('languageChanged'),
-        t('languageChangedMessage'),
-        [{ text: t('ok'), onPress: () => {} }]
-      );
+      showSuccessToast(t('languageChanged'), t('languageChangedMessage'), 2000);
     } catch (error) {
       console.error('Error changing language:', error);
-      Alert.alert(
-        t('error'),
-        t('languageChangeError'),
-        [{ text: t('ok'), onPress: () => {} }]
-      );
+      showErrorToast(t('error'), t('languageChangeError'));
     }
   };
 

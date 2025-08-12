@@ -2,14 +2,11 @@
 (globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
 
 import { useFCMListener } from '@/hooks/useFCMListener';
-import { FontAwesome } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { RootSiblingParent } from 'react-native-root-siblings';
-// @ts-ignore
-import Toast from 'react-native-toast-message';
 import { Provider } from 'react-redux';
 import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -17,42 +14,12 @@ import { AvatarProvider } from '../context/AvatarContext';
 import { CartProvider } from '../context/CartContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { NameProvider } from '../context/NameContext';
+import { UnifiedModalProvider } from '../context/UnifiedModalContext';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
 
-const toastConfig = {
-  customSuccess: ({ text1 }: { text1?: string }) => (
-    <View style={{
-      backgroundColor: 'rgba(30,30,30,0.92)',
-      borderRadius: 14,
-      minWidth: 180,
-      alignSelf: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <FontAwesome name="check" size={22} color="#fff" style={{ marginBottom: 2 }} />
-      <Text style={{ color: '#e0e0e0', fontSize: 14, fontWeight: '400', textAlign: 'center', marginTop: 2 }}>{text1}</Text>
-    </View>
-  ),
-  customError: ({ text1 }: { text1?: string }) => (
-    <View style={{
-      backgroundColor: 'rgba(30,30,30,0.92)',
-      borderRadius: 14,
-      minWidth: 180,
-      alignSelf: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <FontAwesome name="close" size={22} color="#fff" style={{ marginBottom: 2 }} />
-      <Text style={{ color: '#e0e0e0', fontSize: 14, fontWeight: '400', textAlign: 'center', marginTop: 2 }}>{text1}</Text>
-    </View>
-  ),
-};
+
 
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
@@ -124,19 +91,20 @@ export default function RootLayout() {
       <Provider store={store}>
         <LanguageProvider>
           <CartProvider>
-            <AuthProvider>
-              <MenuProvider>
-                <AvatarProvider>
-                  <NameProvider>
-                    <RootLayoutNav />
-                  </NameProvider>
-                </AvatarProvider>
-              </MenuProvider>
-            </AuthProvider>
+            <UnifiedModalProvider>
+              <AuthProvider>
+                <MenuProvider>
+                  <AvatarProvider>
+                    <NameProvider>
+                      <RootLayoutNav />
+                    </NameProvider>
+                  </AvatarProvider>
+                </MenuProvider>
+              </AuthProvider>
+            </UnifiedModalProvider>
           </CartProvider>
         </LanguageProvider>
       </Provider>
-      <Toast config={toastConfig} />
     </RootSiblingParent>
   );
 }

@@ -4,28 +4,26 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { UserAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
   const { t } = useTranslation();
   const { token } = useAuth();
+  const { showErrorToast, showDialog, hideModal } = useUnifiedModal();
   const { from } = useLocalSearchParams();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [showAlert, setShowAlert] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [showDefaultModal, setShowDefaultModal] = useState(false);
-  const [defaultChangeData, setDefaultChangeData] = useState<{
-    currentName: string;
-    newName: string;
-    newId: string;
-  } | null>(null);
+
+
+
+
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   
@@ -125,22 +123,35 @@ const AddressListScreen = () => {
   }, [token]);
 
   const handleDelete = async (id: string) => {
-    setDeleteId(id);
-    setShowDeleteModal(true);
+    showDialog(
+      t('unifiedModal.deleteAddress'),
+      t('unifiedModal.cannotRestoreDeletedAddress'),
+      t('unifiedModal.delete'),
+      t('unifiedModal.cancel'),
+      'delete',
+      () => {
+        hideModal();
+        confirmDelete(id);
+      },
+      () => {
+        hideModal();
+        console.log('Delete cancelled');
+      }
+    );
   };
 
-  const confirmDelete = async () => {
-    if (!deleteId || !token) return;
-    setShowDeleteModal(false);
+  const confirmDelete = async (id: string) => {
+    if (!id || !token) return;
     setLoading(true);
     try {
-      await AddressService.deleteAddress(token, deleteId);
+      await AddressService.deleteAddress(token, id);
       fetchAddresses();
     } catch (error) {
       console.error('Error deleting address:', error);
+      showErrorToast(t('error'), t('cannotDeleteAddress'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    setDeleteId(null);
   };
 
   const handleSetDefault = async (id: string) => {
@@ -149,12 +160,21 @@ const AddressListScreen = () => {
     const currentDefault = addrArr.find((a) => a.is_default);
     const newDefault = addrArr.find((a) => a._id === id);
     if (currentDefault && newDefault && currentDefault._id !== id) {
-      setDefaultChangeData({
-        currentName: currentDefault ? currentDefault.fullName : t('noDefaultAddress'),
-        newName: newDefault.fullName,
-        newId: id,
-      });
-      setShowDefaultModal(true);
+      showDialog(
+        t('changeDefaultAddress'),
+        t('confirmChangeDefaultAddress', { current: currentDefault.fullName, new: newDefault.fullName }),
+        t('confirm'),
+        t('cancel'),
+        'info',
+        () => {
+          hideModal();
+          confirmSetDefault(id);
+        },
+        () => {
+          hideModal();
+          console.log('Change default cancelled');
+        }
+      );
     } else if (!currentDefault && newDefault) {
       // Nếu chưa có mặc định, cho phép set luôn
       try {
@@ -162,14 +182,13 @@ const AddressListScreen = () => {
         fetchAddresses();
       } catch (error) {
         console.error('Error setting default address:', error);
-        Alert.alert(t('error'), t('cannotSetDefaultAddress'));
+        showErrorToast(t('error'), t('cannotSetDefaultAddress'));
       }
     }
   };
 
-  const confirmSetDefault = async () => {
-    if (!defaultChangeData || !token) return;
-    setShowDefaultModal(false);
+  const confirmSetDefault = async (id: string) => {
+    if (!id || !token) return;
     setLoading(true);
     try {
       const addrArr = addresses as any[];
@@ -180,20 +199,19 @@ const AddressListScreen = () => {
       await Promise.all(updatePromises);
       
       // Sau đó set địa chỉ mới thành true
-      await AddressService.setDefaultAddress(token, defaultChangeData.newId);
+      await AddressService.setDefaultAddress(token, id);
       fetchAddresses();
     } catch (error) {
       console.error('Error setting default address:', error);
-      Alert.alert(t('error'), t('cannotSetDefaultAddress'));
+      showErrorToast(t('error'), t('cannotSetDefaultAddress'));
     } finally {
       setLoading(false);
-      setDefaultChangeData(null);
     }
   };
 
   const handleConfirm = () => {
     if (!selected) {
-      Alert.alert(t('error'), t('pleaseSelectAddress'));
+      showErrorToast(t('pleaseSelectAddress'));
       return;
     }
     
@@ -254,51 +272,9 @@ const AddressListScreen = () => {
         </View>
       </Modal>
 
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.deleteModalBox}>
-            <Text style={styles.deleteTitle}>{t('deleteAddress')}</Text>
-            <Text style={styles.deleteDesc}>{t('cannotRestoreDeletedAddress')}</Text>
-            <View style={styles.deleteBtnRow}>
-              <TouchableOpacity style={styles.keepBtn} onPress={() => setShowDeleteModal(false)}>
-                <Text style={styles.keepBtnText}>{t('keep')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
-                <Text style={styles.confirmDeleteText}>{t('confirm')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal
-        visible={showDefaultModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDefaultModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.defaultChangeModalBox}>
-            <Text style={styles.defaultChangeTitle}>{t('changeDefaultAddress')}</Text>
-            <Text style={styles.defaultChangeDesc}>
-              {t('confirmChangeDefaultAddress', { current: defaultChangeData?.currentName, new: defaultChangeData?.newName })}
-            </Text>
-            <View style={styles.defaultChangeBtnRow}>
-              <TouchableOpacity style={styles.cancelDefaultChangeBtn} onPress={() => setShowDefaultModal(false)}>
-                <Text style={styles.cancelDefaultChangeText}>{t('cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDefaultChangeBtn} onPress={confirmSetDefault}>
-                <Text style={styles.confirmDefaultChangeText}>{t('confirm')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
+
 
       {loading ? (
         <View style={styles.loadingContainer}>

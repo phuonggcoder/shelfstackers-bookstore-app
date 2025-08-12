@@ -5,10 +5,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import VoucherValidationPopup from '../components/VoucherValidationPopup';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
@@ -19,6 +20,7 @@ import { formatVND, getBookImageUrl } from '../utils/format';
 export default function OrderReviewScreen() {
   const { t } = useTranslation();
   const { token } = useAuth();
+  const { showErrorToast, showWarningToast } = useUnifiedModal();
   const { bookId, ids, cartItems: cartItemsParam, totalAmount, itemCount } = useLocalSearchParams();
   const [book, setBook] = useState<any>(null);
   const [cartItems, setCartItems] = useState<any[]>([]); // For multi-item checkout
@@ -266,7 +268,7 @@ export default function OrderReviewScreen() {
       await addToCart(token, book._id, 1);
       router.replace('/cart');
     } catch {
-      Alert.alert(t('error'), t('orderReview.cannotAddToCart'));
+      showErrorToast(t('error'), t('orderReview.cannotAddToCart'));
     }
   };
 
@@ -282,23 +284,23 @@ export default function OrderReviewScreen() {
 
   const handleConfirm = async () => {
     if (!token) {
-      Alert.alert(t('error'), t('orderReview.pleaseLoginAgain'));
+      showErrorToast(t('error'), t('orderReview.pleaseLoginAgain'));
       return;
     }
 
     if (!address) {
-      Alert.alert(t('error'), t('orderReview.pleaseSelectShippingAddress'));
+      showErrorToast(t('error'), t('orderReview.pleaseSelectShippingAddress'));
       return;
     }
 
     if (!selectedPaymentMethod) {
-      Alert.alert(t('error'), t('orderReview.pleaseSelectPaymentMethod'));
+      showErrorToast(t('error'), t('orderReview.pleaseSelectPaymentMethod'));
       return;
     }
 
     // Check if we have items to order (either cart items or single book)
     if ((!cartItems || cartItems.length === 0) && !book) {
-      Alert.alert(t('error'), t('orderReview.noProductsToOrder'));
+      showErrorToast(t('error'), t('orderReview.noProductsToOrder'));
       return;
     }
 
@@ -306,7 +308,7 @@ export default function OrderReviewScreen() {
     if (cartItems.length > 0) {
       const invalidItems = cartItems.filter(item => !item.book || !item.book._id);
       if (invalidItems.length > 0) {
-        Alert.alert(t('error'), t('orderReview.invalidCartItems'));
+        showErrorToast(t('error'), t('orderReview.invalidCartItems'));
         return;
       }
       
@@ -321,14 +323,14 @@ export default function OrderReviewScreen() {
         const outOfStockMessage = outOfStockItems.map(item => 
           `${item.book.title}: ${t('orderReview.stockLeft', { count: item.book.stock })}, ${t('orderReview.requested', { count: item.quantity })}`
         ).join('\n');
-        Alert.alert(t('orderReview.outOfStock'), `${t('orderReview.someProductsInsufficient')}:\n${outOfStockMessage}`);
+        showWarningToast(t('orderReview.outOfStock'), `${t('orderReview.someProductsInsufficient')}:\n${outOfStockMessage}`);
         return;
       }
     }
     
     // For single book, check stock
     if (book && (!book.stock || book.stock < 1)) {
-      Alert.alert(t('orderReview.outOfStock'), t('orderReview.productOutOfStock'));
+      showWarningToast(t('orderReview.outOfStock'), t('orderReview.productOutOfStock'));
       return;
     }
 
@@ -351,7 +353,7 @@ export default function OrderReviewScreen() {
           console.log('Voucher validation result:', voucherValidation);
           
           if (!voucherValidation.valid) {
-            Alert.alert('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.');
+            showErrorToast('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.');
             return;
           }
         } catch (error: any) {
@@ -365,7 +367,7 @@ export default function OrderReviewScreen() {
             voucherErrorMsg = 'Giá trị đơn hàng không đủ để áp dụng voucher. Vui lòng thêm sản phẩm hoặc chọn voucher khác.';
           }
           
-          Alert.alert('Lỗi voucher', voucherErrorMsg);
+          showErrorToast('Lỗi voucher', voucherErrorMsg);
           return;
         }
       }
@@ -473,7 +475,7 @@ export default function OrderReviewScreen() {
         }
       }
       
-      Alert.alert('Lỗi', errorMessage);
+      showErrorToast('Lỗi', errorMessage);
     }
   };
 

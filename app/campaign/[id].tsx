@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import Header from '../../components/Header';
 import { useAuth } from '../../context/AuthContext';
+import { useUnifiedModal } from '../../context/UnifiedModalContext';
 import api, { getBooks } from '../../services/api';
 import { Voucher } from '../../services/voucherService';
 import { Book, Campaign } from '../../types';
@@ -24,6 +25,7 @@ const CampaignDetailScreen = () => {
   const [voucherLoading, setVoucherLoading] = useState(true);
   const [booksLoading, setBooksLoading] = useState(true);
   const { user, token } = useAuth();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
 
   useEffect(() => {
     loadCampaignData();
@@ -54,12 +56,12 @@ const CampaignDetailScreen = () => {
   // Xử lý khi user muốn dùng voucher
   const handleUseVoucher = (voucher: Voucher) => {
     if (!token) {
-      Alert.alert('Bạn cần đăng nhập để sử dụng voucher!');
+      showErrorToast('Lỗi', 'Bạn cần đăng nhập để sử dụng voucher!');
       // Có thể chuyển hướng sang màn hình đăng nhập nếu muốn
       return;
     }
     // Logic apply voucher ở đây (tạm thời chỉ alert)
-    Alert.alert('Thành công', `Bạn đã chọn voucher: ${voucher.title || voucher.voucher_id}`);
+    showSuccessToast('Thành công', `Bạn đã chọn voucher: ${voucher.title || voucher.voucher_id}`, 2000);
   };
 
   // Lấy sách gợi ý (random 4 cuốn)

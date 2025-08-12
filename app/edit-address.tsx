@@ -4,10 +4,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { District, UserAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
@@ -15,6 +16,7 @@ const EditAddressScreen = () => {
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,12 +46,12 @@ const EditAddressScreen = () => {
         setFormData(addressToEdit);
         await resolveAddressNames(addressToEdit);
       } else {
-        Alert.alert(t('error'), t('addressNotFound'));
+        showErrorToast(t('error'), t('addressNotFound'));
         router.back();
       }
     } catch (error) {
       console.error('Error fetching address:', error);
-      Alert.alert(t('error'), t('cannotLoadAddressInfo'));
+      showErrorToast(t('error'), t('cannotLoadAddressInfo'));
     } finally {
       setLoading(false);
     }
@@ -113,11 +115,12 @@ const EditAddressScreen = () => {
     const requiredFields: (keyof UserAddress)[] = ['receiver_name', 'phone_number', 'province', 'ward', 'address_detail'];
     const isFormValid = requiredFields.every(field => formData[field] && String(formData[field]).trim());
     if (!isFormValid) {
-      Alert.alert(t('error'), t('pleaseFillAllRequiredFields'));
+      showErrorToast(t('error'), t('pleaseFillAllRequiredFields'));
       return;
     }
     setSaving(true);
     try {
+
       const updatePayload = {
         receiver_name: formData.receiver_name?.trim() || '',
         phone_number: formData.phone_number?.trim() || '',
@@ -141,7 +144,7 @@ const EditAddressScreen = () => {
       ]);
     } catch (error) {
       console.error('Error updating address:', error);
-      Alert.alert(t('error'), t('cannotUpdateAddressPleaseTryAgain'));
+      showErrorToast(t('error'), t('cannotUpdateAddressPleaseTryAgain'));
     } finally {
       setSaving(false);
     }

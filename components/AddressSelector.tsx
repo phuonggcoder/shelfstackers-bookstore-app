@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
+
+import { useUnifiedModal } from '../context/UnifiedModalContext';
     ActivityIndicator,
     Alert,
     FlatList,
@@ -68,6 +70,7 @@ const AddressSelector = memo(({
   disabled = false,
   style,
 }: AddressSelectorProps) => {
+  const { showErrorToast } = useUnifiedModal();
   const [modalVisible, setModalVisible] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
@@ -136,7 +139,7 @@ const AddressSelector = memo(({
 
   const handleConfirm = useCallback(() => {
     if (!selectedProvince || !selectedWard) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
+      showErrorToast('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
       return;
     }
 

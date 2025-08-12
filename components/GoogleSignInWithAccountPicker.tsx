@@ -2,12 +2,12 @@ import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import googleAuthService from '../services/googleAuthService';
 
 interface GoogleSignInWithAccountPickerProps {
@@ -26,6 +26,7 @@ const GoogleSignInWithAccountPicker: React.FC<GoogleSignInWithAccountPickerProps
   textStyle,
 }) => {
   const [loading, setLoading] = useState(false);
+  const { showErrorToast } = useUnifiedModal();
 
   const handleGoogleSignIn = async () => {
     if (disabled || loading) return;
@@ -47,7 +48,7 @@ const GoogleSignInWithAccountPicker: React.FC<GoogleSignInWithAccountPickerProps
       } else {
         const error = new Error(result.message || 'Đăng nhập Google thất bại');
         onError?.(error);
-        Alert.alert('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
+        showErrorToast('Lỗi đăng nhập', result.message || 'Có lỗi xảy ra');
       }
     } catch (error: any) {
       console.error('❌ Google Sign-In error:', error);
@@ -57,13 +58,13 @@ const GoogleSignInWithAccountPicker: React.FC<GoogleSignInWithAccountPickerProps
         console.log('User cancelled Google Sign-In');
         // Không hiển thị alert cho user cancel
       } else if (error.message?.includes('PLAY_SERVICES_NOT_AVAILABLE')) {
-        Alert.alert('Lỗi', 'Google Play Services không khả dụng. Vui lòng cập nhật Google Play Services.');
+        showErrorToast('Lỗi', 'Google Play Services không khả dụng. Vui lòng cập nhật Google Play Services.');
       } else if (error.message?.includes('Không thể lấy ID token')) {
-        Alert.alert('Lỗi', 'Không thể xác thực với Google. Vui lòng thử lại.');
+        showErrorToast('Lỗi', 'Không thể xác thực với Google. Vui lòng thử lại.');
       } else if (error.message?.includes('Network')) {
-        Alert.alert('Lỗi mạng', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet.');
+        showErrorToast('Lỗi mạng', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet.');
       } else {
-        Alert.alert('Lỗi', error.message || 'Đăng nhập Google thất bại');
+        showErrorToast('Lỗi', error.message || 'Đăng nhập Google thất bại');
       }
       
       onError?.(error);

@@ -4,10 +4,11 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getCart, removeFromCart, updateCartQuantity } from '../services/api';
 
 interface CartItem {
@@ -28,6 +29,7 @@ const CartScreen = () => {
   const router = useRouter();
   const { cartCount, fetchCartCount } = useCart();
   const { user, token } = useAuth();
+  const { showErrorToast, showWarningToast, showDeleteDialog, hideModal } = useUnifiedModal();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -106,10 +108,10 @@ const CartScreen = () => {
       await updateCartQuantity(token, bookId, newQuantity);
       await loadCart();
       await fetchCartCount(token);
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      Alert.alert(t('error'), t('cannotUpdateQuantity'));
-    } finally {
+          } catch (error) {
+        console.error('Error updating quantity:', error);
+        showErrorToast(t('error'), t('cannotUpdateQuantity'));
+      } finally {
       setLoading(false);
     }
   };
@@ -117,30 +119,23 @@ const CartScreen = () => {
   const handleRemoveItem = async (bookId: string) => {
     if (!token) return;
     
-    Alert.alert(
-      t('confirm'),
-      t('confirmRemoveFromCart'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('remove'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await removeFromCart(token, bookId);
-              await loadCart();
-              await fetchCartCount(token);
-              setSelectedItems(prev => prev.filter(id => id !== bookId));
-            } catch (error) {
-              console.error('Error removing item:', error);
-              Alert.alert(t('error'), t('cannotRemoveProduct'));
-            } finally {
-              setLoading(false);
-            }
-          }
+    showDeleteDialog(
+      async () => {
+        try {
+          setLoading(true);
+          await removeFromCart(token, bookId);
+          await loadCart();
+          await fetchCartCount(token);
+          setSelectedItems(prev => prev.filter(id => id !== bookId));
+          hideModal(); // Explicitly hide the modal after successful deletion
+        } catch (error) {
+          console.error('Error removing item:', error);
+          showErrorToast(t('error'), t('cannotRemoveProduct'));
+          hideModal(); // Hide modal even on error
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
@@ -166,7 +161,7 @@ const CartScreen = () => {
     
     if (selectedItems.length === 0) {
       console.log('No items selected, showing alert');
-      Alert.alert(t('notification'), t('pleaseSelectAtLeastOneProduct'));
+      showWarningToast(t('notification'), t('pleaseSelectAtLeastOneProduct'));
       return;
     }
     
@@ -201,7 +196,7 @@ const CartScreen = () => {
       console.log('✅ Navigation successful');
     } catch (error) {
       console.error('❌ Error storing data or navigating:', error);
-      Alert.alert(t('error'), t('cannotNavigateToPayment'));
+      showErrorToast(t('error'), t('cannotNavigateToPayment'));
     }
     
     console.log('=== CHECKOUT PROCESS END ===');
