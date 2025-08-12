@@ -423,7 +423,14 @@ export default function OrderReviewScreen() {
 
       // Điều hướng sang trang ZaloPay nếu có order_url
       if (zaloPayData && zaloPayData.order_url) {
-        router.replace({ pathname: '/zalo-pay', params: { orderId } });
+        // Nếu chọn PayOS thì chuyển sang PayOSScreen
+        if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
+          router.replace({ pathname: '/PayOSScreen', params: { orderId } });
+        } else if (selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY) {
+          router.replace({ pathname: '/zalo-pay', params: { orderId } });
+        } else {
+          router.replace({ pathname: '/order-success', params: { orderId: orderCode || orderId } });
+        }
         return;
       }
       // Nếu không có, fallback sang order-success
@@ -870,6 +877,22 @@ export default function OrderReviewScreen() {
                   <Text style={styles.paymentDescription}>{t('orderReview.payViaZaloPayDescription')}</Text>
                 </View>
                 {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY && (
+                  <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.bottomSheetItem,
+                  selectedPaymentMethod === PAYMENT_METHODS.PAYOS && styles.bottomSheetItemSelected
+                ]}
+                onPress={() => setSelectedPaymentMethod(PAYMENT_METHODS.PAYOS)}
+              >
+                <Ionicons name="globe-outline" size={24} color="#3255FB" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.paymentText}>PayOS</Text>
+                  <Text style={styles.paymentDescription}>Thanh toán qua PayOS</Text>
+                </View>
+                {selectedPaymentMethod === PAYMENT_METHODS.PAYOS && (
                   <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
                 )}
               </TouchableOpacity>

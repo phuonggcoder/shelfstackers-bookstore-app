@@ -83,13 +83,16 @@ const AddressListScreen = () => {
       // Get wards for all provinces used in addresses
       const wardMap: {[key: string]: string} = {};
       const uniqueProvinces = [...new Set(addressList.map((addr: any) => addr.province))];
-      
-      for (const provinceCode of uniqueProvinces) {
-        if (provinceCode) {
-          const wards = await AddressService.getWards(provinceCode);
-          wards.forEach(w => {
-            wardMap[w.code] = w.name;
-          });
+      for (const provinceName of uniqueProvinces) {
+        if (provinceName) {
+          // Tìm province code từ name
+          const provinceObj = provinces.find(p => p.name === provinceName);
+          if (provinceObj) {
+            const wards = await AddressService.getWards(provinceObj.code);
+            wards.forEach(w => {
+              wardMap[w.code] = w.name;
+            });
+          }
         }
       }
       setWardNames(wardMap);

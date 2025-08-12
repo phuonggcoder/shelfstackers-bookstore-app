@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +23,9 @@ const AddAddress = () => {
   const { showErrorToast } = useUnifiedModal();
   const [loading, setLoading] = useState(false);
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [street, setStreet] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [addressDetail, setAddressDetail] = useState('');
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
 
   const handleAddressChange = (address: any) => {
@@ -39,13 +38,14 @@ const AddAddress = () => {
       return;
     }
 
-    if (!fullName.trim()) {
-      showErrorToast(t('error'), t('pleaseEnterFullName'));
+
+    if (!receiverName.trim()) {
+      Alert.alert(t('error'), t('pleaseEnterFullName'));
       return;
     }
 
-    if (!phone.trim()) {
-      showErrorToast(t('error'), t('pleaseEnterPhoneNumber'));
+    if (!phoneNumber.trim()) {
+      Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
       return;
     }
 
@@ -54,8 +54,9 @@ const AddAddress = () => {
       return;
     }
 
-    if (!street.trim()) {
-      showErrorToast(t('error'), t('pleaseEnterDetailedAddress'));
+
+    if (!addressDetail.trim()) {
+      Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
       return;
     }
 
@@ -63,28 +64,27 @@ const AddAddress = () => {
     try {
       // Log dữ liệu gửi đi để debug
       // Đảm bảo selectedAddress có đủ trường autocomplete34 và fullAddress
-      const wardName = selectedAddress?.ward?.name || (selectedAddress as any).autocomplete34?.ward?.name || '';
-      const wardCode = selectedAddress?.ward?.code || (selectedAddress as any).autocomplete34?.ward?.code || '';
+      // Chỉ lấy province và ward bằng name, không lấy district
+      const wardName = selectedAddress?.ward?.name || '';
       const provinceName = selectedAddress?.province?.name || '';
-      const provinceCode = selectedAddress?.province?.code || '';
-      const districtCode = selectedAddress?.district?.code || '';
-      const fullAddress =  `${street}, ${wardName}, ${provinceName}`;
-      
+      const fullAddress = `${addressDetail.trim()}, ${wardName}, ${provinceName}`;
       const addressPayload = {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        province: provinceCode,
-        district: districtCode,
-        ward: wardCode,
-        street: street.trim(),
+        receiver_name: receiverName.trim(),
+        phone_number: phoneNumber.trim(),
+        province: provinceName,
+        ward: wardName,
+        address_detail: addressDetail.trim(),
+        fullAddress,
         is_default: false,
       };
       console.log('Payload gửi lên API:', addressPayload);
       await AddressService.addAddress(token, addressPayload);
-      // Set flag to show success message in address list
-      await AsyncStorage.setItem('address_added', 'true');
-      // Navigate to address list
-      router.push('/address-list');
+      Alert.alert(t('success'), t('addressAddedSuccessfully'), [
+        {
+          text: t('ok'),
+          onPress: () => router.back(),
+        },
+      ]);
     } catch (error) {
       console.error('Create address failed:', error);
       showErrorToast(t('error'), t('cannotAddAddressPleaseTryAgain'));
@@ -96,7 +96,7 @@ const AddAddress = () => {
   const formatAddress = () => {
     if (!selectedAddress) return '';
     const parts = [
-      street,
+      addressDetail,
       selectedAddress.ward.name,
       selectedAddress.province.name
     ].filter(Boolean);
@@ -125,21 +125,23 @@ const AddAddress = () => {
 
         <View style={styles.inputGroup}>
           <TextInput
-            placeholder={t('enterFullName')}
+            placeholder={t('fullName')}
             style={styles.input}
-            value={fullName}
-            onChangeText={setFullName}
+            value={receiverName}
+            onChangeText={setReceiverName}
           />
           <TextInput
-            placeholder={t('enterPhoneNumber')}
+            placeholder={t('phoneNumber')}
             keyboardType="phone-pad"
             style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
           />
         </View>
 
         <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
+
+
 
         <View style={styles.section}>
           <AddressSelector onChange={handleAddressChange} />
@@ -147,10 +149,10 @@ const AddAddress = () => {
 
         <View style={styles.section}>
           <TextInput
-            placeholder={t('houseNumberStreetName')}
+            placeholder={t('streetBuildingHouseNumber')}
             style={styles.input}
-            value={street}
-            onChangeText={setStreet}
+            value={addressDetail}
+            onChangeText={setAddressDetail}
             multiline
           />
         </View>
