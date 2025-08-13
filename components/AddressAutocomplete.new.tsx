@@ -1,13 +1,14 @@
 import debounce from 'lodash/debounce';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import AddressService, { AddressData, Province, Ward } from '../services/addressService';
 
@@ -16,6 +17,7 @@ interface AddressAutocompleteProps {
 }
 
 const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSelect }) => {
+  const { t } = useTranslation();
   // States for data
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
@@ -31,45 +33,40 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
   const [showWards, setShowWards] = useState(false);
 
   // Debounced search functions
-  const debouncedSearchProvinces = useCallback(
-    debounce(async (query: string) => {
-      if (query.length >= 2) {
-        try {
-          setLoading(true);
-          const results = await AddressService.getProvinces(query);
-          setProvinces(results);
-          setShowProvinces(true);
-        } catch (err) {
-          setError('Không thể tìm kiếm tỉnh/thành phố');
-        } finally {
-          setLoading(false);
-        }
+  const debouncedSearchProvinces = debounce(async (query: string) => {
+    if (query.length >= 2) {
+      try {
+        setLoading(true);
+        const results = await AddressService.getProvinces(query);
+        setProvinces(results);
+        setShowProvinces(true);
+      } catch {
+        setError(t('cannotLoadCategories'));
+      } finally {
+        setLoading(false);
       }
-    }, 300),
-    []
-  );
+    }
+  }, 300);
 
-  const debouncedSearchWards = useCallback(
-    debounce(async (provinceCode: string, query: string) => {
-      if (query.length >= 2) {
-        try {
-          setLoading(true);
-          const results = await AddressService.getWards(provinceCode, query);
-          setWards(results);
-          setShowWards(true);
-        } catch (err) {
-          setError('Không thể tìm kiếm phường/xã');
-        } finally {
-          setLoading(false);
-        }
+  const debouncedSearchWards = debounce(async (provinceCode: string, query: string) => {
+    if (query.length >= 2) {
+      try {
+        setLoading(true);
+        const results = await AddressService.getWards(provinceCode, query);
+        setWards(results);
+        setShowWards(true);
+      } catch {
+        setError(t('cannotLoadWards') || 'Error');
+      } finally {
+        setLoading(false);
       }
-    }, 300),
-    []
-  );
+    }
+  }, 300);
 
   // Load initial data
   useEffect(() => {
     loadProvinces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadProvinces = async (query: string = '') => {
@@ -78,8 +75,8 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
       const results = await AddressService.getProvinces(query);
       setProvinces(results);
       setShowProvinces(true);
-    } catch (err) {
-      setError('Không thể tải danh sách tỉnh/thành phố');
+    } catch {
+      setError(t('cannotLoadCategories'));
     } finally {
       setLoading(false);
     }
@@ -91,8 +88,8 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
       const results = await AddressService.getWards(provinceCode);
       setWards(results);
       setShowWards(true);
-    } catch (err) {
-      setError('Không thể tải danh sách phường/xã');
+    } catch {
+      setError(t('cannotLoadWards') || 'Error');
     } finally {
       setLoading(false);
     }
@@ -116,10 +113,12 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
     if (selectedProvince && onAddressSelect) {
       onAddressSelect({
         province: selectedProvince,
+  district: { code: '', name: '', provinceId: '', type: '', typeText: '', autocompleteType: 'oapi' },
         ward: ward,
         fullAddress: `${ward.name}, ${selectedProvince.name}`,
         addressCode: {
           provinceCode: selectedProvince.code,
+          districtCode: '',
           wardCode: ward.code
         }
       });
@@ -132,8 +131,8 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
       style={styles.item}
       onPress={() => handleProvinceSelect(item)}
     >
-      <Text style={styles.itemText}>{item.name}</Text>
-      <Text style={styles.itemCode}>Mã: {item.code}</Text>
+  <Text style={styles.itemText}>{item.name}</Text>
+  <Text style={styles.itemCode}>{t('code') || 'Mã'}: {item.code}</Text>
     </TouchableOpacity>
   );
 
@@ -142,8 +141,8 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
       style={styles.item}
       onPress={() => handleWardSelect(item)}
     >
-      <Text style={styles.itemText}>{item.name}</Text>
-      <Text style={styles.itemCode}>Mã: {item.code}</Text>
+  <Text style={styles.itemText}>{item.name}</Text>
+  <Text style={styles.itemCode}>{t('code') || 'Mã'}: {item.code}</Text>
     </TouchableOpacity>
   );
 
@@ -155,12 +154,12 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
           onPress={() => setError(null)}
         >
           <Text style={styles.errorText}>{error}</Text>
-          <Text style={styles.retryText}>Nhấn để thử lại</Text>
+          <Text style={styles.retryText}>{t('retry')}</Text>
         </TouchableOpacity>
       )}
 
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Tỉnh/Thành phố</Text>
+        <Text style={styles.label}>{t('provinceCity')}</Text>
         <TextInput
           style={styles.input}
           value={provinceQuery}
@@ -168,7 +167,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
             setProvinceQuery(text);
             debouncedSearchProvinces(text);
           }}
-          placeholder="Nhập tên tỉnh/thành phố..."
+          placeholder={t('enterProvinceCity')}
           onFocus={() => setShowProvinces(true)}
         />
         {showProvinces && (
@@ -190,7 +189,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
 
       {selectedProvince && (
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Phường/Xã</Text>
+          <Text style={styles.label}>{t('ward')}</Text>
           <TextInput
             style={styles.input}
             value={wardQuery}
@@ -200,7 +199,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
                 debouncedSearchWards(selectedProvince.code, text);
               }
             }}
-            placeholder="Nhập tên phường/xã..."
+            placeholder={t('enterWard')}
             onFocus={() => setShowWards(true)}
           />
           {showWards && (
@@ -223,7 +222,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
 
       {selectedProvince && selectedWard && (
         <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>Địa chỉ đã chọn:</Text>
+          <Text style={styles.summaryTitle}>{t('selectedAddress')}</Text>
           <Text style={styles.summaryText}>
             {selectedWard.name}, {selectedProvince.name}
           </Text>

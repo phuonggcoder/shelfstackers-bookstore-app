@@ -1,8 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-
-import { useUnifiedModal } from '../context/UnifiedModalContext';
     ActivityIndicator,
     Alert,
     FlatList,
@@ -13,15 +11,7 @@ import { useUnifiedModal } from '../context/UnifiedModalContext';
     TouchableOpacity,
     View,
 } from 'react-native';
-import AddressService, { AddressData, Province } from '../services/addressService';
-
-interface Ward {
-  code: string;
-  name: string;
-  provinceCode: string;
-  provinceName: string;
-  mergeWith?: string;
-}
+import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
 
 interface AddressSelectorProps {
   value?: Partial<AddressData> | null;
@@ -38,7 +28,7 @@ const AddressItem = memo(({
   isSelected, 
   onSelect 
 }: {
-  item: Province | Ward;
+  item: Province | District | Ward;
   isSelected: boolean;
   onSelect: () => void;
 }) => (
@@ -50,9 +40,6 @@ const AddressItem = memo(({
     <View style={styles.itemContent}>
       <View style={styles.itemTextContainer}>
         <Text style={styles.itemText}>{item.name}</Text>
-        {item.mergeWith && (
-          <Text style={styles.mergeWithText}>{item.mergeWith}</Text>
-        )}
       </View>
       {isSelected && <Ionicons name="checkmark-circle" size={24} color="#3255FB" />}
     </View>
@@ -70,17 +57,17 @@ const AddressSelector = memo(({
   disabled = false,
   style,
 }: AddressSelectorProps) => {
-  const { showErrorToast } = useUnifiedModal();
   const [modalVisible, setModalVisible] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<District | null>(null);
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredProvinces, setFilteredProvinces] = useState<Province[]>([]);
-  const [filteredWards, setFilteredWards] = useState<Ward[]>([]);
+  const [filteredItems, setFilteredItems] = useState<(Province | District | Ward)[]>([]);
 
   const loadProvinces = useCallback(async () => {
     try {
@@ -99,24 +86,30 @@ const AddressSelector = memo(({
     }
   }, []);
 
-  const loadWards = useCallback(async (provinceCode: string) => {
+  const loadDistricts = useCallback(async (provinceCode: string) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await AddressService.getWards(provinceCode);
+      const response = await AddressService.getDistricts(provinceCode);
       if (response && Array.isArray(response)) {
-        const uniqueWards = response.reduce((acc: Ward[], ward) => {
-          if (!acc.find(w => w.code === ward.code)) {
-            acc.push({
-              code: ward.code,
-              name: ward.name,
-              provinceCode,
-              provinceName: selectedProvince?.name || ''
-            });
-          }
-          return acc;
-        }, []);
-        setWards(uniqueWards);
+        setDistricts(response);
+      } else {
+        setError('Không thể tải danh sách quận/huyện');
+      }
+    } catch {
+      setError('Không thể tải danh sách quận/huyện');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadWards = useCallback(async (districtCode: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await AddressService.getWards(districtCode);
+      if (response && Array.isArray(response)) {
+        setWards(response);
       } else {
         setError('Không thể tải danh sách phường/xã');
       }
@@ -125,12 +118,19 @@ const AddressSelector = memo(({
     } finally {
       setLoading(false);
     }
-  }, [selectedProvince]);
+  }, []);
 
   const handleProvinceSelect = useCallback(async (province: Province) => {
     setSelectedProvince(province);
+    setSelectedDistrict(null);
     setSelectedWard(null);
-    await loadWards(province.code);
+    await loadDistricts(province.code);
+  }, [loadDistricts]);
+
+  const handleDistrictSelect = useCallback(async (district: District) => {
+    setSelectedDistrict(district);
+    setSelectedWard(null);
+    await loadWards(district.code);
   }, [loadWards]);
 
   const handleWardSelect = useCallback((ward: Ward) => {
@@ -138,35 +138,28 @@ const AddressSelector = memo(({
   }, []);
 
   const handleConfirm = useCallback(() => {
-    if (!selectedProvince || !selectedWard) {
-      showErrorToast('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã');
+    if (!selectedProvince || !selectedDistrict  || !selectedWard) {
+      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ tỉnh/thành phố, quận/huyện và phường/xã');
       return;
     }
 
     if (onChange) {
-      const fullAddress = `${selectedWard.name}, ${selectedProvince.name}`;
-      const addressData: AddressData & {
-        autocomplete34: { ward: { name: string; code: string } };
-        fullAddress: string;
-      } = {
+      const fullAddress = `${selectedWard.name}, ${selectedDistrict.name}, ${selectedProvince.name}`;
+      const addressData: AddressData = {
         province: selectedProvince,
+        district: selectedDistrict,
         ward: selectedWard,
         fullAddress,
         addressCode: {
           provinceCode: selectedProvince.code,
+          districtCode: selectedDistrict.code,
           wardCode: selectedWard.code
-        },
-        autocomplete34: {
-          ward: {
-            name: selectedWard.name,
-            code: selectedWard.code
-          }
         }
       };
       onChange(addressData);
     }
     setModalVisible(false);
-  }, [selectedProvince, selectedWard, onChange]);
+  }, [selectedProvince, selectedDistrict, selectedWard, onChange]);
 
   useEffect(() => {
     if (modalVisible) {
@@ -175,57 +168,47 @@ const AddressSelector = memo(({
     }
   }, [modalVisible, loadProvinces]);
 
-  // Effect xử lý tìm kiếm
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProvinces(provinces);
-      setFilteredWards(wards);
-      return;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    
-    if (!selectedProvince) {
-      // Tìm kiếm trong danh sách tỉnh/thành
-      const results = provinces.filter(province => {
-        const matchName = province.name.toLowerCase().includes(query);
-        const matchMergeWith = province.mergeWith?.toLowerCase().includes(query);
-        return matchName || matchMergeWith;
-      });
-      setFilteredProvinces(results);
-    } else {
-      // Tìm kiếm trong danh sách phường/xã
-      const results = wards.filter(ward => {
-        const matchName = ward.name.toLowerCase().includes(query);
-        const matchMergeWith = ward.mergeWith?.toLowerCase().includes(query);
-        return matchName || matchMergeWith;
-      });
-      setFilteredWards(results);
-    }
-  }, [searchQuery, provinces, wards, selectedProvince]);
-
-  const renderItem = useCallback(({ item, type }: { item: Province | Ward; type: 'province' | 'ward' }) => {
-    const isSelected = type === 'province' 
-      ? selectedProvince?.code === item.code
-      : selectedWard?.code === item.code;
-
-    const onSelect = () => {
-      if (type === 'province') {
-        handleProvinceSelect(item as Province);
-      } else {
-        handleWardSelect(item as Ward);
+    // Clear any existing search timeout
+    const timeoutId = setTimeout(() => {
+      if (!searchQuery.trim()) {
+        setFilteredItems(!selectedProvince ? provinces : !selectedDistrict ? districts : wards);
+        return;
       }
-    };
 
-    return (
-      <AddressItem
-        key={`${type}-${item.code}`}
-        item={item}
-        isSelected={isSelected}
-        onSelect={onSelect}
-      />
-    );
-  }, [selectedProvince, selectedWard, handleProvinceSelect, handleWardSelect]);
+      const query = searchQuery.toLowerCase().trim();
+      let results: (Province | District | Ward)[] = [];
+      
+      // Use memoized filter function for better performance
+      if (!selectedProvince) {
+        results = provinces.filter(province => {
+          const normalizedName = province.name.toLowerCase();
+          return normalizedName.includes(query) ||
+                 (province.typeText && province.typeText.toLowerCase().includes(query));
+        });
+      } else if (!selectedDistrict) {
+        results = districts.filter(district => {
+          const normalizedName = district.name.toLowerCase();
+          return normalizedName.includes(query) ||
+                 (district.typeText && district.typeText.toLowerCase().includes(query));
+        });
+      } else {
+        results = wards.filter(ward => {
+          const normalizedName = ward.name.toLowerCase();
+          // Also search in ward's full path if available
+          const fullPath = ward.path ? ward.path.toLowerCase() : '';
+          return normalizedName.includes(query) ||
+                 (ward.typeText && ward.typeText.toLowerCase().includes(query)) ||
+                 fullPath.includes(query);
+        });
+      }
+      setFilteredItems(results);
+    }, 300); // Add debounce of 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, provinces, districts, wards, selectedProvince, selectedDistrict]);
+
+
 
   return (
     <View style={[styles.container, style]}>
@@ -321,47 +304,69 @@ const AddressSelector = memo(({
                   <View style={styles.tabContainer}>
                     <TouchableOpacity 
                       style={[styles.tab, !selectedProvince && styles.activeTab]}
-                      onPress={() => selectedProvince && setSelectedProvince(null)}
+                      onPress={() => {
+                        setSelectedProvince(null);
+                        setSelectedDistrict(null);
+                        setSelectedWard(null);
+                      }}
                     >
                       <Text style={[styles.tabText, !selectedProvince && styles.activeTabText]}>
                         Tỉnh/Thành
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.tab, selectedProvince && styles.activeTab]}
+                      style={[styles.tab, (selectedProvince && !selectedDistrict) && styles.activeTab]}
                       disabled={!selectedProvince}
+                      onPress={() => {
+                        setSelectedDistrict(null);
+                        setSelectedWard(null);
+                      }}
                     >
-                      <Text style={[styles.tabText, selectedProvince && styles.activeTabText]}>
+                      <Text style={[styles.tabText, (selectedProvince && !selectedDistrict) && styles.activeTabText]}>
+                        Quận/Huyện
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.tab, selectedDistrict && styles.activeTab]}
+                      disabled={!selectedDistrict}
+                    >
+                      <Text style={[styles.tabText, selectedDistrict && styles.activeTabText]}>
                         Phường/Xã
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  {!selectedProvince ? (
-                    <View style={styles.listContainer}>
-                      <FlatList
-                        data={filteredProvinces}
-                        keyExtractor={item => `province-${item.code}`}
-                        renderItem={props => renderItem({ ...props, type: 'province' })}
-                        style={{ flex: 1 }}
-                        windowSize={5}
-                        initialNumToRender={10}
-                        maxToRenderPerBatch={10}
-                      />
-                    </View>
-                  ) : (
-                    <View style={styles.listContainer}>
-                      <FlatList
-                        data={filteredWards}
-                        keyExtractor={item => `ward-${selectedProvince.code}-${item.code}`}
-                        renderItem={props => renderItem({ ...props, type: 'ward' })}
-                        style={{ flex: 1 }}
-                        windowSize={5}
-                        initialNumToRender={10}
-                        maxToRenderPerBatch={10}
-                      />
-                    </View>
-                  )}
+                  <View style={styles.listContainer}>
+                    <FlatList
+                      data={filteredItems.length > 0 ? filteredItems : !selectedProvince ? provinces : !selectedDistrict ? districts : wards}
+                      keyExtractor={(item) => `${!selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward'}-${item.code}`}
+                      renderItem={({ item }: { item: Province | District | Ward }) => (
+                        <AddressItem
+                          item={item}
+                          isSelected={
+                            !selectedProvince 
+                              ? selectedProvince?.code === item.code
+                              : !selectedDistrict
+                                ? selectedDistrict?.code === item.code
+                                : selectedWard?.code === item.code
+                          }
+                          onSelect={() => {
+                            if (!selectedProvince) {
+                              handleProvinceSelect(item as Province);
+                            } else if (!selectedDistrict) {
+                              handleDistrictSelect(item as District);
+                            } else {
+                              handleWardSelect(item as Ward);
+                            }
+                          }}
+                        />
+                      )}
+                      style={{ flex: 1 }}
+                      windowSize={5}
+                      initialNumToRender={10}
+                      maxToRenderPerBatch={10}
+                    />
+                  </View>
                 </>
               )}
             </View>

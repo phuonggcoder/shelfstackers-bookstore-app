@@ -1,164 +1,162 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  TextInput,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  StyleSheet,
+    ActivityIndicator,
+    FlatList,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import debounce from 'lodash/debounce';
-import AddressService, { Province, Ward, AddressData } from '../services/addressService';
+import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
 
 interface AddressAutocompleteProps {
   onAddressSelect?: (address: AddressData) => void;
 }
 
 const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSelect }) => {
+  // States for data
   const [provinces, setProvinces] = useState<Province[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
-  
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<District | null>(null);
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
-  
-  const [provinceSearchQuery, setProvinceSearchQuery] = useState('');
-  const [wardSearchQuery, setWardSearchQuery] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // UI state for showing/hiding dropdown lists
+  // States for UI
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [provinceQuery, setProvinceQuery] = useState('');
+  const [districtQuery, setDistrictQuery] = useState('');
+  const [wardQuery, setWardQuery] = useState('');
   const [showProvinces, setShowProvinces] = useState(false);
+  const [showDistricts, setShowDistricts] = useState(false);
   const [showWards, setShowWards] = useState(false);
 
+  // Debounced search functions
+  const debouncedSearchProvinces = useCallback((query: string) => {
+    if (query.length >= 2) {
+      const search = async () => {
+        try {
+          setLoading(true);
+          const results = await AddressService.getProvinces(query);
+          setProvinces(results);
+          setShowProvinces(true);
+        } catch (err: any) {
+          setError(err.message || 'Không thể tìm kiếm tỉnh/thành phố');
+        } finally {
+          setLoading(false);
+        }
+      };
+      search();
+    }
+  }, []);
+
+  const debouncedSearchDistricts = useCallback((provinceCode: string) => {
+    const search = async () => {
+      try {
+        setLoading(true);
+        const results = await AddressService.getDistricts(provinceCode);
+        setDistricts(results);
+        setShowDistricts(true);
+      } catch (err: any) {
+        setError(err.message || 'Không thể tìm kiếm quận/huyện');
+      } finally {
+        setLoading(false);
+      }
+    };
+    search();
+  }, []);
+
+  const debouncedSearchWards = useCallback((districtCode: string) => {
+    const search = async () => {
+      try {
+        setLoading(true);
+        const results = await AddressService.getWards(districtCode);
+        setWards(results);
+        setShowWards(true);
+      } catch (err: any) {
+        setError(err.message || 'Không thể tìm kiếm phường/xã');
+      } finally {
+        setLoading(false);
+      }
+    };
+    search();
+  }, []);
+
+  // Load initial data
   useEffect(() => {
     loadProvinces();
   }, []);
 
-  // Load provinces with optional search
-  const loadProvinces = async (searchQuery: string = '') => {
+  const loadProvinces = async (query: string = '') => {
     try {
       setLoading(true);
-      setError(null);
-      const response = await AddressService.getProvincesMerged(searchQuery);
-      console.log('Loaded provinces:', response.length, 'provinces');
-
-      if (response.length > 0) {
-        setProvinces(response);
-        setShowProvinces(true);
-        console.log('Provinces loaded successfully, showing dropdown');
-      } else {
-        setError('Không thể tải danh sách tỉnh/thành phố');
-        console.error('Province loading error: No data returned');
-      }
-    } catch (err) {
-      setError('Không thể tải danh sách tỉnh/thành phố');
-      console.error('Province loading error:', err);
+      const results = await AddressService.getProvinces(query);
+      setProvinces(results);
+      setShowProvinces(true);
+    } catch (err: any) {
+      setError(err.message || 'Không thể tải danh sách tỉnh/thành phố');
     } finally {
       setLoading(false);
     }
   };
 
-  // Load wards for selected province with optional search
-  const loadWards = async (provinceCode: string, searchQuery: string = '') => {
+  const loadWards = async (provinceCode: string) => {
     try {
-      setLoadingWards(true);
-      setError(null);
-      const response = await AddressService.getWardsByProvince(provinceCode);
-
-      if (response.length > 0) {
-        setWards(response);
-        setSelectedWard(null);
-        setShowWards(true);
-      } else {
-        setError('Không thể tải danh sách phường/xã');
-        console.error('Wards loading error: No data returned');
-      }
-    } catch (err) {
-      setError('Không thể tải danh sách phường/xã');
-      console.error('Wards loading error:', err);
+      setLoading(true);
+      const results = await AddressService.getWards(provinceCode);
+      setWards(results);
+      setShowWards(true);
+    } catch (err: any) {
+      setError(err.message || 'Không thể tải danh sách phường/xã');
     } finally {
-      setLoadingWards(false);
+      setLoading(false);
     }
   };
 
-  // Handle province selection
+  // Handle selections
   const handleProvinceSelect = (province: Province) => {
-    console.log('Selected province:', province);
     setSelectedProvince(province);
-    setSelectedWard(null);
-    setProvinceSearchQuery(province.name);
-    setWardSearchQuery('');
+    setProvinceQuery(province.name);
     setShowProvinces(false);
-    setShowWards(false);
-    
-    // Load wards for selected province
-    loadWards(province.code);
+    setSelectedDistrict(null);
+    setDistrictQuery('');
+    setSelectedWard(null);
+    setWardQuery('');
+    debouncedSearchDistricts(province.code);
   };
 
-  // Handle ward selection
+  const handleDistrictSelect = (district: District) => {
+    setSelectedDistrict(district);
+    setDistrictQuery(district.name);
+    setShowDistricts(false);
+    setSelectedWard(null);
+    setWardQuery('');
+    debouncedSearchWards(district.code);
+  };
+
   const handleWardSelect = (ward: Ward) => {
-    console.log('Selected ward:', ward);
     setSelectedWard(ward);
-    setWardSearchQuery(ward.name);
+    setWardQuery(ward.name);
     setShowWards(false);
-    
-    if (onAddressSelect && selectedProvince) {
+
+    if (selectedProvince && selectedDistrict && onAddressSelect) {
       onAddressSelect({
         province: selectedProvince,
+        district: selectedDistrict,
         ward: ward,
-        fullAddress: `${ward.name}, ${selectedProvince.name}`,
+        fullAddress: `${ward.name}, ${selectedDistrict.name}, ${selectedProvince.name}`,
         addressCode: {
           provinceCode: selectedProvince.code,
+          districtCode: selectedDistrict.code,
           wardCode: ward.code
         }
       });
     }
   };
 
-  // Handle province search input change
-  const handleProvinceSearchChange = (text: string) => {
-    setProvinceSearchQuery(text);
-    setSelectedProvince(null);
-    setSelectedWard(null);
-    setWards([]);
-    setShowWards(false);
-
-    if (text.length >= 2) {
-      setTimeout(() => {
-        if (text === provinceSearchQuery) {
-          loadProvinces(text);
-        }
-      }, 300);
-    } else if (text.length === 0) {
-      loadProvinces();
-    } else {
-      setShowProvinces(false);
-    }
-  };
-
-  // Handle ward search input change
-  const handleWardSearchChange = (text: string) => {
-    setWardSearchQuery(text);
-    setSelectedWard(null);
-
-    if (selectedProvince) {
-      if (text.length >= 2) {
-        setTimeout(() => {
-          if (text === wardSearchQuery) {
-            loadWards(selectedProvince.code, text);
-          }
-        }, 300);
-      } else if (text.length === 0) {
-        loadWards(selectedProvince.code);
-      } else {
-        setShowWards(false);
-      }
-    }
-  };
-
+  // Render list items
   const renderProvinceItem = ({ item }: { item: Province }) => (
     <TouchableOpacity
       style={styles.item}
@@ -169,163 +167,136 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
     </TouchableOpacity>
   );
 
-  // Removed invalid properties from Ward rendering logic
   const renderWardItem = ({ item }: { item: Ward }) => (
     <TouchableOpacity
       style={styles.item}
       onPress={() => handleWardSelect(item)}
     >
       <Text style={styles.itemText}>{item.name}</Text>
-      <View style={styles.wardDetails}>
-        <Text style={styles.itemCode}>Mã: {item.code}</Text>
-      </View>
+      <Text style={styles.itemCode}>Mã: {item.code}</Text>
     </TouchableOpacity>
   );
-
-  if (loading && provinces.length === 0) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
       {error && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.errorContainer}
-          onPress={() => {
-            setError(null);
-            if (!selectedProvince) {
-              loadProvinces(provinceSearchQuery);
-            } else {
-              loadWards(selectedProvince.code, wardSearchQuery);
-            }
-          }}
+          onPress={() => setError(null)}
         >
-          <Text style={styles.error}>{error}</Text>
+          <Text style={styles.errorText}>{error}</Text>
           <Text style={styles.retryText}>Nhấn để thử lại</Text>
         </TouchableOpacity>
       )}
-      
-      {/* Province Selection */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Tỉnh/Thành phố *</Text>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Tỉnh/Thành phố</Text>
         <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm kiếm tỉnh/thành phố..."
-          value={provinceSearchQuery}
-          onChangeText={handleProvinceSearchChange}
-          onFocus={() => {
-            setShowProvinces(true);
-            setShowWards(false);
-            if (provinces.length === 0) {
-              loadProvinces();
-            }
+          style={styles.input}
+          value={provinceQuery}
+          onChangeText={(text) => {
+            setProvinceQuery(text);
+            debouncedSearchProvinces(text);
           }}
+          placeholder="Nhập tên tỉnh/thành phố..."
+          onFocus={() => setShowProvinces(true)}
         />
-        
         {showProvinces && (
-          <View style={styles.listContainer}>
+          <View style={styles.dropdown}>
             {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#007AFF" />
-                <Text>Đang tìm kiếm...</Text>
-              </View>
-            ) : provinces.length > 0 ? (
+              <ActivityIndicator size="small" color="#0000ff" />
+            ) : (
               <FlatList
                 data={provinces}
-                keyExtractor={(item) => item.code}
                 renderItem={renderProvinceItem}
+                keyExtractor={(item) => item.code}
                 style={styles.list}
-                maxToRenderPerBatch={10}
-                windowSize={10}
                 keyboardShouldPersistTaps="handled"
               />
-            ) : (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>
-                  Không tìm thấy tỉnh/thành phố nào
-                </Text>
-              </View>
             )}
           </View>
         )}
       </View>
 
-      {/* Ward Selection */}
       {selectedProvince && (
-        <View style={styles.section}>
-          <Text style={styles.label}>Phường/Xã/Thị trấn *</Text>
-          <Text style={styles.selectedProvinceText}>
-            Đã chọn: {selectedProvince.name}
-          </Text>
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Quận/Huyện</Text>
           <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm kiếm phường/xã/thị trấn..."
-            value={wardSearchQuery}
-            onChangeText={handleWardSearchChange}
-            onFocus={() => {
-              setShowWards(true);
-              setShowProvinces(false);
-              if (wards.length === 0) {
-                loadWards(selectedProvince.code);
+            style={styles.input}
+            value={districtQuery}
+            onChangeText={(text) => {
+              setDistrictQuery(text);
+              if (selectedProvince) {
+                debouncedSearchDistricts(selectedProvince.code);
               }
             }}
+            placeholder="Nhập tên quận/huyện..."
+            onFocus={() => setShowDistricts(true)}
           />
-          
-          {showWards && (
-            <View style={styles.listContainer}>
-              {loadingWards ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#007AFF" />
-                  <Text>Đang tìm kiếm...</Text>
-                </View>
-              ) : wards.length > 0 ? (
+          {showDistricts && (
+            <View style={styles.dropdown}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#0000ff" />
+              ) : (
                 <FlatList
-                  data={wards}
+                  data={districts}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.item}
+                      onPress={() => handleDistrictSelect(item)}
+                    >
+                      <Text style={styles.itemText}>{item.name}</Text>
+                      <Text style={styles.itemCode}>Mã: {item.code}</Text>
+                    </TouchableOpacity>
+                  )}
                   keyExtractor={(item) => item.code}
-                  renderItem={renderWardItem}
                   style={styles.list}
-                  maxToRenderPerBatch={10}
-                  windowSize={10}
                   keyboardShouldPersistTaps="handled"
                 />
-              ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={styles.noDataText}>
-                    Không tìm thấy phường/xã/thị trấn nào
-                  </Text>
-                </View>
               )}
             </View>
           )}
         </View>
       )}
 
-      {/* Selected Address Summary */}
-      {selectedProvince && selectedWard && (
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Địa chỉ đã chọn:</Text>
-          <Text style={styles.summaryText}>
-            {selectedWard.name}, {selectedProvince.name}
-          </Text>
-          <Text style={styles.summaryCode}>
-            Mã: {selectedProvince.code} - {selectedWard.code}
-          </Text>
+      {selectedDistrict && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Phường/Xã</Text>
+          <TextInput
+            style={styles.input}
+            value={wardQuery}
+            onChangeText={(text) => {
+              setWardQuery(text);
+              if (selectedDistrict) {
+                debouncedSearchWards(selectedDistrict.code);
+              }
+            }}
+            placeholder="Nhập tên phường/xã..."
+            onFocus={() => setShowWards(true)}
+          />
+          {showWards && (
+            <View style={styles.dropdown}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#0000ff" />
+              ) : (
+                <FlatList
+                  data={wards}
+                  renderItem={renderWardItem}
+                  keyExtractor={(item) => item.code}
+                  style={styles.list}
+                  keyboardShouldPersistTaps="handled"
+                />
+              )}
+            </View>
+          )}
         </View>
       )}
-      
-      {/* Debug info */}
-      {__DEV__ && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            Debug: Provinces:{provinces.length} Wards:{wards.length}
-          </Text>
-          <Text style={styles.debugText}>
-            Loading: {loading ? 'Provinces' : ''} {loadingWards ? 'Wards' : ''}
+
+      {selectedProvince && selectedDistrict && selectedWard && (
+        <View style={styles.summary}>
+          <Text style={styles.summaryTitle}>Địa chỉ đã chọn:</Text>
+          <Text style={styles.summaryText}>
+            {selectedWard.name}, {selectedDistrict.name}, {selectedProvince.name}
           </Text>
         </View>
       )}
@@ -335,153 +306,75 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ onAddressSele
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 16,
   },
-  section: {
-    marginBottom: 20,
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#c62828',
+    textAlign: 'center',
+  },
+  retryText: {
+    color: '#c62828',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    marginTop: 4,
+  },
+  inputContainer: {
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
   },
-  searchInput: {
+  input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: 'white',
   },
-  selectedProvinceText: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  listContainer: {
+  dropdown: {
     marginTop: 4,
-    position: 'relative',
-    zIndex: 1000,
-  },
-  list: {
-    maxHeight: 250,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
+    maxHeight: 200,
+  },
+  list: {
     backgroundColor: 'white',
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   item: {
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: 'white',
   },
   itemText: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
   },
   itemCode: {
     fontSize: 12,
     color: '#666',
-    marginTop: 2,
   },
-  wardDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  errorContainer: {
-    backgroundColor: '#FFE5E5',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  error: {
-    color: '#FF3B30',
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  retryText: {
-    color: '#FF3B30',
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 4,
-    textDecorationLine: 'underline',
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 8,
-  },
-  noDataContainer: {
-    padding: 20,
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FFEAA7',
-  },
-  noDataText: {
-    textAlign: 'center',
-    color: '#856404',
-    fontSize: 14,
-  },
-  summaryContainer: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 8,
+  summary: {
+    backgroundColor: '#e8f5e9',
     padding: 16,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderRadius: 8,
+    marginTop: 16,
   },
   summaryTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2E7D32',
     marginBottom: 8,
   },
   summaryText: {
     fontSize: 16,
-    color: '#2E7D32',
-    fontWeight: '500',
-  },
-  summaryCode: {
-    fontSize: 12,
-    color: '#2E7D32',
-    marginTop: 4,
-  },
-  debugContainer: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
   },
 });
 

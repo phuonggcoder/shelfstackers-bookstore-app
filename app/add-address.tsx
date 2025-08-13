@@ -2,14 +2,15 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import AddressSelector from '../components/AddressSelector';
 import { useAuth } from '../context/AuthContext';
@@ -38,46 +39,87 @@ const AddAddress = () => {
       return;
     }
 
-
+    // Validate fields strictly as backend expects
     if (!receiverName.trim()) {
       Alert.alert(t('error'), t('pleaseEnterFullName'));
       return;
     }
-
     if (!phoneNumber.trim()) {
       Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
       return;
     }
-
-    if (!selectedAddress) {
+    // Vietnamese phone validation (10 digits, valid prefix)
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const validPrefixes = [
+      '086','096','097','098','032','033','034','035','036','037','038','039',
+      '088','091','094','083','084','085','081','082',
+      '089','090','093','070','079','077','076','078',
+      '092','056','058','099','059',
+    ];
+    if (cleanPhone.length !== 10 || !validPrefixes.some(prefix => cleanPhone.startsWith(prefix))) {
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
+      return;
+    }
+    if (!selectedAddress || !selectedAddress.province || !selectedAddress.district || !selectedAddress.ward) {
       showErrorToast(t('error'), t('pleaseSelectCompleteAddress'));
       return;
     }
-
-
     if (!addressDetail.trim()) {
       Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
+      return;
+    }
+    // Validate province/district/ward are objects with code+name
+    const { province, district, ward } = selectedAddress;
+    if (!province.code || !province.name) {
+      Alert.alert(t('error'), t('pleaseSelectProvince'));
+      return;
+    }
+    if (!district.code || !district.name) {
+      Alert.alert(t('error'), t('pleaseSelectDistrict'));
+      return;
+    }
+    if (!ward.code || !ward.name) {
+      Alert.alert(t('error'), t('pleaseSelectWard'));
       return;
     }
 
     setLoading(true);
     try {
-      // Log dữ liệu gửi đi để debug
-      // Đảm bảo selectedAddress có đủ trường autocomplete34 và fullAddress
-      // Chỉ lấy province và ward bằng name, không lấy district
-      const wardName = selectedAddress?.ward?.name || '';
-      const provinceName = selectedAddress?.province?.name || '';
-      const fullAddress = `${addressDetail.trim()}, ${wardName}, ${provinceName}`;
+      // FE sends province/district/ward as objects, BE will format fullAddress
       const addressPayload = {
-        receiver_name: receiverName.trim(),
-        phone_number: phoneNumber.trim(),
-        province: provinceName,
-        ward: wardName,
-        address_detail: addressDetail.trim(),
-        fullAddress,
-        is_default: false,
+        fullName: receiverName.trim(),
+        phone: cleanPhone,
+        street: addressDetail.trim(),
+        province: {
+          code: province.code,
+          name: province.name,
+          type: province.type,
+          typeText: province.typeText,
+          slug: province.slug,
+          autocompleteType: province.autocompleteType
+        },
+        district: {
+          code: district.code,
+          name: district.name,
+          provinceId: province.code,
+          type: district.type,
+          typeText: district.typeText,
+          autocompleteType: district.autocompleteType
+        },
+        ward: {
+          code: ward.code,
+          name: ward.name,
+          districtId: district.code,
+          type: ward.type,
+          typeText: ward.typeText,
+          autocompleteType: ward.autocompleteType,
+          fullName: ward.fullName,
+          path: ward.path
+        },
+        isDefault: false,
+        type: addressType,
+        note: ''
       };
-      console.log('Payload gửi lên API:', addressPayload);
       await AddressService.addAddress(token, addressPayload);
       Alert.alert(t('success'), t('addressAddedSuccessfully'), [
         {
@@ -93,12 +135,14 @@ const AddAddress = () => {
     }
   };
 
+  // No need to format fullAddress on FE, BE will handle it
   const formatAddress = () => {
     if (!selectedAddress) return '';
     const parts = [
       addressDetail,
-      selectedAddress.ward.name,
-      selectedAddress.province.name
+      selectedAddress.ward?.name,
+      selectedAddress.district?.name,
+      selectedAddress.province?.name
     ].filter(Boolean);
     return parts.join(', ');
   };

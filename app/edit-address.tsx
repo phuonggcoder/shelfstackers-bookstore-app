@@ -4,34 +4,34 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AddressAutocomplete from '../components/AddressAutocomplete.new';
 
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
-import AddressService, { District, UserAddress } from '../services/addressService';
+import AddressService, { UserAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
   const { t } = useTranslation();
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { showErrorToast, showSuccessToast } = useUnifiedModal();
+  const { showErrorToast } = useUnifiedModal();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [selectedProvince, setSelectedProvince] = useState({ code: '', name: '' });
+  const [selectedDistrict, setSelectedDistrict] = useState({ code: '', name: '' });
   const [selectedWard, setSelectedWard] = useState({ code: '', name: '' });
 
   const [formData, setFormData] = useState<Partial<UserAddress>>({
-    receiver_name: '',
-    phone_number: '',
-    province: '',
-    ward: '',
-    address_detail: '',
+    fullName: '',
+    phone: '',
+    street: '',
     note: '',
-    is_default: false,
+    isDefault: false,
     type: 'office',
   });
 
@@ -41,9 +41,16 @@ const EditAddressScreen = () => {
       setLoading(true);
       const addresses = await AddressService.getAddresses(token);
       const addressToEdit = addresses.find(addr => addr._id === id);
-
       if (addressToEdit) {
-        setFormData(addressToEdit);
+        setFormData({
+          fullName: addressToEdit.fullName || '',
+          phone: addressToEdit.phone || '',
+          street: addressToEdit.street || '',
+          note: addressToEdit.note || '',
+          isDefault: addressToEdit.isDefault ?? false,
+          type: addressToEdit.type || 'office',
+        });
+        // Resolve province/district/ward as object
         await resolveAddressNames(addressToEdit);
       } else {
         showErrorToast(t('error'), t('addressNotFound'));
@@ -55,7 +62,7 @@ const EditAddressScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, token, t, router]);
+  }, [id, token, t, router, showErrorToast]);
 
   useEffect(() => {
     fetchAddress();
@@ -66,22 +73,26 @@ const EditAddressScreen = () => {
       const getSelectedAddress = async () => {
         try {
             const provinceData = await AsyncStorage.getItem('selected_province');
+            const districtData = await AsyncStorage.getItem('selected_district');
             const wardData = await AsyncStorage.getItem('selected_ward');
 
-            if (provinceData && wardData) {
+            if (provinceData && districtData && wardData) {
               const province = JSON.parse(provinceData);
+              const district = JSON.parse(districtData);
               const ward = JSON.parse(wardData);
 
               setSelectedProvince(province);
+              setSelectedDistrict(district);
               setSelectedWard(ward);
 
               setFormData(prev => ({
                 ...prev,
                 province: province.code,
+                district: district.code,
                 ward: ward.code,
               }));
 
-              await AsyncStorage.multiRemove(['selected_province', 'selected_ward']);
+              await AsyncStorage.multiRemove(['selected_province', 'selected_district', 'selected_ward']);
             }
         } catch (error) {
           console.error('Error processing selected address:', error);
@@ -93,16 +104,19 @@ const EditAddressScreen = () => {
   );
 
   const resolveAddressNames = async (address: Partial<UserAddress>) => {
-    if (!address.province) return;
+    // Accepts both code or name for province/district/ward
     try {
       const provinces = await AddressService.getProvinces();
-      const province = provinces.find(p => p.code === address.province);
+      let province = provinces.find(p => p.code === address.province || p.name === address.province);
       if (province) setSelectedProvince(province);
 
-      const wards = await AddressService.getWards(address.province);
-      const ward = wards.find(w => w.code === address.ward);
-      if (ward) setSelectedWard(ward);
+      const districts = province ? await AddressService.getDistricts(province.code) : [];
+      let district = districts.find(d => d.code === address.district || d.name === address.district);
+      if (district) setSelectedDistrict(district);
 
+      const wards = district ? await AddressService.getWards(district.code) : [];
+      let ward = wards.find(w => w.code === address.ward || w.name === address.ward);
+      if (ward) setSelectedWard(ward);
     } catch (error) {
       console.error('Error resolving address names:', error);
     }
@@ -111,24 +125,22 @@ const EditAddressScreen = () => {
   const handleSubmit = async () => {
     if (!token || !id) return;
 
-    // Chỉ lấy province và ward bằng name, không lấy district, kiểm tra lại họ tên, sdt, địa chỉ chi tiết
-    const requiredFields: (keyof UserAddress)[] = ['receiver_name', 'phone_number', 'province', 'ward', 'address_detail'];
-    const isFormValid = requiredFields.every(field => formData[field] && String(formData[field]).trim());
-    if (!isFormValid) {
+    // Validate required fields
+    if (!formData.fullName || !formData.phone || !selectedProvince.code || !selectedDistrict.code || !selectedWard.code || !formData.street) {
       showErrorToast(t('error'), t('pleaseFillAllRequiredFields'));
       return;
     }
     setSaving(true);
     try {
-
+      // Build payload with full objects for province/district/ward (đủ các field cần thiết)
       const updatePayload = {
-        receiver_name: formData.receiver_name?.trim() || '',
-        phone_number: formData.phone_number?.trim() || '',
-        province: selectedProvince.name,
-        ward: selectedWard.name,
-        address_detail: formData.address_detail?.trim() || '',
-        fullAddress: `${formData.address_detail?.trim() || ''}, ${selectedWard.name}, ${selectedProvince.name}`,
-        is_default: formData.is_default,
+        fullName: formData.fullName?.trim() || '',
+        phone: formData.phone?.trim() || '',
+        street: formData.street?.trim() || '',
+        province: selectedProvince,
+        district: { ...selectedDistrict, provinceId: selectedProvince.code },
+        ward: { ...selectedWard, districtId: selectedDistrict.code },
+        isDefault: formData.isDefault,
         note: formData.note,
         type: formData.type,
       };
@@ -176,8 +188,8 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('fullName')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.receiver_name}
-              onChangeText={text => setFormData(prev => ({ ...prev, receiver_name: text }))}
+              value={formData.fullName}
+              onChangeText={text => setFormData(prev => ({ ...prev, fullName: text }))}
               placeholder={t('enterFullName')}
             />
           </View>
@@ -185,8 +197,8 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('phoneNumber')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.phone_number}
-              onChangeText={text => setFormData(prev => ({ ...prev, phone_number: text }))}
+              value={formData.phone}
+              onChangeText={text => setFormData(prev => ({ ...prev, phone: text }))}
               placeholder={t('enterPhoneNumber')}
               keyboardType="phone-pad"
             />
@@ -197,24 +209,24 @@ const EditAddressScreen = () => {
           <Text style={styles.sectionTitle}>{t('shippingAddress')}</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('address')} *</Text>
-            <TouchableOpacity
-              style={styles.addressSelector}
-              onPress={() => router.push('/address-selection')}
-            >
-              <Text style={styles.addressText} numberOfLines={1}>
-            {selectedProvince.name && selectedWard.name
-              ? `${selectedWard.name}, ${selectedProvince.name}`
-              : t('selectAddress')}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
-            </TouchableOpacity>
+            <AddressAutocomplete
+              onAddressSelect={(address) => {
+                setSelectedProvince(address.province || { code: '', name: '' });
+                setSelectedWard(address.ward || { code: '', name: '' });
+                setFormData(prev => ({
+                  ...prev,
+                  province: address.province?.code || '',
+                  ward: address.ward?.code || '',
+                }));
+              }}
+            />
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('street')} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              value={formData.address_detail}
-              onChangeText={text => setFormData(prev => ({ ...prev, address_detail: text }))}
+              value={formData.street}
+              onChangeText={text => setFormData(prev => ({ ...prev, street: text }))}
               placeholder={t('enterStreet')}
               multiline
             />
@@ -235,12 +247,12 @@ const EditAddressScreen = () => {
           </View>
           <TouchableOpacity
             style={styles.defaultToggle}
-            onPress={() => setFormData(prev => ({ ...prev, is_default: !prev.is_default }))}
+            onPress={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
           >
             <Ionicons
-              name={formData.is_default ? 'checkbox' : 'square-outline'}
+              name={formData.isDefault ? 'checkbox' : 'square-outline'}
               size={24}
-              color={formData.is_default ? '#3255FB' : '#666'}
+              color={formData.isDefault ? '#3255FB' : '#666'}
             />
             <Text style={styles.defaultText}>{t('setAsDefaultAddress')}</Text>
           </TouchableOpacity>

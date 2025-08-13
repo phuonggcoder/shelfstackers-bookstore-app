@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    SectionList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SectionList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import AddressService, { AddressData, Province } from '../services/addressService';
+import AddressService, { Province } from '../services/addressService';
 
 interface ProvinceListProps {
   provinces: Province[];
@@ -27,6 +28,7 @@ const ProvinceList: React.FC<ProvinceListProps> = ({
   onRetry,
   searchQuery 
 }) => {
+  const { t } = useTranslation();
   const filteredProvinces = useMemo(() => {
     if (!searchQuery) return provinces;
     return provinces.filter(province => 
@@ -54,7 +56,7 @@ const ProvinceList: React.FC<ProvinceListProps> = ({
         <Text style={styles.errorText}>{error}</Text>
         {onRetry && (
           <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-            <Text style={styles.retryText}>Thử lại</Text>
+            <Text style={styles.retryText}>{t('retry')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -94,7 +96,7 @@ const ProvinceList: React.FC<ProvinceListProps> = ({
         ListEmptyComponent={
           <View style={[styles.emptyContainer, {flex: 1, justifyContent: 'center'}]}>
             <Text style={styles.emptyText}>
-              {searchQuery ? 'Không tìm thấy kết quả phù hợp' : 'Không có dữ liệu'}
+              {searchQuery ? t('noResultsFound') : t('noData')}
             </Text>
           </View>
         }
@@ -105,6 +107,7 @@ const ProvinceList: React.FC<ProvinceListProps> = ({
 
 const AddressSelectorScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,15 +148,17 @@ const AddressSelectorScreen = () => {
 
   const handleProvinceSelect = (province: Province) => {
     // Navigate back with the selected province
-    const addressData: Partial<AddressData> = {
-      province,
-      fullAddress: province.name,
-      addressCode: {
-        provinceCode: province.code,
-        wardCode: ''
-      }
-    };
-    router.back();
+  // Nếu cần truyền về, hãy truyền đủ districtCode (ở đây để rỗng)
+  // const addressData: Partial<AddressData> = {
+  //   province,
+  //   fullAddress: province.name,
+  //   addressCode: {
+  //     provinceCode: province.code,
+  //     districtCode: '',
+  //     wardCode: ''
+  //   }
+  // };
+  router.back();
     // You'll need to implement a way to pass this data back to the previous screen
     // This could be done through a global state management solution or route params
   };
@@ -163,7 +168,7 @@ const AddressSelectorScreen = () => {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: 'Chọn địa chỉ',
+          title: t('selectAddress'),
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#fff' },
         }}
@@ -175,7 +180,7 @@ const AddressSelectorScreen = () => {
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm nhanh tỉnh thành, phường xã"
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChangeText={(text) => {
               setSearchQuery(text);
@@ -197,7 +202,7 @@ const AddressSelectorScreen = () => {
 
         {/* Tab Selection */}
         <View style={styles.tabContainer}>
-          <Text style={[styles.tabText, styles.tabActive]}>Tỉnh/Thành</Text>
+          <Text style={[styles.tabText, styles.tabActive]}>{t('provinceCity')}</Text>
         </View>
 
         {loading ? (

@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
@@ -15,37 +15,18 @@ const AddressListScreen = () => {
   const { token } = useAuth();
   const { showErrorToast, showDialog, hideModal } = useUnifiedModal();
   const { from } = useLocalSearchParams();
+  const isFromOrderReview = from === 'order-review';
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [showAlert, setShowAlert] = useState(false);
-
-
-
-
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // State for storing province and ward names
-  const [provinceNames, setProvinceNames] = useState<{[key: string]: string}>({});
-  const [wardNames, setWardNames] = useState<{[key: string]: string}>({});
 
-  const isFromOrderReview = from === 'order-review';
+  // ...existing code...
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchAddresses();
-    setRefreshing(false);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchAddresses();
-    }, [])
-  );
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -54,12 +35,8 @@ const AddressListScreen = () => {
       setAddresses(arr);
       console.log('Fetched addresses:', arr);
       if (!selected && arr.length > 0) {
-        const defaultAddr = arr.find((a: any) => a.is_default);
+        const defaultAddr = arr.find((addr) => addr.isDefault);
         setSelected(defaultAddr ? defaultAddr._id : arr[0]._id);
-      }
-      // Resolve address names after fetching addresses
-      if (arr.length > 0) {
-        await resolveAddressNames(arr);
       }
     } catch (e) {
       setAddresses([]);
@@ -67,80 +44,22 @@ const AddressListScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, selected]);
 
-  // Function to resolve province and ward names
-  const resolveAddressNames = async (addressList: any[]) => {
-    try {
-      // Get all provinces
-      const provinces = await AddressService.getProvinces();
-      const provinceMap: {[key: string]: string} = {};
-      provinces.forEach(p => {
-        provinceMap[p.code] = p.name;
-      });
-      setProvinceNames(provinceMap);
+  // Tự động fetch địa chỉ khi vào màn hình
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAddresses();
+    }, [fetchAddresses])
+  );
 
-      // Get wards for all provinces used in addresses
-      const wardMap: {[key: string]: string} = {};
-      const uniqueProvinces = [...new Set(addressList.map((addr: any) => addr.province))];
-      for (const provinceName of uniqueProvinces) {
-        if (provinceName) {
-          // Tìm province code từ name
-          const provinceObj = provinces.find(p => p.name === provinceName);
-          if (provinceObj) {
-            const wards = await AddressService.getWards(provinceObj.code);
-            wards.forEach(w => {
-              wardMap[w.code] = w.name;
-            });
-          }
-        }
-      }
-      setWardNames(wardMap);
-    } catch (error) {
-      console.error('Error resolving address names:', error);
-    }
-  };
-
-  React.useEffect(() => {
-    // Check if we're coming from add address screen
-    const checkAddedAddress = async () => {
-      try {
-        const added = await AsyncStorage.getItem('address_added');
-        if (added === 'true') {
-          setShowAlert(true);
-          await AsyncStorage.removeItem('address_added');
-        }
-      } catch (error) {
-        console.error('Error checking added address:', error);
-      }
-    };
-    checkAddedAddress();
-  }, []);
-
-  React.useEffect(() => {
-    if (!token) setShowLoginModal(true);
-    else setShowLoginModal(false);
-  }, [token]);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAddresses();
+    setRefreshing(false);
+  }, [fetchAddresses]);
 
   const handleDelete = async (id: string) => {
-    showDialog(
-      t('unifiedModal.deleteAddress'),
-      t('unifiedModal.cannotRestoreDeletedAddress'),
-      t('unifiedModal.delete'),
-      t('unifiedModal.cancel'),
-      'delete',
-      () => {
-        hideModal();
-        confirmDelete(id);
-      },
-      () => {
-        hideModal();
-        console.log('Delete cancelled');
-      }
-    );
-  };
-
-  const confirmDelete = async (id: string) => {
     if (!id || !token) return;
     setLoading(true);
     try {
@@ -191,10 +110,24 @@ const AddressListScreen = () => {
     if (!id || !token) return;
     setLoading(true);
     try {
-      const addrArr = addresses as any[];
+      const addrArr = addresses as UserAddress[];
       // Set tất cả địa chỉ thành false trước
+      const targetAddr = addrArr.find(addr => addr._id === id);
+      if (!targetAddr) {
+        throw new Error('Address not found');
+      }
+
+      // Update all addresses to not default, including the province information
       const updatePromises = addrArr.map((addr) => 
-        AddressService.updateAddress(token, addr._id, { is_default: false })
+        AddressService.updateAddress(token, addr._id, { 
+          isDefault: false,
+          province: {
+            code: addr.province,
+            name: addr.province,
+            type: '0',
+            typeText: ''
+          }
+        })
       );
       await Promise.all(updatePromises);
       
@@ -282,27 +215,32 @@ const AddressListScreen = () => {
           <Text style={styles.loadingText}>{t('loadingAddresses')}</Text>
         </View>
       ) : (
-        <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#3255FB']}
-            tintColor="#3255FB"
-          />
-        }
-      >
-          {addresses.length === 0 ? (
+        <FlatList
+          style={styles.content}
+          data={addresses}
+          keyExtractor={(item) => item._id}
+          showsVerticalScrollIndicator={false}
+          windowSize={5}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#3255FB']}
+              tintColor="#3255FB"
+            />
+          }
+          ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Ionicons name="location-outline" size={64} color="#ccc" />
               <Text style={styles.emptyTitle}>{t('noAddressesYet')}</Text>
               <Text style={styles.emptySubtitle}>{t('addAddressForQuickDelivery')}</Text>
             </View>
-          ) : (
-            <>
-              {addresses.map((addr: any) => (
+          )}
+          renderItem={({ item: addr }) => (
                 <View key={addr._id} style={styles.addressCard}>
                   <TouchableOpacity 
                     style={styles.radioRow} 
@@ -319,13 +257,13 @@ const AddressListScreen = () => {
                     <View style={styles.addressInfo}>
                       <View style={styles.nameRow}>
                         <Text style={styles.name}>{addr.fullName} <Text style={styles.phone}>| {addr.phone}</Text></Text>
-                        {addr.is_default && (
+                        {addr.isDefault && (
                           <View style={styles.defaultTag}>
                             <Text style={styles.defaultText}>{t('default')}</Text>
                           </View>
                         )}
                       </View>
-                      <Text style={styles.addressText}>{addr.street}, {wardNames[addr.ward] || ''}, {provinceNames[addr.province] || ''}</Text>
+                      <Text style={styles.addressText}>{addr.fullAddress}</Text>
                       {/* Hiển thị loại địa chỉ */}
                       <View style={styles.addressTypeRow}>
                         <View style={styles.typeTag}>
@@ -346,7 +284,7 @@ const AddressListScreen = () => {
                         >
                           <Ionicons name="create-outline" size={20} color="#3255FB" />
                         </TouchableOpacity>
-                        {!addr.is_default && (
+                        {!addr.isDefault && (
                           <TouchableOpacity 
                             style={styles.defaultButton}
                             onPress={() => handleSetDefault(addr._id)}
@@ -364,19 +302,17 @@ const AddressListScreen = () => {
                     )}
                   </TouchableOpacity>
                 </View>
-              ))}
-              
-              {/* Add address button in list */}
-              <TouchableOpacity 
-                style={styles.addAddressInList}
-                onPress={() => router.push('/add-address')}
-              >
-                <Ionicons name="add" size={20} color="#3255FB" />
-                <Text style={styles.addAddressInListText}>{t('addNewAddress')}</Text>
-              </TouchableOpacity>
-            </>
+              )}
+          ListFooterComponent={() => (
+            <TouchableOpacity 
+              style={styles.addAddressInList}
+              onPress={() => router.push('/add-address')}
+            >
+              <Ionicons name="add" size={20} color="#3255FB" />
+              <Text style={styles.addAddressInListText}>{t('addNewAddress')}</Text>
+            </TouchableOpacity>
           )}
-        </ScrollView>
+        />
       )}
 
       {isFromOrderReview && addresses.length > 0 && (
@@ -412,6 +348,70 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: 'bold', 
     color: '#333' 
+  },
+  addButton: {
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#888',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: 300,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#222',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 8,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   loadingContainer: {
     flex: 1,
