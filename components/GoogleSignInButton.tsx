@@ -100,7 +100,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#4285F4',
+    // backgroundColor: '#4285F4',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -108,17 +108,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    // shadowColor: '#000',
+    // shadowOffset: {
+    //   width: 0,
+    //   height: 2,
+    // },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 3.84,
+    // elevation: 5,
   },
   buttonDisabled: {
-    backgroundColor: '#cccccc',
+    // backgroundColor: '#cccccc',
     opacity: 0.6,
   },
   buttonContent: {

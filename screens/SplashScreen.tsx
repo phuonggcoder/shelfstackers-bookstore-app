@@ -19,7 +19,7 @@ const SplashScreen = () => {
     <View style={styles.container}>
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
         <Image
-          source={require('../assets/images/icon.png')}
+          source={require('../assets/images/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 120,
     height: 120,
+    borderRadius: 20,
   },
 });
 
