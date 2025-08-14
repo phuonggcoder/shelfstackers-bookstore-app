@@ -260,22 +260,6 @@ const EditAddressScreen = () => {
             <Text style={styles.label}>{t('addressType')}</Text>
             <View style={styles.typeButtons}>
               <TouchableOpacity
-                style={[
-                  styles.typeButton,
-                  formData.type === 'office' && styles.typeButtonActive,
-                ]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
-              >
-                <Text
-                  style={[
-                    styles.typeText,
-                    formData.type === 'office' && styles.typeTextActive,
-                  ]}
-                >
-                  {t('office')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.typeButton, formData.type === 'home' && styles.typeButtonActive]}
                 onPress={() => setFormData(prev => ({ ...prev, type: 'home' }))}
               >
@@ -285,7 +269,20 @@ const EditAddressScreen = () => {
                     formData.type === 'home' && styles.typeTextActive,
                   ]}
                 >
-                  {t('home')}
+                  Nhà
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
+              >
+                <Text
+                  style={[
+                    styles.typeText,
+                    formData.type === 'office' && styles.typeTextActive,
+                  ]}
+                >
+                  Văn phòng
                 </Text>
               </TouchableOpacity>
             </View>

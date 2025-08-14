@@ -212,19 +212,19 @@ const AddAddress = () => {
           <Text style={styles.switchLabel}>{t('addressType')}</Text>
           <View style={styles.typeButtons}>
             <TouchableOpacity
-              style={[styles.typeButton, addressType === 'office' && styles.typeButtonActive]}
-              onPress={() => setAddressType('office')}
-            >
-              <Text style={[styles.typeText, addressType === 'office' && styles.typeTextActive]}>
-                {t('office')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.typeButton, addressType === 'home' && styles.typeButtonActive]}
               onPress={() => setAddressType('home')}
             >
               <Text style={[styles.typeText, addressType === 'home' && styles.typeTextActive]}>
-                {t('home')}
+                Nhà
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.typeButton, addressType === 'office' && styles.typeButtonActive]}
+              onPress={() => setAddressType('office')}
+            >
+              <Text style={[styles.typeText, addressType === 'office' && styles.typeTextActive]}>
+                Văn phòng
               </Text>
             </TouchableOpacity>
           </View>
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: '#3255FB',
     borderRadius: 24,
-    paddingVertical: 16,
+    paddingVertical: 24, // tăng chiều cao nút
     alignItems: 'center',
   },
   submitButtonDisabled: {

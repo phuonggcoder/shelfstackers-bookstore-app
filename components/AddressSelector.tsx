@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
 
@@ -228,8 +228,8 @@ const AddressSelector = memo(({
             if (value?.fullAddress) {
               return value.fullAddress;
             }
-            if (selectedProvince && selectedWard) {
-              return `${selectedWard.name}, ${selectedProvince.name}`;
+            if (selectedProvince && selectedDistrict && selectedWard) {
+              return `${selectedWard.name}, ${selectedDistrict.name}, ${selectedProvince.name}`;
             }
             return placeholder;
           })()}
@@ -277,8 +277,9 @@ const AddressSelector = memo(({
                   {selectedProvince && (
                     <View style={styles.selectedArea}>
                       <Text style={styles.selectedAreaText}>
-                        Khu vực đang chọn: {selectedProvince.name}
-                        {selectedWard ? `, ${selectedWard.name}` : ''}
+                        Khu vực đang chọn: {selectedWard ? `${selectedWard.name}, ` : ''}
+                        {selectedDistrict ? `${selectedDistrict.name}, ` : ''}
+                        {selectedProvince.name}
                       </Text>
                     </View>
                   )}

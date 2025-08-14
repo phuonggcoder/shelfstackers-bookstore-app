@@ -35,7 +35,8 @@ const AddressListScreen = () => {
       setAddresses(arr);
       console.log('Fetched addresses:', arr);
       if (!selected && arr.length > 0) {
-        const defaultAddr = arr.find((addr) => addr.isDefault);
+        // Support both isDefault and is_default
+        const defaultAddr = arr.find((addr) => addr.isDefault || addr.is_default);
         setSelected(defaultAddr ? defaultAddr._id : arr[0]._id);
       }
     } catch (e) {
@@ -147,10 +148,9 @@ const AddressListScreen = () => {
       showErrorToast(t('pleaseSelectAddress'));
       return;
     }
-    
+    // Support both isDefault and is_default
     const selectedAddress = addresses.find((addr: any) => addr._id === selected);
     if (selectedAddress) {
-      // Store selected address and go back to order review
       AsyncStorage.setItem('selected_address', JSON.stringify(selectedAddress));
       router.back();
     }
@@ -241,68 +241,68 @@ const AddressListScreen = () => {
             </View>
           )}
           renderItem={({ item: addr }) => (
-                <View key={addr._id} style={styles.addressCard}>
-                  <TouchableOpacity 
-                    style={styles.radioRow} 
-                    onPress={() => setSelected(addr._id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.radioContainer}>
-                      <Ionicons
-                        name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
-                        size={24}
-                        color={selected === addr._id ? '#3255FB' : '#ccc'}
-                      />
-                    </View>
-                    <View style={styles.addressInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.name}>{addr.fullName} <Text style={styles.phone}>| {addr.phone}</Text></Text>
-                        {addr.isDefault && (
-                          <View style={styles.defaultTag}>
-                            <Text style={styles.defaultText}>{t('default')}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.addressText}>{addr.fullAddress}</Text>
-                      {/* Hiển thị loại địa chỉ */}
-                      <View style={styles.addressTypeRow}>
-                        <View style={styles.typeTag}>
-                          <Text style={styles.typeText}>
-                            {addr.type === 'office' ? t('home'):  t('office') }
-                          </Text>
-                        </View>
-                      </View>
-                      {addr.note && (
-                        <Text style={styles.noteText}>{t('note')}: {addr.note}</Text>
-                      )}
-                    </View>
-                    {!isFromOrderReview && (
-                      <View style={styles.actionButtons}>
-                        <TouchableOpacity 
-                          style={styles.editButton}
-                          onPress={() => router.push(`/edit-address?id=${addr._id}`)}
-                        >
-                          <Ionicons name="create-outline" size={20} color="#3255FB" />
-                        </TouchableOpacity>
-                        {!addr.isDefault && (
-                          <TouchableOpacity 
-                            style={styles.defaultButton}
-                            onPress={() => handleSetDefault(addr._id)}
-                          >
-                            <Ionicons name="star-outline" size={20} color="#FFD700" />
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity 
-                          style={styles.deleteButton}
-                          onPress={() => handleDelete(addr._id)}
-                        >
-                          <Ionicons name="trash-outline" size={20} color="#4A90E2" />
-                        </TouchableOpacity>
+            <View key={addr._id} style={styles.addressCard}>
+              <TouchableOpacity 
+                style={styles.radioRow} 
+                onPress={() => setSelected(addr._id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.radioContainer}>
+                  <Ionicons
+                    name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
+                    size={24}
+                    color={selected === addr._id ? '#3255FB' : '#ccc'}
+                  />
+                </View>
+                <View style={styles.addressInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name}>{addr.fullName} <Text style={styles.phone}>| {addr.phone}</Text></Text>
+                    {(addr.isDefault || addr.is_default) && (
+                      <View style={styles.defaultTag}>
+                        <Text style={styles.defaultText}>{t('default')}</Text>
                       </View>
                     )}
-                  </TouchableOpacity>
+                  </View>
+                  <Text style={styles.addressText}>{addr.fullAddress}</Text>
+                  {/* Hiển thị loại địa chỉ */}
+                  <View style={styles.addressTypeRow}>
+                    <View style={styles.typeTag}>
+                      <Text style={styles.typeText}>
+                        {addr.type === 'office' ? t('office') : t('home')}
+                      </Text>
+                    </View>
+                  </View>
+                  {addr.note && (
+                    <Text style={styles.noteText}>{t('note')}: {addr.note}</Text>
+                  )}
                 </View>
-              )}
+                {!isFromOrderReview && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.editButton}
+                      onPress={() => router.push(`/edit-address?id=${addr._id}`)}
+                    >
+                      <Ionicons name="create-outline" size={20} color="#3255FB" />
+                    </TouchableOpacity>
+                    {!(addr.isDefault || addr.is_default) && (
+                      <TouchableOpacity 
+                        style={styles.defaultButton}
+                        onPress={() => handleSetDefault(addr._id)}
+                      >
+                        <Ionicons name="star-outline" size={20} color="#FFD700" />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(addr._id)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#4A90E2" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
           ListFooterComponent={() => (
             <TouchableOpacity 
               style={styles.addAddressInList}

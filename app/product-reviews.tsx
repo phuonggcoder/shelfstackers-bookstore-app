@@ -37,8 +37,12 @@ const ProductReviewsScreen = () => {
   const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const router = useRouter();
 
-  // Parse items from order if available
-  const orderItems = items ? JSON.parse(items) : [];
+  // Parse items from order if available, memoized
+  const orderItems = React.useMemo(() => (items ? JSON.parse(items) : []), [items]);
+  // State to track if we are in selection mode
+  const [selectingOrderItem, setSelectingOrderItem] = useState(orderId && orderItems.length > 0 && !productId);
+  // State for selected productId if coming from order
+  const [selectedProductId, setSelectedProductId] = useState<string | undefined>(productId);
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [summary, setSummary] = useState<ReviewSummaryType | null>(null);
@@ -53,6 +57,9 @@ const ProductReviewsScreen = () => {
     token: token || undefined,
     enabled: !!(productId && orderId && user)
   });
+
+  // Nếu đã đánh giá, không cho phép tạo mới, chỉ cho sửa/xem lại
+  // const canCreateReview = !userReview; // No longer used
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [pendingDeleteReviewId, setPendingDeleteReviewId] = useState<string | null>(null);
@@ -61,23 +68,51 @@ const ProductReviewsScreen = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  // Memoize loadReviews and loadSummary to avoid dependency issues
+   const loadReviews = React.useCallback(async (prodId: string, pageNum = 1, refresh = false) => {
+     try {
+       console.log('ProductReviews - loadReviews - Starting with productId:', prodId, 'pageNum:', pageNum);
+       if (refresh) {
+         setLoading(true);
+       }
+       const response = await ReviewService.getProductReviews(prodId, pageNum, 10, token || undefined);
+       if (refresh || pageNum === 1) {
+         setReviews(response.reviews || []);
+       } else {
+         setReviews(prev => [...prev, ...(response.reviews || [])]);
+       }
+       setHasMore((response.reviews?.length || 0) === 10); // Assuming limit is 10
+       setPage(pageNum);
+     } catch (error) {
+       console.error('ProductReviews - Error loading reviews:', error);
+       showErrorToast('Lỗi', 'Không thể tải danh sách đánh giá');
+     } finally {
+       setLoading(false);
+       setRefreshing(false);
+     }
+   }, [token, showErrorToast]);
+
+  const loadSummary = React.useCallback(async (prodId: string) => {
+    try {
+      const summaryData = await ReviewService.getProductReviewSummary(prodId, token || undefined);
+      setSummary(summaryData);
+    } catch (error) {
+      console.error('Error loading summary:', error);
+    }
+  }, [token]);
+
   useEffect(() => {
-    console.log('ProductReviews - useEffect - productId:', productId, 'orderId:', orderId, 'user:', !!user);
-    
     // If coming from order, show order items selection first
-    if (orderId && orderItems.length > 0 && !productId) {
-      console.log('ProductReviews - Showing order items selection');
-      // Show order items selection
+    if (orderId && orderItems.length > 0 && !selectedProductId) {
+      setSelectingOrderItem(true);
       return;
     }
-    
-    if (productId) {
-      console.log('ProductReviews - Loading reviews for productId:', productId);
+    if (selectedProductId) {
       setLoading(true);
-      loadReviews();
-      loadSummary();
+      loadReviews(selectedProductId);
+      loadSummary(selectedProductId);
     }
-  }, [productId, user, orderId]);
+  }, [selectedProductId, user, orderId, orderItems.length, loadReviews, loadSummary]);
 
   // Auto-show review form if in edit mode and user review is loaded
   useEffect(() => {
@@ -89,56 +124,18 @@ const ProductReviewsScreen = () => {
     }
   }, [editMode, userReview, showReviewForm]);
 
-  const loadReviews = async (pageNum = 1, refresh = false) => {
-    try {
-      console.log('ProductReviews - loadReviews - Starting with productId:', productId, 'pageNum:', pageNum);
-      if (refresh) {
-        setLoading(true);
-      }
-      
-      const response = await ReviewService.getProductReviews(productId!, pageNum, 10, token || undefined);
-      console.log('ProductReviews - loadReviews - Response:', response);
-      console.log('ProductReviews - loadReviews - Reviews array:', response.reviews);
-      console.log('ProductReviews - loadReviews - Reviews length:', response.reviews?.length || 0);
-      
-      if (refresh || pageNum === 1) {
-        setReviews(response.reviews || []);
-      } else {
-        setReviews(prev => [...prev, ...(response.reviews || [])]);
-      }
-      
-      setHasMore((response.reviews?.length || 0) === 10); // Assuming limit is 10
-      setPage(pageNum);
-      console.log('ProductReviews - loadReviews - Set reviews count:', response.reviews?.length || 0);
-    } catch (error) {
-      console.error('ProductReviews - Error loading reviews:', error);
-      showErrorToast('Lỗi', 'Không thể tải danh sách đánh giá');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      console.log('ProductReviews - loadReviews - Finished, loading set to false');
-    }
-  };
-
-  const loadSummary = async () => {
-    try {
-      const summaryData = await ReviewService.getProductReviewSummary(productId!, token || undefined);
-      setSummary(summaryData);
-    } catch (error) {
-      console.error('Error loading summary:', error);
-    }
-  };
 
   const handleRefresh = () => {
+    if (!selectedProductId) return;
     setRefreshing(true);
-    loadReviews(1, true);
-    loadSummary();
+    loadReviews(selectedProductId, 1, true);
+    loadSummary(selectedProductId);
     refetchUserReview();
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !loading) {
-      loadReviews(page + 1);
+    if (hasMore && !loading && selectedProductId) {
+      loadReviews(selectedProductId, page + 1);
     }
   };
 
@@ -269,96 +266,47 @@ const ProductReviewsScreen = () => {
     );
   };
 
-  // If coming from order with multiple items, show order items selection
-  // If only one item, automatically select it
-  if (orderId && orderItems.length > 0 && !productId) {
-    // If only one item, automatically navigate to it
-    if (orderItems.length === 1) {
-      // Use useEffect to handle navigation instead of doing it in render
-      React.useEffect(() => {
-        const singleItem = orderItems[0];
-        router.replace({
-          pathname: '/product-reviews',
-          params: {
-            productId: singleItem.book._id,
-            orderId: orderId,
-            orderCode: orderCode
-          }
-        });
-      }, []);
-      return (
-        <SafeAreaView style={styles.container}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3255FB" />
-            <Text style={styles.loadingText}>Đang chuyển hướng...</Text>
-          </View>
-        </SafeAreaView>
-      );
+  // Auto-select if only one item
+  useEffect(() => {
+    if (selectingOrderItem && orderItems.length === 1) {
+      setSelectedProductId(orderItems[0].book._id);
+      setSelectingOrderItem(false);
     }
+  }, [selectingOrderItem, orderItems]);
+
+  // Handler for selecting an item from the order
+  const handleSelectOrderItem = (item: any) => {
+    setSelectedProductId(item.book._id);
+    setSelectingOrderItem(false);
+  };
+  if (selectingOrderItem) {
+    // Render order item selection screen
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2c3e50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Đánh giá đơn hàng</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderCode}>Đơn hàng: {orderCode}</Text>
-          <Text style={styles.orderSubtitle}>Chọn sản phẩm để đánh giá ({orderItems.length} sản phẩm)</Text>
-        </View>
-
+        {renderHeader()}
         <FlatList
           data={orderItems}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={item => item.book._id}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.orderItem}
-              onPress={() => {
-                // Navigate to product reviews with selected product
-                router.push({
-                  pathname: '/product-reviews',
-                  params: {
-                    productId: item.book._id,
-                    orderId: orderId,
-                    orderCode: orderCode
-                  }
-                });
-              }}
-            >
-              <View style={styles.orderItemContent}>
-                <View style={styles.orderItemImage}>
-                  {item.book.thumbnail || (item.book.cover_image && item.book.cover_image[0]) ? (
-                    <Image 
-                      source={{ 
-                        uri: item.book.thumbnail || (item.book.cover_image && item.book.cover_image[0]) || 'https://i.imgur.com/gTzT0hA.jpeg'
-                      }} 
-                      style={styles.bookImage} 
-                    />
-                  ) : (
-                    <View style={[styles.bookImage, styles.placeholderImage]}>
-                      <Ionicons name="book-outline" size={24} color="#ccc" />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.orderItemInfo}>
-                  <Text style={styles.orderItemTitle} numberOfLines={2}>
-                    {item.book.title}
-                  </Text>
-                  <Text style={styles.orderItemQuantity}>
-                    Số lượng: {item.quantity}
-                  </Text>
-                  <Text style={styles.orderItemPrice}>
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND'
-                    }).format(item.price)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            <TouchableOpacity style={styles.orderItemRow || styles.orderItem} onPress={() => handleSelectOrderItem(item)}>
+              <View style={styles.bookImageWrapper || { marginRight: 12 }}>
+                {item.book.thumbnail || (item.book.cover_image && item.book.cover_image[0]) ? (
+                  <Image
+                    source={{ uri: item.book.thumbnail || (item.book.cover_image && item.book.cover_image[0]) || 'https://i.imgur.com/gTzT0hA.jpeg' }}
+                    style={styles.bookImage}
+                  />
+                ) : (
+                  <View style={[styles.bookImage, styles.placeholderImage]}>
+                    <Ionicons name="book-outline" size={24} color="#ccc" />
+                  </View>
+                )}
               </View>
+              <View style={styles.orderItemInfo}>
+                <Text style={styles.orderItemTitle} numberOfLines={2}>{item.book.title}</Text>
+                <Text style={styles.orderItemQuantity}>Số lượng: {item.quantity}</Text>
+                <Text style={styles.orderItemPrice}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -394,7 +342,6 @@ const ProductReviewsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       {renderHeader()}
-      
       <FlatList
         data={reviews}
         renderItem={renderReviewItem}
@@ -448,30 +395,27 @@ const ProductReviewsScreen = () => {
         ListEmptyComponent={renderEmptyState()}
         ListFooterComponent={renderFooter()}
       />
-
-             <Modal
-         visible={showReviewForm}
-         animationType="slide"
-         presentationStyle="pageSheet"
-         onRequestClose={handleCloseReviewForm}
-       >
-         <ReviewForm
-           productId={productId!}
-           orderId={orderId!}
-           existingReview={userReview || undefined}
-           onSubmit={handleSubmitReview}
-           onCancel={handleCloseReviewForm}
-           isLoading={submitting}
-         />
-       </Modal>
-
+      <Modal
+        visible={showReviewForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCloseReviewForm}
+      >
+        <ReviewForm
+          productId={selectedProductId!}
+          orderId={orderId!}
+          existingReview={userReview || undefined}
+          onSubmit={handleSubmitReview}
+          onCancel={handleCloseReviewForm}
+          isLoading={submitting}
+        />
+      </Modal>
       <ThankYouModal
         visible={showThankYouModal}
         onClose={handleCloseThankYouModal}
         onGoHome={handleGoHome}
         isUpdate={isUpdateReview}
       />
-
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         visible={showDeleteConfirmModal}
@@ -488,6 +432,17 @@ const ProductReviewsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  orderItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  bookImageWrapper: {
+    marginRight: 12,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',

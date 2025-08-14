@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import { useTranslation } from 'react-i18next';
 
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -16,8 +18,37 @@ import { createOrder } from '../services/orderService';
 import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
 import { getAvailableVouchers, validateVoucher } from '../services/voucherService';
 import { formatVND, getBookImageUrl } from '../utils/format';
+  // Khi quay lại màn hình, luôn lấy địa chỉ mới nhất từ AsyncStorage (nếu có)
+//  useFocusEffect(
+//     React.useCallback(() => {
+//       const checkSelectedAddress = async () => {
+//         const stored = await AsyncStorage.getItem('selected_address');
+//         if (stored) {
+//           try {
+//             const parsed = JSON.parse(stored);
+//             setAddress(parsed);
+//           } catch {}
+//         }
+//       };
+//       checkSelectedAddress();
+//     }, [])
+//   ); 
 
 export default function OrderReviewScreen() {
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkSelectedAddress = async () => {
+        const stored = await AsyncStorage.getItem('selected_address');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            setAddress(parsed);
+          } catch {}
+        }
+      };
+      checkSelectedAddress();
+    }, [])
+  );
   const { t } = useTranslation();
   const { token } = useAuth();
   const { showErrorToast, showWarningToast } = useUnifiedModal();
@@ -60,15 +91,16 @@ export default function OrderReviewScreen() {
         const addresses = await AddressService.getAddresses(token);
         setAddresses(addresses);
         console.log('OrderReview addresses:', addresses);
-        
-        // Always use default address or first available address
-        const defaultAddress = addresses.find((addr: any) => addr.is_default) || addresses[0];
-        if (defaultAddress) {
-          setAddress(defaultAddress);
+        // Nếu không còn địa chỉ nào, xóa selected_address khỏi AsyncStorage và UI
+        if (!addresses || addresses.length === 0) {
+          await AsyncStorage.removeItem('selected_address');
+          setAddress(null);
         }
       } catch (error) {
         console.error('Error loading addresses:', error);
         setAddresses([]);
+        await AsyncStorage.removeItem('selected_address');
+        setAddress(null);
       }
     };
     loadAddresses();
@@ -239,22 +271,45 @@ export default function OrderReviewScreen() {
   }, [token]);
 
   // Calculate totals
+  // Luôn tính tổng tiền đơn hàng (subtotal) để validate voucher
   const subtotal = cartItems.length > 0
     ? cartItems.reduce((sum, item) => {
         if (!item || !item.book) {
-          console.log('Skipping item with null book for subtotal calculation:', item);
           return sum;
         }
         const price = item.book.price || 0;
         const quantity = item.quantity || 1;
-        console.log('Adding to subtotal:', { title: item.book.title, price, quantity, total: price * quantity });
         return sum + (price * quantity);
       }, 0)
     : (book?.price || 0);
-  
+
   const shippingFee = shipping === 'free' ? 0 : 30000;
-  const discount = selectedVoucher ? (selectedVoucher.voucher_type==='percent' ? subtotal*selectedVoucher.discount_value/100 : selectedVoucher.discount_value) : 15000; // fallback 15000 demo
+  const discount = selectedVoucher
+    ? (selectedVoucher.voucher_type === 'percent'
+        ? Math.min(subtotal * selectedVoucher.discount_value / 100, selectedVoucher.max_discount_value || Infinity)
+        : selectedVoucher.discount_value)
+    : 0;
   const total = subtotal - discount + shippingFee;
+
+  // Nhập mã voucher thủ công
+  const [manualVoucherCode, setManualVoucherCode] = useState('');
+  const [manualVoucherError, setManualVoucherError] = useState('');
+
+  const handleManualVoucherApply = async () => {
+    if (!manualVoucherCode) return;
+    setManualVoucherError('');
+    try {
+      const validateRes = await import('../services/voucherService').then(m => m.validateVoucher(token, manualVoucherCode, subtotal));
+      if (validateRes.valid && validateRes.voucher) {
+        setSelectedVoucher(validateRes.voucher);
+        setManualVoucherError('');
+      } else {
+        setManualVoucherError(validateRes.msg || 'Mã không hợp lệ hoặc không đủ điều kiện');
+      }
+    } catch (e: any) {
+      setManualVoucherError(e.message || 'Không thể kiểm tra mã');
+    }
+  };
 
   const handleEdit = async () => {
     if (!token) return;
@@ -422,6 +477,16 @@ export default function OrderReviewScreen() {
       }
 
       // Điều hướng sang trang ZaloPay nếu có order_url
+      // Sau khi đặt hàng thành công, xóa từng sản phẩm đã chọn khỏi giỏ hàng nếu là từ cart
+      if (cartItems.length > 0 && token) {
+        for (const item of cartItems) {
+          try {
+            await import('../services/api').then(apiModule => apiModule.removeFromCart(token, item.book._id));
+          } catch (e) {
+            console.warn('Không thể xóa sản phẩm khỏi giỏ:', item.book.title, e);
+          }
+        }
+      }
       if (zaloPayData && zaloPayData.order_url) {
         // Nếu chọn PayOS thì chuyển sang PayOSScreen
         if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
@@ -654,9 +719,28 @@ export default function OrderReviewScreen() {
         {address ? (
           <TouchableOpacity style={styles.addressContainer} onPress={handleAddressSelect}>
             <View style={styles.addressInfo}>
-              <Text style={styles.addressName}>{address.receiver_name}</Text>
-              <Text style={styles.addressPhone}>{address.phone_number}</Text>
-              <Text style={styles.addressText}>{formatAddressText(address)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                <Text style={styles.addressName}>{address.fullName || address.receiver_name}</Text>
+                <Text style={styles.addressPhone}> | {address.phone || address.phone_number}</Text>
+                {address.isDefault && (
+                  <View style={{ backgroundColor: '#eaf1ff', borderRadius: 4, marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ color: '#3255FB', fontWeight: 'bold', fontSize: 11 }}>{t('default')}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.addressText}>{address.fullAddress || formatAddressText(address)}</Text>
+              {address.type && (
+                <View style={{ flexDirection: 'row', marginTop: 2 }}>
+                  <View style={{ backgroundColor: '#f0f4ff', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 }}>
+                    <Text style={{ color: '#3255FB', fontSize: 11, fontWeight: 'bold' }}>
+                      {address.type === 'office' ? t('office') : t('home')}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              {address.note && (
+                <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>{t('note')}: {address.note}</Text>
+              )}
             </View>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
@@ -737,32 +821,33 @@ export default function OrderReviewScreen() {
                   <Text style={styles.noVouchersText}>{t('orderReview.noDiscountVouchers')}</Text>
                 )}
                 {vouchers.filter(v => v.discount_type === 'order').map(v => {
-                  const expired = new Date(v.end_date) <= new Date();
+                  const expired = v.end_date ? new Date(v.end_date) <= new Date() : false;
                   const minOrderValue = v?.min_order_value || 0;
                   const isInsufficient = subtotal < minOrderValue;
                   const isDisabled = expired || isInsufficient;
+                  const isSelected = tempOrderVoucher?._id === v._id;
                   return (
                     <TouchableOpacity
                       key={v._id}
                       style={[
                         styles.bottomSheetItem,
-                        tempOrderVoucher?._id === v._id && styles.bottomSheetItemSelected,
+                        isSelected && styles.bottomSheetItemSelected,
                         isDisabled && styles.bottomSheetItemDisabled
                       ]}
-                      disabled={isDisabled}
+                      activeOpacity={isDisabled ? 1 : 0.7}
                       onPress={() => {
-                        const newVoucher = tempOrderVoucher?._id === v._id ? null : v;
-                        if (newVoucher) {
-                          // Validate voucher trước khi cho phép chọn
-                          if (validateVoucherAndShowPopup(newVoucher)) {
-                            setTempOrderVoucher(newVoucher);
-                          }
-                        } else {
-                          setTempOrderVoucher(null);
+                        if (isDisabled) {
+                          // Show custom notification instantly if invalid
+                          setTimeout(() => {
+                            showWarningToast('Không thể chọn', expired ? 'Voucher đã hết hạn.' : 'Đơn hàng chưa đủ điều kiện để áp dụng mã này.');
+                          }, 0);
+                          return;
                         }
+                        setTempOrderVoucher(isSelected ? null : v);
                       }}
                     >
-                      <Ionicons name="pricetag-outline" size={28} color="#bbb" style={{ marginRight: 12 }} />
+                      {/* Icon left */}
+                      <Ionicons name="pricetag" size={24} color="#FF9800" style={{ marginRight: 14 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.voucherCode}>{v.title || v.voucher_id}</Text>
                         <Text style={styles.voucherDescription}>{v.description || ''}</Text>
@@ -771,17 +856,21 @@ export default function OrderReviewScreen() {
                             ? `${t('orderReview.discountPercent', { value: v.discount_value })}`
                             : `${t('orderReview.discountAmount', { value: formatVND(v.discount_value) })}`}
                         </Text>
-
-                        <Text style={styles.voucherExpiry}>HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+                        <Text style={styles.voucherExpiry}>HSD: {v.end_date ? new Date(v.end_date).toLocaleDateString('vi-VN') : 'Không xác định'}</Text>
                         {isInsufficient && (
                           <Text style={styles.voucherInsufficient}>
                             Cần thêm {(minOrderValue - subtotal).toLocaleString('vi-VN')} VNĐ
                           </Text>
                         )}
                       </View>
-                      {tempOrderVoucher?._id === v._id && (
-                        <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
-                      )}
+                      {/* Checkbox right */}
+                      <View style={[styles.radioButton, isSelected && styles.selectedRadio, { marginLeft: 12 }]}> 
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
+                        ) : (
+                          <Ionicons name="ellipse-outline" size={22} color={isDisabled ? '#eee' : '#bbb'} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -791,19 +880,32 @@ export default function OrderReviewScreen() {
                   <Text style={styles.noVouchersText}>{t('orderReview.noShippingVouchers')}</Text>
                 )}
                 {vouchers.filter(v => v.discount_type === 'shipping').map(v => {
-                  const expired = new Date(v.end_date) <= new Date();
+                  const expired = v.end_date ? new Date(v.end_date) <= new Date() : false;
+                  const minOrderValue = v?.min_order_value || 0;
+                  const isInsufficient = subtotal < minOrderValue;
+                  const isDisabled = expired || isInsufficient;
+                  const isSelected = tempShippingVoucher?._id === v._id;
                   return (
                     <TouchableOpacity
                       key={v._id}
                       style={[
                         styles.bottomSheetItem,
-                        tempShippingVoucher?._id === v._id && styles.bottomSheetItemSelected,
-                        expired && styles.bottomSheetItemDisabled
+                        isSelected && styles.bottomSheetItemSelected,
+                        isDisabled && styles.bottomSheetItemDisabled
                       ]}
-                      disabled={expired}
-                      onPress={() => setTempShippingVoucher(tempShippingVoucher?._id === v._id ? null : v)}
+                      activeOpacity={isDisabled ? 1 : 0.7}
+                      onPress={() => {
+                        if (isDisabled) {
+                          setTimeout(() => {
+                            showWarningToast('Không thể chọn', expired ? 'Voucher đã hết hạn.' : 'Đơn hàng chưa đủ điều kiện để áp dụng mã này.');
+                          }, 0);
+                          return;
+                        }
+                        setTempShippingVoucher(isSelected ? null : v);
+                      }}
                     >
-                      <Ionicons name="car-outline" size={28} color="#bbb" style={{ marginRight: 12 }} />
+                      {/* Icon left */}
+                      <Ionicons name="cube" size={24} color="#2196F3" style={{ marginRight: 14 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.voucherCode}>{v.title || v.voucher_id}</Text>
                         <Text style={styles.voucherDescription}>{v.description || ''}</Text>
@@ -812,11 +914,21 @@ export default function OrderReviewScreen() {
                             ? `${t('orderReview.shippingDiscountPercent', { value: v.discount_value })}`
                             : `${t('orderReview.shippingDiscountAmount', { value: formatVND(v.discount_value) })}`}
                         </Text>
-                        <Text style={styles.voucherExpiry}>{t('orderReview.voucherExpiry')}: {new Date(v.end_date).toLocaleDateString('vi-VN')}</Text>
+                        <Text style={styles.voucherExpiry}>{t('orderReview.voucherExpiry')}: {v.end_date ? new Date(v.end_date).toLocaleDateString('vi-VN') : 'Không xác định'}</Text>
+                        {isInsufficient && (
+                          <Text style={styles.voucherInsufficient}>
+                            Cần thêm {(minOrderValue - subtotal).toLocaleString('vi-VN')} VNĐ
+                          </Text>
+                        )}
                       </View>
-                      {tempShippingVoucher?._id === v._id && (
-                        <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
-                      )}
+                      {/* Checkbox right */}
+                      <View style={[styles.radioButton, isSelected && styles.selectedRadio, { marginLeft: 12 }]}> 
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
+                        ) : (
+                          <Ionicons name="ellipse-outline" size={22} color={isDisabled ? '#eee' : '#bbb'} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}

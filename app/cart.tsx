@@ -18,6 +18,7 @@ interface CartItem {
     title: string;
     author: string;
     price: number;
+    stock: number;
     thumbnail?: string;
     cover_image?: string[];
   };
@@ -27,21 +28,16 @@ interface CartItem {
 const CartScreen = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { cartCount, fetchCartCount } = useCart();
-  const { user, token } = useAuth();
+  const { fetchCartCount } = useCart();
+  const { token } = useAuth();
   const { showErrorToast, showWarningToast, showDeleteDialog, hideModal } = useUnifiedModal();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  useEffect(() => {
-    if (token) {
-      loadCart();
-    }
-  }, [token]);
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     try {
       setLoading(true);
       const cartData = await getCart(token!);
@@ -53,7 +49,14 @@ const CartScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      loadCart();
+    }
+  }, [token, loadCart]);
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -102,36 +105,44 @@ const CartScreen = () => {
 
   const handleQuantityChange = async (bookId: string, newQuantity: number) => {
     if (newQuantity < 1 || !token) return;
-    
+    // Kiểm tra tồn kho trước khi cập nhật
+    const item = cart.find(i => i.book_id._id === bookId);
+    if (!item) return;
+    const stock = item.book_id.stock ?? 0;
+    if (newQuantity > stock) {
+      showWarningToast(t('notification'), t('notEnoughStock', { stock, requested: newQuantity }));
+      return;
+    }
     try {
       setLoading(true);
       await updateCartQuantity(token, bookId, newQuantity);
-      await loadCart();
+      setCart(prevCart => prevCart.map(item =>
+        item.book_id._id === bookId ? { ...item, quantity: newQuantity } : item
+      ));
       await fetchCartCount(token);
-          } catch (error) {
-        console.error('Error updating quantity:', error);
-        showErrorToast(t('error'), t('cannotUpdateQuantity'));
-      } finally {
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      showErrorToast(t('error'), t('cannotUpdateQuantity'));
+    } finally {
       setLoading(false);
     }
   };
 
   const handleRemoveItem = async (bookId: string) => {
     if (!token) return;
-    
     showDeleteDialog(
       async () => {
         try {
           setLoading(true);
           await removeFromCart(token, bookId);
-          await loadCart();
+          setCart(prevCart => prevCart.filter(item => item.book_id._id !== bookId));
           await fetchCartCount(token);
           setSelectedItems(prev => prev.filter(id => id !== bookId));
-          hideModal(); // Explicitly hide the modal after successful deletion
+          hideModal();
         } catch (error) {
           console.error('Error removing item:', error);
           showErrorToast(t('error'), t('cannotRemoveProduct'));
-          hideModal(); // Hide modal even on error
+          hideModal();
         } finally {
           setLoading(false);
         }
@@ -139,7 +150,7 @@ const CartScreen = () => {
     );
   };
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     // Log chi tiết các item được chọn và số lượng
     const total = selectedItems.reduce((sum, bookId) => {
       const item = cart.find(cartItem => cartItem.book_id._id === bookId);
@@ -151,7 +162,7 @@ const CartScreen = () => {
     }, 0);
     console.log('Tổng tiền các item được chọn:', total);
     return total;
-  };
+  }, [selectedItems, cart]);
 
   const handleCheckout = useCallback(async () => {
     console.log('=== CHECKOUT PROCESS START ===');
@@ -200,7 +211,7 @@ const CartScreen = () => {
     }
     
     console.log('=== CHECKOUT PROCESS END ===');
-  }, [selectedItems, cart, router, t]);
+  }, [selectedItems, cart, router, t, calculateTotal, showErrorToast, showWarningToast]);
 
   const renderCartItem = ({ item }: { item: CartItem }) => {
     const isSelected = selectedItems.includes(item.book_id._id);
@@ -351,23 +362,7 @@ const CartScreen = () => {
               </Text>
             </TouchableOpacity>
             
-            {/* Test button for debugging */}
-            <TouchableOpacity 
-              style={[styles.checkoutButton, { marginTop: 10, backgroundColor: '#ff6b6b' }]}
-              onPress={() => {
-                console.log('🧪 Test navigation button pressed');
-                try {
-                  router.push('/order-review');
-                  console.log('✅ Test navigation successful');
-                } catch (error) {
-                  console.error('❌ Test navigation failed:', error);
-                }
-              }}
-            >
-              <Text style={styles.checkoutText}>
-                Test Navigation
-              </Text>
-            </TouchableOpacity>
+
           </View>
         </>
       )}
