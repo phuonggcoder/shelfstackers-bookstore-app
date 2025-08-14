@@ -440,7 +440,7 @@
     "shippingDiscountAmount": "Giảm {{value}} phí vận chuyển",
     "paymentMethod": "Phương thức thanh toán",
     "paymentStatus": "Trạng thái thanh toán",
-    "payViaZaloPay": "Thanh Toán Qua ZaloPay",
+    "payViaZaloPay": "Thanh toán qua ZaloPay",
     "payOnDelivery": "Thanh toán khi nhận hàng (COD)",
     "discountVoucher": "Mã giảm giá",
     "noDiscountVouchers": "Không có mã giảm giá khả dụng",
@@ -527,5 +527,9 @@
     "fileNotFound": "Không tìm thấy tệp",
     "timeout": "Hết thời gian yêu cầu",
     "unknownError": "Đã xảy ra lỗi không xác định"
-  }
-} 
+  },
+  "orderDeliveredSuccessfully": "Đơn hàng đã được giao thành công",
+  "orderInformation": "Thông tin đơn hàng",
+  "totalAmount": "Tổng số tiền",
+  "unknownPaymentMethod": "Phương thức thanh toán không xác định"
+}

@@ -5,6 +5,8 @@ export const configureGoogleSignIn = () => {
   GoogleSignin.configure({
     // Web Client ID (chính)
     webClientId: "346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com",
+    // webClientId: "346115100070-5n3pabau28kbh2s5uq1fmvbvu48fkd4v.apps.googleusercontent.com",
+
     // Android Client ID (New SHA1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25)
     // Android Client ID (Old SHA1: e8c5475a7a42db2328c778122b13baff7d8207a4)
     offlineAccess: true,

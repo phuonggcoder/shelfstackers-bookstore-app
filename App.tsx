@@ -1,6 +1,6 @@
 import Toast from 'react-native-toast-message';
+import './app/i18n';
 import { toastConfig } from './components/CustomToast';
-// ... các import khác ...
 
 export default function App() {
   return (

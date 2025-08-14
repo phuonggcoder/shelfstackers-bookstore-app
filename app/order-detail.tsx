@@ -5,7 +5,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import i18n from 'i18next';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CancelOrderModal from '../components/CancelOrderModal';
 import RefundStatusNotification from '../components/RefundStatusNotification';
@@ -14,7 +16,7 @@ import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useOrderDetail } from '../hooks/useOrders';
-import { cancelOrder, requestRefund } from '../services/orderService';
+import { cancelOrder } from '../services/orderService';
 import ReviewService from '../services/reviewService';
 
 interface OrderItem {
@@ -51,12 +53,19 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
-  orderHistory: Array<{
+  orderHistory: {
     status: string;
     timestamp: string;
     description: string;
-  }>;
+  }[];
 }
+
+const PAYMENT_METHOD_NAMES: { [key: string]: string } = {
+  zalopay: 'ZaloPay',
+  payos: 'PayOS',
+  cod: 'Thanh toán khi nhận hàng',
+  // Thêm các phương thức thanh toán khác nếu cần
+};
 
 const OrderDetailScreen = () => {
   const router = useRouter();
@@ -90,33 +99,52 @@ const OrderDetailScreen = () => {
 
   const handleCancelConfirm = async (reason: string, newAddress?: string) => {
     if (!token || !order) return;
-
-    // Sử dụng order._id thực sự từ response thay vì orderId từ params
     const actualOrderId = order._id;
-    console.log('Processing order with ID:', actualOrderId);
-    console.log('Reason:', reason);
-    if (newAddress) {
-      console.log('New address:', newAddress);
-    }
-
     setCancelling(true);
     try {
-      if (canRequestRefund(order.status)) {
-        // Hoàn tiền cho đơn hàng đã giao
-        await requestRefund(token, actualOrderId, reason);
-        showSuccessToast(t('success'), t('refundRequestSent'), 2000);
+      // Hủy đơn hàng hoặc thay đổi địa chỉ
+      if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
+        await cancelOrder(token, actualOrderId, reason, newAddress);
+        showSuccessToast(t('success'), t('addressChangeRequestSent'), 2000);
       } else {
-        // Hủy đơn hàng hoặc thay đổi địa chỉ
-        if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
-          // Gửi yêu cầu thay đổi địa chỉ thay vì hủy đơn hàng
-          await cancelOrder(token, actualOrderId, reason, newAddress);
-          showSuccessToast(t('success'), t('addressChangeRequestSent'), 2000);
-        } else {
-          // Hủy đơn hàng bình thường
-          await cancelOrder(token, actualOrderId, reason);
-          showSuccessToast(t('success'), t('orderCancelled'), 2000);
+        await cancelOrder(token, actualOrderId, reason);
+        showSuccessToast(t('success'), t('orderCancelled'), 2000);
+      }
+
+      // Xử lý hoàn tiền tự động cho ZaloPay và PayOS
+      if (
+        order.paymentMethod &&
+        order.paymentStatus &&
+        ['completed', 'processing', 'pending'].includes(order.paymentStatus.toLowerCase())
+      ) {
+        // Hoàn tiền ZaloPay
+        if (order.paymentMethod.toLowerCase() === 'zalopay') {
+          try {
+            await axios.post(
+              `/orders/${actualOrderId}/zalopay-refund`,
+              { amount: order.totalAmount, description: reason },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            showSuccessToast(t('success'), 'Đã gửi yêu cầu hoàn tiền ZaloPay', 2000);
+          } catch (refundErr: any) {
+            showErrorToast(t('error'), refundErr?.response?.data?.msg || 'Hoàn tiền ZaloPay thất bại');
+          }
+        }
+        // Hoàn tiền PayOS
+        if (order.paymentMethod.toLowerCase() === 'payos') {
+          try {
+            await axios.post(
+              `/orders/${actualOrderId}/payos-refund`,
+              { amount: order.totalAmount, description: reason },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            showSuccessToast(t('success'), 'Đã gửi yêu cầu hoàn tiền PayOS', 2000);
+          } catch (refundErr: any) {
+            showErrorToast(t('error'), refundErr?.response?.data?.msg || 'Hoàn tiền PayOS thất bại');
+          }
         }
       }
+
       setShowCancelModal(false);
       refreshOrderDetail();
     } catch (e: any) {
@@ -299,7 +327,7 @@ const OrderDetailScreen = () => {
         return '#9b59b6';
       case 'cancelled':
       case 'canceled':
-        return '#e74c3c';
+        return '#95a5a6';
       default: return '#95a5a6';
     }
   };
@@ -376,6 +404,22 @@ const OrderDetailScreen = () => {
     return 'https://i.imgur.com/gTzT0hA.jpeg';
   };
 
+  // Explicitly type the address parameter
+  const formatAddress = (address: {
+    street?: string;
+    ward?: string;
+    district?: string;
+    province?: string;
+  }) => {
+    const { street, ward, district, province } = address;
+    if (!street && !ward && !district && !province) {
+      return 'Address details unavailable';
+    }
+    return [street || 'Unknown street', ward || 'Unknown ward', district || 'Unknown district', province || 'Unknown province']
+      .filter(Boolean)
+      .join(', ');
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -413,7 +457,7 @@ const OrderDetailScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+  <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
@@ -461,7 +505,7 @@ const OrderDetailScreen = () => {
 
           <Text style={styles.sectionTitle}>{t('purchasedProducts')}</Text>
           {order.items.map((item: OrderItem, index: number) => (
-            <View key={index} style={styles.productItem}>
+            <View key={index} style={[styles.itemContainer, order.items.length > 1 ? styles.multiItemAlignment : styles.singleItemAlignment]}>
               <View style={styles.productImageContainer}>
                 <Image
                   source={{ uri: getBookImage(item.book) }}
@@ -512,15 +556,7 @@ const OrderDetailScreen = () => {
                 </Text>
               )}
               {/* Địa chỉ đầy đủ */}
-              <Text style={styles.addressDetail}>
-                {[
-                  order.shippingAddress.addressDetail,
-                  order.shippingAddress.street,
-                  order.shippingAddress.ward,
-                  order.shippingAddress.district,
-                  order.shippingAddress.province
-                ].filter(Boolean).join(', ')}
-              </Text>
+              <Text style={styles.addressDetail}>{formatAddress(order.shippingAddress)}</Text>
             </View>
           </View>
         </View>
@@ -530,7 +566,7 @@ const OrderDetailScreen = () => {
           <Text style={styles.sectionTitle}>{t('paymentInformation')}</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t('paymentMethod')}:</Text>
-            <Text style={styles.infoValue}>{order.paymentMethod}</Text>
+            <Text style={styles.infoValue}>{PAYMENT_METHOD_NAMES[order.paymentMethod] || t('unknownPaymentMethod')}</Text>
           </View>
           <View style={styles.infoRow}>
 
@@ -589,6 +625,16 @@ const OrderDetailScreen = () => {
 
       {/* Action Buttons */}
       <View style={styles.actionButtonsContainer}>
+        {/* Nút Thanh toán cho PayOS/ZaloPay nếu đơn chưa thanh toán */}
+        {order.paymentStatus?.toLowerCase() === 'pending' && order.paymentMethod !== 'cod' && order.payment?.order_url && (
+          <TouchableOpacity
+            style={styles.refundButton}
+            onPress={() => Linking.openURL(order.payment.order_url)}
+          >
+            <Ionicons name="card-outline" size={20} color="white" />
+            <Text style={styles.refundButtonText}>{t('payNow') || 'Thanh toán ngay'}</Text>
+          </TouchableOpacity>
+        )}
         {isOrderCompleted() ? (
           <>
             <TouchableOpacity
@@ -612,7 +658,6 @@ const OrderDetailScreen = () => {
             )}
           </>
         ) : canCancelOrder(order.status) ? (
-
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={handleCancelOrder}
@@ -937,7 +982,21 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     fontStyle: 'italic',
   },
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f4',
+  },
+  singleItemAlignment: {
+    justifyContent: 'space-between',
+  },
+  multiItemAlignment: {
+    justifyContent: 'flex-start',
+  },
 
 });
 
-export default OrderDetailScreen; 
+export default OrderDetailScreen;

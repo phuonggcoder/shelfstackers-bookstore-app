@@ -599,6 +599,50 @@ export default function OrderReviewScreen() {
     });
   };
 
+  // Dialog state cho lỗi payment chưa hoàn tất
+  const [pendingPaymentDialog, setPendingPaymentDialog] = useState<{ visible: boolean, paymentId?: string } | null>(null);
+
+  const renderPendingPaymentDialog = () => {
+    if (!pendingPaymentDialog?.visible) return null;
+    return (
+      <Modal visible transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: '#0008', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 24, width: 320, alignItems: 'center' }}>
+            <Ionicons name="alert-circle" size={48} color="#e67e22" style={{ marginBottom: 12 }} />
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#e67e22', marginBottom: 8 }}>Bạn đã có giao dịch chưa hoàn tất</Text>
+            <Text style={{ fontSize: 15, color: '#444', textAlign: 'center', marginBottom: 16 }}>
+              Vui lòng hoàn tất giao dịch cũ trước khi tạo đơn hàng mới.
+            </Text>
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity
+                style={{ backgroundColor: '#3498db', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, marginRight: 8 }}
+                onPress={() => {
+                  setPendingPaymentDialog(null);
+                  if (pendingPaymentDialog.paymentId) {
+                    router.replace({ pathname: '/order-detail', params: { orderId: pendingPaymentDialog.paymentId } });
+                  } else {
+                    router.replace('/order-history');
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Đi tới đơn cần thanh toán</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: '#bbb', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 }}
+                onPress={() => {
+                  setPendingPaymentDialog(null);
+                  router.back();
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Quay lại</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   if (loading) return (
     <SafeAreaView style={styles.safeArea}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -1038,6 +1082,9 @@ export default function OrderReviewScreen() {
         subtotal={voucherValidationPopup.subtotal}
         onClose={closeVoucherValidationPopup}
       />
+
+      {/* Pending Payment Dialog */}
+      {renderPendingPaymentDialog()}
 
     </SafeAreaView>
   );

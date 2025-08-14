@@ -1,6 +1,4 @@
 // Silence Firebase deprecation warnings
-(globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
-
 import { useFCMListener } from '@/hooks/useFCMListener';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -8,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { RootSiblingParent } from 'react-native-root-siblings';
 import { Provider } from 'react-redux';
+import '../app/i18n';
 import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { AvatarProvider } from '../context/AvatarContext';
@@ -19,6 +18,7 @@ import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
 
+(globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
 
 
 function RootLayoutNav() {

@@ -487,7 +487,7 @@
     "shippingDiscountAmount": "Discount {{value}} shipping fee",
       "paymentMethod": "Payment Method",
   "paymentStatus": "Payment Status",
-  "payViaZaloPay": "Pay Via ZaloPay",
+  "payViaZaloPay": "Pay via ZaloPay",
     "payOnDelivery": "Pay on delivery (COD)",
     "discountVoucher": "Discount Voucher",
     "noDiscountVouchers": "No discount vouchers available",
@@ -573,6 +573,9 @@
     "permissionDenied": "Permission denied",
     "fileNotFound": "File not found",
     "timeout": "Request timeout",
-    "unknownError": "An unknown error occurred"
-  }
+    "unknownError": "An unknown error occurred",
+    "orderDeliveredSuccessfully": "Order delivered successfully"
+  },
+  "totalAmount": "Total Amount",
+  "unknownPaymentMethod": "Unknown payment method"
 }

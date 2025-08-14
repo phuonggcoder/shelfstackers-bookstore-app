@@ -63,7 +63,8 @@ export const PAYMENT_METHOD_NAMES = {
   [PAYMENT_METHODS.ZALOPAY]: 'ZaloPay',
   [PAYMENT_METHODS.VNPAY]: 'VNPay',
   [PAYMENT_METHODS.BANK_TRANSFER]: 'Chuyển khoản ngân hàng',
-  [PAYMENT_METHODS.CREDIT_CARD]: 'Thẻ tín dụng'
+  [PAYMENT_METHODS.CREDIT_CARD]: 'Thẻ tín dụng',
+  [PAYMENT_METHODS.PAYOS]: 'PayOS'
 } as const;
 
 // Payment method icons (you can add your icon imports here)
@@ -74,4 +75,4 @@ export const PAYMENT_METHOD_ICONS = {
   [PAYMENT_METHODS.VNPAY]: '💚',
   [PAYMENT_METHODS.BANK_TRANSFER]: '🏦',
   [PAYMENT_METHODS.CREDIT_CARD]: '💳'
-} as const; 
+} as const;
