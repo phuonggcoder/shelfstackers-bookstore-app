@@ -29,8 +29,6 @@
           "launchMode": "most-recent"
         }
       ],
-      "./withNotifeeAndroidFix"
-
     ],
     "experiments": {
       "typedRoutes": true
