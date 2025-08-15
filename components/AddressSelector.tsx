@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
 
@@ -47,6 +47,11 @@ const AddressItem = memo(({
 ));
 
 AddressItem.displayName = 'AddressItem';
+
+// Thêm hàm normalizeString để loại bỏ dấu
+const normalizeString = (str: string): string => {
+  return str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+};
 
 const AddressSelector = memo(({
   value,
@@ -124,17 +129,20 @@ const AddressSelector = memo(({
     setSelectedProvince(province);
     setSelectedDistrict(null);
     setSelectedWard(null);
+    setSearchQuery(''); // Reset thanh tìm kiếm
     await loadDistricts(province.code);
   }, [loadDistricts]);
 
   const handleDistrictSelect = useCallback(async (district: District) => {
     setSelectedDistrict(district);
     setSelectedWard(null);
+    setSearchQuery(''); // Reset thanh tìm kiếm
     await loadWards(district.code);
   }, [loadWards]);
 
   const handleWardSelect = useCallback((ward: Ward) => {
     setSelectedWard(ward);
+    setSearchQuery(''); // Reset thanh tìm kiếm
   }, []);
 
   const handleConfirm = useCallback(() => {
@@ -176,30 +184,24 @@ const AddressSelector = memo(({
         return;
       }
 
-      const query = searchQuery.toLowerCase().trim();
+      const query = normalizeString(searchQuery.trim());
       let results: (Province | District | Ward)[] = [];
-      
-      // Use memoized filter function for better performance
+
       if (!selectedProvince) {
         results = provinces.filter(province => {
-          const normalizedName = province.name.toLowerCase();
-          return normalizedName.includes(query) ||
-                 (province.typeText && province.typeText.toLowerCase().includes(query));
+          const normalizedName = normalizeString(province.name);
+          return normalizedName.includes(query);
         });
       } else if (!selectedDistrict) {
         results = districts.filter(district => {
-          const normalizedName = district.name.toLowerCase();
-          return normalizedName.includes(query) ||
-                 (district.typeText && district.typeText.toLowerCase().includes(query));
+          const normalizedName = normalizeString(district.name);
+          return normalizedName.includes(query);
         });
       } else {
         results = wards.filter(ward => {
-          const normalizedName = ward.name.toLowerCase();
-          // Also search in ward's full path if available
-          const fullPath = ward.path ? ward.path.toLowerCase() : '';
-          return normalizedName.includes(query) ||
-                 (ward.typeText && ward.typeText.toLowerCase().includes(query)) ||
-                 fullPath.includes(query);
+          const normalizedName = normalizeString(ward.name);
+          const fullPath = ward.path ? normalizeString(ward.path) : '';
+          return normalizedName.includes(query) || fullPath.includes(query);
         });
       }
       setFilteredItems(results);
@@ -340,7 +342,7 @@ const AddressSelector = memo(({
                   <View style={styles.listContainer}>
                     <FlatList
                       data={filteredItems.length > 0 ? filteredItems : !selectedProvince ? provinces : !selectedDistrict ? districts : wards}
-                      keyExtractor={(item) => `${!selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward'}-${item.code}`}
+                      keyExtractor={(item: Province | District | Ward) => `${!selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward'}-${item.code}`}
                       renderItem={({ item }: { item: Province | District | Ward }) => (
                         <AddressItem
                           item={item}

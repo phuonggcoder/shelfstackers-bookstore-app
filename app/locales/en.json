@@ -577,5 +577,14 @@
     "orderDeliveredSuccessfully": "Order delivered successfully"
   },
   "totalAmount": "Total Amount",
-  "unknownPaymentMethod": "Unknown payment method"
+  "unknownPaymentMethod": "Unknown payment method",
+   "orderValue": "Order Value",
+  "paymentAmount": "Payment Amount",
+  "orderNumber": "Order Number",
+  "content": "Content",
+  "processing": "Processing",
+  "completed": "Completed",
+  "expired": "Expired",
+  "viewOrderHistory": "View Order History",
+  "backToHome": "Back to Home"
 }

@@ -531,5 +531,18 @@
   "orderDeliveredSuccessfully": "Đơn hàng đã được giao thành công",
   "orderInformation": "Thông tin đơn hàng",
   "totalAmount": "Tổng số tiền",
-  "unknownPaymentMethod": "Phương thức thanh toán không xác định"
+  "unknownPaymentMethod": "Phương thức thanh toán không xác định",
+  "orderSuccess": "Đặt hàng thành công",
+  "thankYouForYourOrder": "Cảm ơn bạn đã đặt hàng",
+  "paymentStatus": "Trạng thái thanh toán",
+    "orderValue": "Giá trị đơn hàng",
+  "paymentAmount": "Số tiền thanh toán",
+  "orderNumber": "Mã đơn hàng",
+  "content": "Nội dung",
+  "processing": "Đang xử lý",
+  "completed": "Hoàn thành",
+  "expired": "Hết hạn",
+  "viewOrderHistory": "Xem lịch sử đơn hàng",
+  "backToHome": "Về trang chủ"
+  
 }

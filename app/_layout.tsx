@@ -76,6 +76,15 @@ function RootLayoutNav() {
             animation: 'fade',
           }} 
         />
+        {/* Thêm đường dẫn cho màn hình order-success */}
+        <Stack.Screen 
+          name="order-success" 
+          options={{ 
+            headerShown: true, 
+            title: 'Order Success', 
+            animation: 'slide_from_bottom', 
+          }} 
+        />
       </Stack>
       <TokenExpiredAlert 
         visible={tokenExpiredAlertVisible}
