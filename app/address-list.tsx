@@ -3,45 +3,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, FlatList, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { UserAddress } from '../services/addressService';
 
 const AddressListScreen = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
+  const { showErrorToast, showDialog, hideModal } = useUnifiedModal();
   const { from } = useLocalSearchParams();
+  const isFromOrderReview = from === 'order-review';
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [showAlert, setShowAlert] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [showDefaultModal, setShowDefaultModal] = useState(false);
-  const [defaultChangeData, setDefaultChangeData] = useState<{
-    currentName: string;
-    newName: string;
-    newId: string;
-  } | null>(null);
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  
 
-  const isFromOrderReview = from === 'order-review';
+  // ...existing code...
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchAddresses();
-    setRefreshing(false);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchAddresses();
-    }, [])
-  );
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -50,7 +35,8 @@ const AddressListScreen = () => {
       setAddresses(arr);
       console.log('Fetched addresses:', arr);
       if (!selected && arr.length > 0) {
-        const defaultAddr = arr.find((a: any) => a.is_default);
+        // Support both isDefault and is_default
+        const defaultAddr = arr.find((addr) => addr.isDefault || addr.is_default);
         setSelected(defaultAddr ? defaultAddr._id : arr[0]._id);
       }
     } catch (e) {
@@ -59,46 +45,33 @@ const AddressListScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, selected]);
 
-  React.useEffect(() => {
-    // Check if we're coming from add address screen
-    const checkAddedAddress = async () => {
-      try {
-        const added = await AsyncStorage.getItem('address_added');
-        if (added === 'true') {
-          setShowAlert(true);
-          await AsyncStorage.removeItem('address_added');
-        }
-      } catch (error) {
-        console.error('Error checking added address:', error);
-      }
-    };
-    checkAddedAddress();
-  }, []);
+  // Tự động fetch địa chỉ khi vào màn hình
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAddresses();
+    }, [fetchAddresses])
+  );
 
-  React.useEffect(() => {
-    if (!token) setShowLoginModal(true);
-    else setShowLoginModal(false);
-  }, [token]);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAddresses();
+    setRefreshing(false);
+  }, [fetchAddresses]);
 
   const handleDelete = async (id: string) => {
-    setDeleteId(id);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteId || !token) return;
-    setShowDeleteModal(false);
+    if (!id || !token) return;
     setLoading(true);
     try {
-      await AddressService.deleteAddress(token, deleteId);
+      await AddressService.deleteAddress(token, id);
       fetchAddresses();
     } catch (error) {
       console.error('Error deleting address:', error);
+      showErrorToast(t('error'), t('cannotDeleteAddress'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    setDeleteId(null);
   };
 
   const handleSetDefault = async (id: string) => {
@@ -107,12 +80,21 @@ const AddressListScreen = () => {
     const currentDefault = addrArr.find((a) => a.is_default);
     const newDefault = addrArr.find((a) => a._id === id);
     if (currentDefault && newDefault && currentDefault._id !== id) {
-      setDefaultChangeData({
-        currentName: currentDefault.receiver_name,
-        newName: newDefault.receiver_name,
-        newId: id
-      });
-      setShowDefaultModal(true);
+      showDialog(
+        t('changeDefaultAddress'),
+        t('confirmChangeDefaultAddress', { current: currentDefault.fullName, new: newDefault.fullName }),
+        t('confirm'),
+        t('cancel'),
+        'info',
+        () => {
+          hideModal();
+          confirmSetDefault(id);
+        },
+        () => {
+          hideModal();
+          console.log('Change default cancelled');
+        }
+      );
     } else if (!currentDefault && newDefault) {
       // Nếu chưa có mặc định, cho phép set luôn
       try {
@@ -120,57 +102,58 @@ const AddressListScreen = () => {
         fetchAddresses();
       } catch (error) {
         console.error('Error setting default address:', error);
-        Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+        showErrorToast(t('error'), t('cannotSetDefaultAddress'));
       }
     }
   };
 
-  const confirmSetDefault = async () => {
-    if (!defaultChangeData || !token) return;
-    setShowDefaultModal(false);
+  const confirmSetDefault = async (id: string) => {
+    if (!id || !token) return;
     setLoading(true);
     try {
-      const addrArr = addresses as any[];
+      const addrArr = addresses as UserAddress[];
       // Set tất cả địa chỉ thành false trước
+      const targetAddr = addrArr.find(addr => addr._id === id);
+      if (!targetAddr) {
+        throw new Error('Address not found');
+      }
+
+      // Update all addresses to not default, including the province information
       const updatePromises = addrArr.map((addr) => 
-        AddressService.updateAddress(token, addr._id, { is_default: false })
+        AddressService.updateAddress(token, addr._id, { 
+          isDefault: false,
+          province: {
+            code: addr.province,
+            name: addr.province,
+            type: '0',
+            typeText: ''
+          }
+        })
       );
       await Promise.all(updatePromises);
       
       // Sau đó set địa chỉ mới thành true
-      await AddressService.setDefaultAddress(token, defaultChangeData.newId);
+      await AddressService.setDefaultAddress(token, id);
       fetchAddresses();
     } catch (error) {
       console.error('Error setting default address:', error);
-      Alert.alert('Lỗi', 'Không thể đặt địa chỉ mặc định');
+      showErrorToast(t('error'), t('cannotSetDefaultAddress'));
     } finally {
       setLoading(false);
-      setDefaultChangeData(null);
     }
   };
 
   const handleConfirm = () => {
     if (!selected) {
-      Alert.alert('Lỗi', 'Vui lòng chọn một địa chỉ');
+      showErrorToast(t('pleaseSelectAddress'));
       return;
     }
-    
+    // Support both isDefault and is_default
     const selectedAddress = addresses.find((addr: any) => addr._id === selected);
     if (selectedAddress) {
-      // Store selected address and go back to order review
       AsyncStorage.setItem('selected_address', JSON.stringify(selectedAddress));
       router.back();
     }
-  };
-
-  const formatAddress = (addr: any) => {
-    const parts = [];
-    if (addr.address_detail) parts.push(addr.address_detail);
-    if (addr.street) parts.push(addr.street);
-    if (addr.ward) parts.push(addr.ward);
-    if (addr.district) parts.push(addr.district);
-    if (addr.province) parts.push(addr.province);
-    return parts.join(', ');
   };
 
   return (
@@ -180,7 +163,7 @@ const AddressListScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isFromOrderReview ? 'Chọn địa chỉ giao hàng' : 'Địa chỉ giao hàng'}
+          {isFromOrderReview ? t('selectShippingAddress') : t('shippingAddress')}
         </Text>
         <TouchableOpacity onPress={() => router.push('/add-address')}>
           <Ionicons name="add" size={24} color="#3255FB" />
@@ -199,8 +182,8 @@ const AddressListScreen = () => {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', width: 320 }}>
             <Ionicons name="log-in-outline" size={48} color="#3255FB" style={{ marginBottom: 16 }} />
-            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>Bạn chưa đăng nhập</Text>
-            <Text style={{ color: '#666', marginBottom: 24, textAlign: 'center' }}>Vui lòng đăng nhập để sử dụng tính năng này.</Text>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>{t('notLoggedIn')}</Text>
+            <Text style={{ color: '#666', marginBottom: 24, textAlign: 'center' }}>{t('pleaseLoginToUseFeature')}</Text>
             <View style={{ flexDirection: 'row', gap: 16 }}>
               <TouchableOpacity
                 style={{ backgroundColor: '#3255FB', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginRight: 8 }}
@@ -209,168 +192,127 @@ const AddressListScreen = () => {
                   router.push('/(auth)/login');
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Đăng nhập</Text>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{t('login')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ backgroundColor: '#eee', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24 }}
                 onPress={() => setShowLoginModal(false)}
               >
-                <Text style={{ color: '#3255FB', fontWeight: 'bold', fontSize: 16 }}>Bỏ qua</Text>
+                <Text style={{ color: '#3255FB', fontWeight: 'bold', fontSize: 16 }}>{t('skip')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.deleteModalBox}>
-            <Text style={styles.deleteTitle}>Xóa địa chỉ</Text>
-            <Text style={styles.deleteDesc}>Không thể khôi phục địa chỉ đã xóa.</Text>
-            <View style={styles.deleteBtnRow}>
-              <TouchableOpacity style={styles.keepBtn} onPress={() => setShowDeleteModal(false)}>
-                <Text style={styles.keepBtnText}>Giữ lại</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
-                <Text style={styles.confirmDeleteText}>Đồng ý</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal
-        visible={showDefaultModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDefaultModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.defaultChangeModalBox}>
-            <Text style={styles.defaultChangeTitle}>Thay đổi địa chỉ mặc định</Text>
-            <Text style={styles.defaultChangeDesc}>
-              Bạn có muốn thay đổi địa chỉ mặc định từ "{defaultChangeData?.currentName}" thành "{defaultChangeData?.newName}" không?
-            </Text>
-            <View style={styles.defaultChangeBtnRow}>
-              <TouchableOpacity style={styles.cancelDefaultChangeBtn} onPress={() => setShowDefaultModal(false)}>
-                <Text style={styles.cancelDefaultChangeText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDefaultChangeBtn} onPress={confirmSetDefault}>
-                <Text style={styles.confirmDefaultChangeText}>Đồng ý</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
+
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>Đang tải địa chỉ...</Text>
+          <Text style={styles.loadingText}>{t('loadingAddresses')}</Text>
         </View>
       ) : (
-        <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#3255FB']}
-            tintColor="#3255FB"
-          />
-        }
-      >
-          {addresses.length === 0 ? (
+        <FlatList
+          style={styles.content}
+          data={addresses}
+          keyExtractor={(item) => item._id}
+          showsVerticalScrollIndicator={false}
+          windowSize={5}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#3255FB']}
+              tintColor="#3255FB"
+            />
+          }
+          ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Ionicons name="location-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyTitle}>Chưa có địa chỉ nào</Text>
-              <Text style={styles.emptySubtitle}>Thêm địa chỉ để nhận hàng nhanh chóng</Text>
+              <Text style={styles.emptyTitle}>{t('noAddressesYet')}</Text>
+              <Text style={styles.emptySubtitle}>{t('addAddressForQuickDelivery')}</Text>
             </View>
-          ) : (
-            <>
-              {addresses.map((addr: any) => (
-                <View key={addr._id} style={styles.addressCard}>
-                  <TouchableOpacity 
-                    style={styles.radioRow} 
-                    onPress={() => setSelected(addr._id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.radioContainer}>
-                      <Ionicons
-                        name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
-                        size={24}
-                        color={selected === addr._id ? '#3255FB' : '#ccc'}
-                      />
-                    </View>
-                    <View style={styles.addressInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.name}>{addr.receiver_name}</Text>
-                        <Text style={styles.phone}>{addr.phone_number}</Text>
-                        {/* Chỉ hiển thị Mặc định cho địa chỉ mặc định thực sự */}
-                        {addr.is_default && (
-                          <View style={styles.defaultTag}>
-                            <Text style={styles.defaultText}>Mặc định</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.addressText}>{formatAddress(addr)}</Text>
-                      {/* Hiển thị loại địa chỉ */}
-                      <View style={styles.addressTypeRow}>
-                        <View style={styles.typeTag}>
-                          <Text style={styles.typeText}>
-                            {addr.type === 'office' ? '🏢 Văn phòng' : '🏠 Nhà riêng'}
-                          </Text>
-                        </View>
-                      </View>
-                      {addr.note && (
-                        <Text style={styles.noteText}>Ghi chú: {addr.note}</Text>
-                      )}
-                    </View>
-                    {!isFromOrderReview && (
-                      <View style={styles.actionButtons}>
-                        <TouchableOpacity 
-                          style={styles.editButton}
-                          onPress={() => router.push(`/edit-address?id=${addr._id}`)}
-                        >
-                          <Ionicons name="create-outline" size={20} color="#3255FB" />
-                        </TouchableOpacity>
-                        {!addr.is_default && (
-                          <TouchableOpacity 
-                            style={styles.defaultButton}
-                            onPress={() => handleSetDefault(addr._id)}
-                          >
-                            <Ionicons name="star-outline" size={20} color="#FFD700" />
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity 
-                          style={styles.deleteButton}
-                          onPress={() => handleDelete(addr._id)}
-                        >
-                          <Ionicons name="trash-outline" size={20} color="#4A90E2" />
-                        </TouchableOpacity>
+          )}
+          renderItem={({ item: addr }) => (
+            <View key={addr._id} style={styles.addressCard}>
+              <TouchableOpacity 
+                style={styles.radioRow} 
+                onPress={() => setSelected(addr._id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.radioContainer}>
+                  <Ionicons
+                    name={selected === addr._id ? 'radio-button-on' : 'radio-button-off'}
+                    size={24}
+                    color={selected === addr._id ? '#3255FB' : '#ccc'}
+                  />
+                </View>
+                <View style={styles.addressInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name}>{addr.fullName} <Text style={styles.phone}>| {addr.phone}</Text></Text>
+                    {(addr.isDefault || addr.is_default) && (
+                      <View style={styles.defaultTag}>
+                        <Text style={styles.defaultText}>{t('default')}</Text>
                       </View>
                     )}
-                  </TouchableOpacity>
+                  </View>
+                  <Text style={styles.addressText}>{addr.fullAddress}</Text>
+                  {/* Hiển thị loại địa chỉ */}
+                  <View style={styles.addressTypeRow}>
+                    <View style={styles.typeTag}>
+                      <Text style={styles.typeText}>
+                        {addr.type === 'office' ? t('office') : t('home')}
+                      </Text>
+                    </View>
+                  </View>
+                  {addr.note && (
+                    <Text style={styles.noteText}>{t('note')}: {addr.note}</Text>
+                  )}
                 </View>
-              ))}
-              
-              {/* Add address button in list */}
-              <TouchableOpacity 
-                style={styles.addAddressInList}
-                onPress={() => router.push('/add-address')}
-              >
-                <Ionicons name="add" size={20} color="#3255FB" />
-                <Text style={styles.addAddressInListText}>Thêm địa chỉ mới</Text>
+                {!isFromOrderReview && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.editButton}
+                      onPress={() => router.push(`/edit-address?id=${addr._id}`)}
+                    >
+                      <Ionicons name="create-outline" size={20} color="#3255FB" />
+                    </TouchableOpacity>
+                    {!(addr.isDefault || addr.is_default) && (
+                      <TouchableOpacity 
+                        style={styles.defaultButton}
+                        onPress={() => handleSetDefault(addr._id)}
+                      >
+                        <Ionicons name="star-outline" size={20} color="#FFD700" />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(addr._id)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#4A90E2" />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
-            </>
+            </View>
           )}
-        </ScrollView>
+          ListFooterComponent={() => (
+            <TouchableOpacity 
+              style={styles.addAddressInList}
+              onPress={() => router.push('/add-address')}
+            >
+              <Ionicons name="add" size={20} color="#3255FB" />
+              <Text style={styles.addAddressInListText}>{t('addNewAddress')}</Text>
+            </TouchableOpacity>
+          )}
+        />
       )}
 
       {isFromOrderReview && addresses.length > 0 && (
@@ -380,7 +322,7 @@ const AddressListScreen = () => {
             onPress={handleConfirm}
             disabled={!selected}
           >
-            <Text style={styles.confirmButtonText}>Xác nhận địa chỉ</Text>
+            <Text style={styles.confirmButtonText}>{t('confirmAddress')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -406,6 +348,70 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: 'bold', 
     color: '#333' 
+  },
+  addButton: {
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#888',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: 300,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#222',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: '#3255FB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 8,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -479,6 +485,7 @@ const styles = StyleSheet.create({
   phone: { 
     color: '#666', 
     fontSize: 14,
+    fontWeight: 'normal',
   },
   defaultTag: { 
     backgroundColor: '#e8f4fd', 

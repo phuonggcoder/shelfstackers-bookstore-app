@@ -1,24 +1,27 @@
-import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  SafeAreaView,
-  Image,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { authService } from '../services/authService'; // ✅ Đảm bảo đường dẫn đúng
 
 const ChangePassword = () => {
+  const { t } = useTranslation();
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,17 +33,17 @@ const ChangePassword = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      showErrorToast(t('error'), t('pleaseEnterAllInformation'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải có ít nhất 6 ký tự');
+      showErrorToast(t('error'), t('newPasswordMinLength'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới và xác nhận không khớp');
+      showErrorToast(t('error'), t('passwordsDoNotMatch'));
       return;
     }
 
@@ -48,16 +51,16 @@ const ChangePassword = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        Alert.alert('Lỗi', 'Không tìm thấy token người dùng. Vui lòng đăng nhập lại.');
+        showErrorToast(t('error'), t('userTokenNotFound'));
         return;
       }
 
       const message = await authService.changePassword(currentPassword, newPassword, token);
-      Alert.alert('Thành công', message);
+      showSuccessToast(t('success'), message, 2000);
       navigation.goBack();
     } catch (err: any) {
-      console.log('Lỗi đổi mật khẩu:', err.message);
-      Alert.alert('Thất bại', err.message || 'Đã có lỗi xảy ra');
+      console.log(t('passwordChangeError'), err.message);
+      showErrorToast(t('failure'), err.message || t('anErrorOccurred'));
     } finally {
       setLoading(false);
     }
@@ -94,7 +97,7 @@ const ChangePassword = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Image source={require('../assets/images/quaylai.png')} style={styles.backIcon} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Đổi Mật khẩu</Text>
+        <Text style={styles.headerTitle}>{t('changePassword')}</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -103,9 +106,9 @@ const ChangePassword = () => {
         keyboardVerticalOffset={80}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {renderInput('Mật khẩu hiện tại', 'Nhập mật khẩu hiện tại...', currentPassword, setCurrentPassword, showCurrent, () => setShowCurrent(!showCurrent))}
-          {renderInput('Mật khẩu mới', 'Nhập mật khẩu mới...', newPassword, setNewPassword, showNew, () => setShowNew(!showNew))}
-          {renderInput('Xác nhận mật khẩu mới', 'Nhập lại mật khẩu mới...', confirmPassword, setConfirmPassword, showConfirm, () => setShowConfirm(!showConfirm))}
+          {renderInput(t('currentPassword'), t('enterCurrentPassword'), currentPassword, setCurrentPassword, showCurrent, () => setShowCurrent(!showCurrent))}
+          {renderInput(t('newPassword'), t('enterNewPassword'), newPassword, setNewPassword, showNew, () => setShowNew(!showNew))}
+          {renderInput(t('confirmNewPassword'), t('reEnterNewPassword'), confirmPassword, setConfirmPassword, showConfirm, () => setShowConfirm(!showConfirm))}
         </ScrollView>
 
         <View style={styles.bottomContainer}>
@@ -117,7 +120,7 @@ const ChangePassword = () => {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Lưu thay đổi</Text>
+              <Text style={styles.buttonText}>{t('saveChanges')}</Text>
             )}
           </TouchableOpacity>
         </View>

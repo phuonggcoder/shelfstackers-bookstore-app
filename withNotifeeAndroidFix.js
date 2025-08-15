@@ -1,4 +1,3 @@
-// withNotifeeAndroidFix.js
 const { withProjectBuildGradle } = require("@expo/config-plugins");
 const generateCode = require("@expo/config-plugins/build/utils/generateCode");
 

@@ -3,10 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getCart, removeFromCart, updateCartQuantity } from '../services/api';
 
 interface CartItem {
@@ -16,6 +18,7 @@ interface CartItem {
     title: string;
     author: string;
     price: number;
+    stock: number;
     thumbnail?: string;
     cover_image?: string[];
   };
@@ -23,21 +26,18 @@ interface CartItem {
 }
 
 const CartScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { cartCount, fetchCartCount } = useCart();
-  const { user, token } = useAuth();
+  const { fetchCartCount } = useCart();
+  const { token } = useAuth();
+  const { showErrorToast, showWarningToast, showDeleteDialog, hideModal } = useUnifiedModal();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  useEffect(() => {
-    if (token) {
-      loadCart();
-    }
-  }, [token]);
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     try {
       setLoading(true);
       const cartData = await getCart(token!);
@@ -49,7 +49,14 @@ const CartScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      loadCart();
+    }
+  }, [token, loadCart]);
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -98,15 +105,24 @@ const CartScreen = () => {
 
   const handleQuantityChange = async (bookId: string, newQuantity: number) => {
     if (newQuantity < 1 || !token) return;
-    
+    // Kiểm tra tồn kho trước khi cập nhật
+    const item = cart.find(i => i.book_id._id === bookId);
+    if (!item) return;
+    const stock = item.book_id.stock ?? 0;
+    if (newQuantity > stock) {
+      showWarningToast(t('notification'), t('notEnoughStock', { stock, requested: newQuantity }));
+      return;
+    }
     try {
       setLoading(true);
       await updateCartQuantity(token, bookId, newQuantity);
-      await loadCart();
+      setCart(prevCart => prevCart.map(item =>
+        item.book_id._id === bookId ? { ...item, quantity: newQuantity } : item
+      ));
       await fetchCartCount(token);
     } catch (error) {
       console.error('Error updating quantity:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+      showErrorToast(t('error'), t('cannotUpdateQuantity'));
     } finally {
       setLoading(false);
     }
@@ -114,35 +130,27 @@ const CartScreen = () => {
 
   const handleRemoveItem = async (bookId: string) => {
     if (!token) return;
-    
-    Alert.alert(
-      'Xác nhận',
-      'Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await removeFromCart(token, bookId);
-              await loadCart();
-              await fetchCartCount(token);
-              setSelectedItems(prev => prev.filter(id => id !== bookId));
-            } catch (error) {
-              console.error('Error removing item:', error);
-              Alert.alert('Lỗi', 'Không thể xóa sản phẩm');
-            } finally {
-              setLoading(false);
-            }
-          }
+    showDeleteDialog(
+      async () => {
+        try {
+          setLoading(true);
+          await removeFromCart(token, bookId);
+          setCart(prevCart => prevCart.filter(item => item.book_id._id !== bookId));
+          await fetchCartCount(token);
+          setSelectedItems(prev => prev.filter(id => id !== bookId));
+          hideModal();
+        } catch (error) {
+          console.error('Error removing item:', error);
+          showErrorToast(t('error'), t('cannotRemoveProduct'));
+          hideModal();
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     // Log chi tiết các item được chọn và số lượng
     const total = selectedItems.reduce((sum, bookId) => {
       const item = cart.find(cartItem => cartItem.book_id._id === bookId);
@@ -154,7 +162,7 @@ const CartScreen = () => {
     }, 0);
     console.log('Tổng tiền các item được chọn:', total);
     return total;
-  };
+  }, [selectedItems, cart]);
 
   const handleCheckout = useCallback(async () => {
     console.log('=== CHECKOUT PROCESS START ===');
@@ -164,7 +172,7 @@ const CartScreen = () => {
     
     if (selectedItems.length === 0) {
       console.log('No items selected, showing alert');
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để thanh toán');
+      showWarningToast(t('notification'), t('pleaseSelectAtLeastOneProduct'));
       return;
     }
     
@@ -199,11 +207,11 @@ const CartScreen = () => {
       console.log('✅ Navigation successful');
     } catch (error) {
       console.error('❌ Error storing data or navigating:', error);
-      Alert.alert('Lỗi', 'Không thể chuyển đến trang thanh toán');
+      showErrorToast(t('error'), t('cannotNavigateToPayment'));
     }
     
     console.log('=== CHECKOUT PROCESS END ===');
-  }, [selectedItems, cart, router]);
+  }, [selectedItems, cart, router, t, calculateTotal, showErrorToast, showWarningToast]);
 
   const renderCartItem = ({ item }: { item: CartItem }) => {
     const isSelected = selectedItems.includes(item.book_id._id);
@@ -232,7 +240,7 @@ const CartScreen = () => {
             {item.book_id.title}
           </Text>
           <Text style={styles.bookAuthor}>
-            Tác giả: {item.book_id.author}
+            {t('author')}: {item.book_id.author}
           </Text>
           <Text style={styles.bookPrice}>
             {formatPrice(item.book_id.price)}
@@ -277,12 +285,12 @@ const CartScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+          <Text style={styles.headerTitle}>{t('cart')}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang xử lý...</Text>
+          <Text style={styles.loadingText}>{t('processing')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -294,10 +302,10 @@ const CartScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#2c3e50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
         <TouchableOpacity onPress={selectAllItems}>
           <Text style={styles.selectAllText}>
-            {selectedItems.length === cart.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            {selectedItems.length === cart.length ? t('deselectAll') : t('selectAll')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -305,13 +313,13 @@ const CartScreen = () => {
       {cart.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={64} color="#bdc3c7" />
-          <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
-          <Text style={styles.emptyText}>Bạn chưa có sản phẩm nào trong giỏ hàng</Text>
+          <Text style={styles.emptyTitle}>{t('cartEmpty')}</Text>
+          <Text style={styles.emptyText}>{t('noProductsInCart')}</Text>
           <TouchableOpacity 
             style={styles.shopNowButton}
             onPress={() => router.push('/(tabs)')}
           >
-            <Text style={styles.shopNowText}>Mua sắm ngay</Text>
+            <Text style={styles.shopNowText}>{t('shopNow')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -330,12 +338,12 @@ const CartScreen = () => {
           <View style={styles.bottomSection}>
             <TouchableOpacity style={styles.voucherButton}>
               <Ionicons name="pricetag-outline" size={20} color="#667eea" />
-              <Text style={styles.voucherText}>Chọn mã giảm giá</Text>
+              <Text style={styles.voucherText}>{t('selectPromoCode')}</Text>
               <Ionicons name="chevron-forward" size={16} color="#667eea" />
             </TouchableOpacity>
             
             <View style={styles.totalSection}>
-              <Text style={styles.totalLabel}>Tổng cộng</Text>
+              <Text style={styles.totalLabel}>{t('total')}</Text>
               <Text style={styles.totalAmount}>
                 {formatPrice(calculateTotal())}
               </Text>
@@ -350,27 +358,11 @@ const CartScreen = () => {
               disabled={selectedItems.length === 0}
             >
               <Text style={styles.checkoutText}>
-                Thanh toán ({selectedItems.length})
+                {t('checkout')} ({selectedItems.length})
               </Text>
             </TouchableOpacity>
             
-            {/* Test button for debugging */}
-            <TouchableOpacity 
-              style={[styles.checkoutButton, { marginTop: 10, backgroundColor: '#ff6b6b' }]}
-              onPress={() => {
-                console.log('🧪 Test navigation button pressed');
-                try {
-                  router.push('/order-review');
-                  console.log('✅ Test navigation successful');
-                } catch (error) {
-                  console.error('❌ Test navigation failed:', error);
-                }
-              }}
-            >
-              <Text style={styles.checkoutText}>
-                Test Navigation
-              </Text>
-            </TouchableOpacity>
+
           </View>
         </>
       )}

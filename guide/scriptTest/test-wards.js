@@ -19,7 +19,7 @@ async function testWards() {
       // Test 2: Get wards for this district
       console.log(`2️⃣ Getting wards for ${firstDistrict.name}...`);
       const wardsResponse = await axios.get(`${BASE_URL}/address/wards`, {
-        params: { 'districts-code': firstDistrict.code }
+        params: { 'province-code': '01' } // Use province code instead of district code
       });
       
       console.log('✅ Wards Response:', {

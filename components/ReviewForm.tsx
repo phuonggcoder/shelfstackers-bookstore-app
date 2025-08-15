@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { CreateReviewData, Review, UpdateReviewData } from '../services/reviewService';
 import ConfirmModal from './ConfirmModal';
 import RatingStars from './RatingStars';
@@ -40,6 +40,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
+  const { showErrorToast } = useUnifiedModal();
 
   // Update form data when existingReview changes
   useEffect(() => {
@@ -56,12 +57,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đánh giá từ 1-5 sao');
+      showErrorToast('Lỗi', 'Vui lòng chọn đánh giá từ 1-5 sao');
       return;
     }
 
     if (!comment.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập nội dung đánh giá');
+      showErrorToast('Lỗi', 'Vui lòng nhập nội dung đánh giá');
       return;
     }
 
@@ -86,7 +87,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       try {
         await onSubmit(submitData);
       } catch (error) {
-        Alert.alert('Lỗi', 'Có lỗi xảy ra khi gửi đánh giá');
+        showErrorToast('Lỗi', 'Có lỗi xảy ra khi gửi đánh giá');
       }
     }
   };
@@ -97,7 +98,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       try {
         await onSubmit(pendingSubmitData);
       } catch (error) {
-        Alert.alert('Lỗi', 'Có lỗi xảy ra khi cập nhật đánh giá');
+        showErrorToast('Lỗi', 'Có lỗi xảy ra khi cập nhật đánh giá');
       }
     }
   };
@@ -127,7 +128,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         await uploadMedia(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể chọn ảnh');
+      showErrorToast('Lỗi', 'Không thể chọn ảnh');
     }
   };
 
@@ -135,7 +136,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Quyền truy cập', 'Cần quyền truy cập camera để chụp ảnh');
+        showErrorToast('Quyền truy cập', 'Cần quyền truy cập camera để chụp ảnh');
         return;
       }
 
@@ -149,7 +150,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         await uploadMedia(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể chụp ảnh');
+      showErrorToast('Lỗi', 'Không thể chụp ảnh');
     }
   };
 
@@ -165,7 +166,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       }, 1000);
     } catch (error) {
       setUploadingMedia(false);
-      Alert.alert('Lỗi', 'Không thể upload ảnh');
+      showErrorToast('Lỗi', 'Không thể upload ảnh');
     }
   };
 
@@ -174,14 +175,9 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   };
 
   const showMediaOptions = () => {
-    Alert.alert(
+    showErrorToast(
       'Thêm ảnh/video',
-      'Chọn cách thêm media',
-      [
-        { text: 'Chụp ảnh', onPress: takePhoto },
-        { text: 'Chọn từ thư viện', onPress: pickImage },
-        { text: 'Hủy', style: 'cancel' },
-      ]
+      'Chọn cách thêm media'
     );
   };
 

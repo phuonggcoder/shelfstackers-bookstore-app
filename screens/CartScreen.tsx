@@ -3,9 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getBooksByCategory, getCart, removeFromCart, updateCartQuantity } from '../services/api';
 import { Book } from '../types';
 import { formatVND, getBookImageUrl } from '../utils/format';
@@ -18,54 +20,60 @@ type CartItem = {
 // Mock data - replace with real cart data later
 const mockCartItems: CartItem[] = [];
 
-const EmptyCart = ({ onContinueShopping, router, isLoggedIn }: { onContinueShopping: () => void; router: any; isLoggedIn: boolean }) => (
-  <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'bottom']}>
-    <View style={[styles.headerBar, { paddingTop: 24 }]}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
-        <Ionicons name="arrow-back" size={26} color="#222" />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>Giỏ hàng</Text>
-    </View>
-    <View style={styles.emptyContainer}>
-      <Image 
-        source={require('../assets/images/cart.png')}
-        style={styles.emptyCartImage}
-        contentFit="contain"
-      />
-      {isLoggedIn ? (
-        <>
-          <Text style={styles.emptyTitle}>Giỏ hàng của bạn còn trống</Text>
-          <Text style={styles.emptyText}>
-            Khám phá các danh mục của chúng tôi và tìm những ưu đãi tốt nhất!
-          </Text>
-          <TouchableOpacity 
-            style={styles.startShoppingButton}
-            onPress={onContinueShopping}
-          >
-            <Text style={styles.startShoppingText}>Bắt đầu mua sắm</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          <Text style={styles.emptyTitle}>Vui lòng đăng nhập</Text>
-          <Text style={styles.emptyText}>
-            Đăng nhập để xem giỏ hàng và mua sắm
-          </Text>
-          <TouchableOpacity 
-            style={styles.startShoppingButton}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            <Text style={styles.startShoppingText}>Đăng nhập</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
-  </SafeAreaView>
-);
+const EmptyCart = ({ onContinueShopping, router, isLoggedIn }: { onContinueShopping: () => void; router: any; isLoggedIn: boolean }) => {
+  const { t } = useTranslation();
+  
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'bottom']}>
+      <View style={[styles.headerBar, { paddingTop: 24 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+          <Ionicons name="arrow-back" size={26} color="#222" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
+      </View>
+      <View style={styles.emptyContainer}>
+        <Image 
+          source={require('../assets/images/cart.png')}
+          style={styles.emptyCartImage}
+          contentFit="contain"
+        />
+        {isLoggedIn ? (
+          <>
+            <Text style={styles.emptyTitle}>{t('yourCartIsEmpty')}</Text>
+            <Text style={styles.emptyText}>
+              {t('exploreOurCategories')}
+            </Text>
+            <TouchableOpacity 
+              style={styles.startShoppingButton}
+              onPress={onContinueShopping}
+            >
+              <Text style={styles.startShoppingText}>{t('startShopping')}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.emptyTitle}>{t('pleaseLogin')}</Text>
+            <Text style={styles.emptyText}>
+              {t('loginToViewCart')}
+            </Text>
+            <TouchableOpacity 
+              style={styles.startShoppingButton}
+              onPress={() => router.push('/(auth)/login')}
+            >
+              <Text style={styles.startShoppingText}>{t('login')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+};
 
 const CartScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const { token, isLoading } = useAuth();
+  const { showErrorToast } = useUnifiedModal();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -159,14 +167,14 @@ const CartScreen = () => {
   const updateQuantity = async (bookId: string, increment: boolean) => {
     if (!token) {
       console.error('No token available for updateQuantity');
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập lại.');
+      showErrorToast('Lỗi', 'Vui lòng đăng nhập lại.');
       return;
     }
     
     const item = cartItems.find(i => i.book._id === bookId);
     if (!item) {
       console.error('Item not found for updateQuantity:', bookId);
-      Alert.alert('Lỗi', 'Không tìm thấy sản phẩm trong giỏ hàng.');
+      showErrorToast('Lỗi', 'Không tìm thấy sản phẩm trong giỏ hàng.');
       return;
     }
     
@@ -191,7 +199,7 @@ const CartScreen = () => {
       
       // Show user-friendly error message
       const errorMessage = error.message || 'Không thể cập nhật số lượng. Vui lòng thử lại.';
-      Alert.alert('Lỗi', errorMessage);
+      showErrorToast('Lỗi', errorMessage);
     }
   };
 
@@ -215,7 +223,7 @@ const CartScreen = () => {
     } catch (error) {
       console.error('Error removing item from cart:', error);
       // Show user-friendly error message
-      Alert.alert('Lỗi', 'Không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại.');
+      showErrorToast('Lỗi', 'Không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại.');
     }
   };
 
@@ -304,10 +312,10 @@ const CartScreen = () => {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={26} color="#222" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+          <Text style={styles.headerTitle}>{t('cart')}</Text>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Đang tải...</Text>
+          <Text>{t('loadingCart')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -321,15 +329,15 @@ const CartScreen = () => {
           <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={26} color="#222" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Giỏ hàng</Text>
+          <Text style={styles.headerTitle}>{t('cart')}</Text>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Vui lòng đăng nhập để xem giỏ hàng</Text>
+          <Text>{t('pleaseLoginToViewCart')}</Text>
           <TouchableOpacity 
             style={{ marginTop: 20, padding: 15, backgroundColor: '#3255FB', borderRadius: 8 }}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Đăng nhập</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>{t('login')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -342,7 +350,7 @@ const CartScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={26} color="#222" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
       </View>
       <ScrollView
         style={styles.container}
@@ -365,10 +373,10 @@ const CartScreen = () => {
         {relatedBooks.length > 0 && (
           <View style={styles.similarBooksSectionWrap}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={styles.similarBooksTitle}>Sách liên quan</Text>
+              <Text style={styles.similarBooksTitle}>{t('relatedBooks')}</Text>
               {relatedCategory && (
                 <TouchableOpacity onPress={() => router.push({ pathname: '/category/[id]', params: { id: String(relatedCategory) } })}>
-                  <Text style={{ color: '#3255FB', fontWeight: 'bold' }}>Xem tất cả</Text>
+                  <Text style={{ color: '#3255FB', fontWeight: 'bold' }}>{t('viewAll')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -394,19 +402,19 @@ const CartScreen = () => {
           <View style={[styles.checkbox, selectAll && styles.checkboxChecked]}>
             {selectAll && <Ionicons name="checkmark" size={18} color="#fff" />}
           </View>
-          <Text style={styles.selectAllText}>Tất cả</Text>
+          <Text style={styles.selectAllText}>{t('selectAll')}</Text>
         </Pressable>
         <View style={{ flex: 1, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', marginRight: 10 }}>
           <TouchableOpacity style={styles.voucherBar} onPress={() => router.push('/allcategories')}>
             <Ionicons name="pricetag-outline" size={22} color="#3255FB" style={{ marginRight: 8 }} />
-            <Text style={styles.voucherText}>Chọn mã giảm giá</Text>
+            <Text style={styles.voucherText}>{t('selectPromoCode')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 4 }} />
           </TouchableOpacity>
-          <Text style={styles.totalLabelSmall}>Tổng cộng</Text>
+          <Text style={styles.totalLabelSmall}>{t('total')}</Text>
           <Text style={styles.totalAmountSmall}>{formatVND(calculateTotal())}</Text>
         </View>
         <TouchableOpacity style={[styles.checkoutButtonSmall, { opacity: selectedIds.length === 0 ? 0.5 : 1 }]} onPress={() => router.push({ pathname: '/order-review', params: { ids: selectedIds.join(',') } })} disabled={selectedIds.length === 0}>
-          <Text style={styles.checkoutButtonTextSmall}>Thanh toán ({selectedIds.length})</Text>
+          <Text style={styles.checkoutButtonTextSmall}>{t('checkout')}({selectedIds.length})</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -417,10 +425,10 @@ const CartScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
           <Ionicons name="arrow-back" size={26} color="#222" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Giỏ hàng</Text>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
       </View>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Đang tải giỏ hàng...</Text>
+        <Text>{t('loadingCart')}</Text>
       </View>
     </SafeAreaView>
   ) : (

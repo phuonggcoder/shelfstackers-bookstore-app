@@ -7,6 +7,7 @@ const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 export const configureGoogleSignIn = () => {
   GoogleSignin.configure({
     webClientId: "346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com",
+    // webClientId: "346115100070-5n3pabau28kbh2s5uq1fmvbvu48fkd4v.apps.googleusercontent.com",
     offlineAccess: true,
     forceCodeForRefreshToken: true,
     scopes: ['profile', 'email'],

@@ -1,57 +1,25 @@
 // Silence Firebase deprecation warnings
-(globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
-
 import { useFCMListener } from '@/hooks/useFCMListener';
-import { FontAwesome } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { RootSiblingParent } from 'react-native-root-siblings';
-// @ts-ignore
-import Toast from 'react-native-toast-message';
 import { Provider } from 'react-redux';
+import '../app/i18n';
 import TokenExpiredAlert from '../components/TokenExpiredAlert';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { AvatarProvider } from '../context/AvatarContext';
 import { CartProvider } from '../context/CartContext';
+import { LanguageProvider } from '../context/LanguageContext';
 import { NameProvider } from '../context/NameContext';
+import { UnifiedModalProvider } from '../context/UnifiedModalContext';
 import { usePushNotification } from '../hooks/usePushNotification';
 import SplashScreen from '../screens/SplashScreen';
 import { store } from '../store/store';
 
-const toastConfig = {
-  customSuccess: ({ text1 }: { text1?: string }) => (
-    <View style={{
-      backgroundColor: 'rgba(30,30,30,0.92)',
-      borderRadius: 14,
-      minWidth: 180,
-      alignSelf: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <FontAwesome name="check" size={22} color="#fff" style={{ marginBottom: 2 }} />
-      <Text style={{ color: '#e0e0e0', fontSize: 14, fontWeight: '400', textAlign: 'center', marginTop: 2 }}>{text1}</Text>
-    </View>
-  ),
-  customError: ({ text1 }: { text1?: string }) => (
-    <View style={{
-      backgroundColor: 'rgba(30,30,30,0.92)',
-      borderRadius: 14,
-      minWidth: 180,
-      alignSelf: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <FontAwesome name="close" size={22} color="#fff" style={{ marginBottom: 2 }} />
-      <Text style={{ color: '#e0e0e0', fontSize: 14, fontWeight: '400', textAlign: 'center', marginTop: 2 }}>{text1}</Text>
-    </View>
-  ),
-};
+(globalThis as any).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
+
 
 function RootLayoutNav() {
   console.log('🔧 RootLayoutNav: Initializing FCM and Notifee...');
@@ -108,6 +76,15 @@ function RootLayoutNav() {
             animation: 'fade',
           }} 
         />
+        {/* Thêm đường dẫn cho màn hình order-success */}
+        <Stack.Screen 
+          name="order-success" 
+          options={{ 
+            headerShown: true, 
+            title: 'Order Success', 
+            animation: 'slide_from_bottom', 
+          }} 
+        />
       </Stack>
       <TokenExpiredAlert 
         visible={tokenExpiredAlertVisible}
@@ -121,19 +98,22 @@ export default function RootLayout() {
   return (
     <RootSiblingParent>
       <Provider store={store}>
-        <CartProvider>
-          <AuthProvider>
-            <MenuProvider>
-              <AvatarProvider>
-                <NameProvider>
-                  <RootLayoutNav />
-                </NameProvider>
-              </AvatarProvider>
-            </MenuProvider>
-          </AuthProvider>
-        </CartProvider>
+        <LanguageProvider>
+          <CartProvider>
+            <UnifiedModalProvider>
+              <AuthProvider>
+                <MenuProvider>
+                  <AvatarProvider>
+                    <NameProvider>
+                      <RootLayoutNav />
+                    </NameProvider>
+                  </AvatarProvider>
+                </MenuProvider>
+              </AuthProvider>
+            </UnifiedModalProvider>
+          </CartProvider>
+        </LanguageProvider>
       </Provider>
-      <Toast config={toastConfig} />
     </RootSiblingParent>
   );
 }

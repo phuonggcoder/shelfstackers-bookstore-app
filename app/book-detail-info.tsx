@@ -1,61 +1,81 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBookById } from '../services/api';
+import { Book } from '../types';
 
 const FIELD_LABELS = [
-  { key: 'title', label: 'Tên sách' },
+  { key: 'title', label: 'Tiêu đề' },
   { key: 'author', label: 'Tác giả' },
-  { key: 'price', label: 'Giá bán' },
-  { key: 'description', label: 'Mô tả' },
-  { key: 'cover_image', label: 'Ảnh bìa' },
-  { key: 'stock', label: 'Tồn kho' },
-  { key: 'publication_date', label: 'Ngày xuất bản' },
   { key: 'publisher', label: 'Nhà xuất bản' },
-  { key: 'weight', label: 'Khối lượng' },
-  { key: 'dimensions', label: 'Kích thước' },
-  { key: 'page_count', label: 'Số trang' },
-  { key: 'supplier', label: 'Nhà cung cấp' },
+  { key: 'publication_date', label: 'Ngày xuất bản' },
+  { key: 'isbn', label: 'ISBN' },
+  { key: 'pages', label: 'Số trang' },
+  { key: 'format', label: 'Định dạng' },
   { key: 'language', label: 'Ngôn ngữ' },
-  { key: 'categories', label: 'Thể loại' },
+  { key: 'price', label: 'Giá' },
+  { key: 'description', label: 'Mô tả' },
+  { key: 'categories', label: 'Danh mục' },
+  { key: 'cover_image', label: 'Hình ảnh bìa' },
 ];
 
 const BookDetailInfoScreen = () => {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
-  const [book, setBook] = useState<any>(null);
+  const [book, setBook] = useState<Book | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-
-  const contentWidth = useMemo(() => width, [width]);
+  const { width } = useWindowDimensions();
+  const contentWidth = width - 32; // 16px padding on each side
 
   useEffect(() => {
     if (id) {
-      getBookById(id as string).then(setBook).catch(() => setBook(null));
+      loadBook();
     }
   }, [id]);
+
+  const loadBook = async () => {
+    try {
+      const data = await getBookById(id as string);
+      setBook(data);
+    } catch (error) {
+      console.error('Error loading book:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>{t('loading')}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Header với nút back */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="black" accessibilityLabel="Quay lại" />
+          <Ionicons name="arrow-back" size={24} color="black" accessibilityLabel={t('back')} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông tin chi tiết sách</Text>
+        <Text style={styles.headerTitle}>{t('bookDetails')}</Text>
       </View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 16 + (insets.bottom || 0) }]}>
         {FIELD_LABELS.map(field => (
           <View style={styles.row} key={field.key}>
-            <Text style={styles.label}>{field.label}:</Text>
+            <Text style={styles.label}>{t(field.key)}:</Text>
             <View style={styles.valueContainer}>
               {(() => {
-                if (!book) return <Text style={styles.value}>Không có</Text>;
+                if (!book) return <Text style={styles.value}>{t('noData')}</Text>;
                 const value = book[field.key];
-                if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return <Text style={styles.value}>Không có</Text>;
+                if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return <Text style={styles.value}>{t('noData')}</Text>;
                 if (field.key === 'price') return <Text style={styles.value}>{value.toLocaleString('vi-VN')}₫</Text>;
                 if (field.key === 'publication_date') return <Text style={styles.value}>{new Date(value).toLocaleDateString('vi-VN')}</Text>;
                 if (field.key === 'cover_image') return <Text style={styles.value}>{Array.isArray(value) ? value.join(', ') : value}</Text>;

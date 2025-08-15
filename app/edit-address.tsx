@@ -1,129 +1,162 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BottomAlert from '../components/BottomAlert';
+import AddressAutocomplete from '../components/AddressAutocomplete.new';
+
 import { useAuth } from '../context/AuthContext';
-import AddressService from '../services/addressService';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
+import AddressService, { UserAddress } from '../services/addressService';
 
 const EditAddressScreen = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  
+  const { showErrorToast } = useUnifiedModal();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showAlert, setShowAlert] = useState(false);
-  
-  // Form data
-  const [formData, setFormData] = useState({
-    receiver_name: '',
-    phone_number: '',
-    email: '',
-    province: '',
-    district: '',
-    ward: '',
+
+  const [selectedProvince, setSelectedProvince] = useState({ code: '', name: '' });
+  const [selectedDistrict, setSelectedDistrict] = useState({ code: '', name: '' });
+  const [selectedWard, setSelectedWard] = useState({ code: '', name: '' });
+
+  const [formData, setFormData] = useState<Partial<UserAddress>>({
+    fullName: '',
+    phone: '',
     street: '',
-    address_detail: '',
     note: '',
-    is_default: false,
-    type: 'office' as 'office' | 'home', // Thêm type
+    isDefault: false,
+    type: 'office',
   });
 
-  useEffect(() => {
-    if (id && token) {
-      fetchAddress();
-    }
-  }, [id, token]);
-
-  const fetchAddress = async () => {
+  const fetchAddress = useCallback(async () => {
     if (!id || !token) return;
     try {
       setLoading(true);
-      console.log('Fetching address with id:', id, 'token:', token);
-      
-      // Lấy danh sách địa chỉ và tìm địa chỉ cần edit
       const addresses = await AddressService.getAddresses(token);
-      const address = addresses.find((addr: any) => addr._id === id);
-      
-      if (!address) {
-        Alert.alert('Lỗi', 'Địa chỉ không tồn tại hoặc đã bị xóa');
+      const addressToEdit = addresses.find(addr => addr._id === id);
+      if (addressToEdit) {
+        setFormData({
+          fullName: addressToEdit.fullName || '',
+          phone: addressToEdit.phone || '',
+          street: addressToEdit.street || '',
+          note: addressToEdit.note || '',
+          isDefault: addressToEdit.isDefault ?? false,
+          type: addressToEdit.type || 'office',
+        });
+        // Resolve province/district/ward as object
+        await resolveAddressNames(addressToEdit);
+      } else {
+        showErrorToast(t('error'), t('addressNotFound'));
         router.back();
-        return;
       }
-      
-      console.log('Found address:', address);
-      
-      setFormData({
-        receiver_name: address.receiver_name || '',
-        phone_number: address.phone_number || '',
-        email: address.email || '',
-        province: address.province || '',
-        district: address.district || '',
-        ward: address.ward || '',
-        street: address.street || '',
-        address_detail: address.address_detail || '',
-        note: address.note || '',
-        is_default: address.is_default || false,
-        type: (address.type as 'home' | 'office') || 'office', // Thêm type
-      });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching address:', error);
-      Alert.alert('Lỗi', 'Không thể tải thông tin địa chỉ');
-      router.back();
+      showErrorToast(t('error'), t('cannotLoadAddressInfo'));
     } finally {
       setLoading(false);
+    }
+  }, [id, token, t, router, showErrorToast]);
+
+  useEffect(() => {
+    fetchAddress();
+  }, [fetchAddress]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const getSelectedAddress = async () => {
+        try {
+            const provinceData = await AsyncStorage.getItem('selected_province');
+            const districtData = await AsyncStorage.getItem('selected_district');
+            const wardData = await AsyncStorage.getItem('selected_ward');
+
+            if (provinceData && districtData && wardData) {
+              const province = JSON.parse(provinceData);
+              const district = JSON.parse(districtData);
+              const ward = JSON.parse(wardData);
+
+              setSelectedProvince(province);
+              setSelectedDistrict(district);
+              setSelectedWard(ward);
+
+              setFormData(prev => ({
+                ...prev,
+                province: province.code,
+                district: district.code,
+                ward: ward.code,
+              }));
+
+              await AsyncStorage.multiRemove(['selected_province', 'selected_district', 'selected_ward']);
+            }
+        } catch (error) {
+          console.error('Error processing selected address:', error);
+        }
+      };
+
+      getSelectedAddress();
+    }, [])
+  );
+
+  const resolveAddressNames = async (address: Partial<UserAddress>) => {
+    // Accepts both code or name for province/district/ward
+    try {
+      const provinces = await AddressService.getProvinces();
+      let province = provinces.find(p => p.code === address.province || p.name === address.province);
+      if (province) setSelectedProvince(province);
+
+      const districts = province ? await AddressService.getDistricts(province.code) : [];
+      let district = districts.find(d => d.code === address.district || d.name === address.district);
+      if (district) setSelectedDistrict(district);
+
+      const wards = district ? await AddressService.getWards(district.code) : [];
+      let ward = wards.find(w => w.code === address.ward || w.name === address.ward);
+      if (ward) setSelectedWard(ward);
+    } catch (error) {
+      console.error('Error resolving address names:', error);
     }
   };
 
   const handleSubmit = async () => {
     if (!token || !id) return;
 
-    // Validation
-    if (!formData.receiver_name.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tên người nhận');
+    // Validate required fields
+    if (!formData.fullName || !formData.phone || !selectedProvince.code || !selectedDistrict.code || !selectedWard.code || !formData.street) {
+      showErrorToast(t('error'), t('pleaseFillAllRequiredFields'));
       return;
     }
-    if (!formData.phone_number.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
-      return;
-    }
-    if (!formData.province) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tỉnh/thành phố');
-      return;
-    }
-    if (!formData.district) {
-      Alert.alert('Lỗi', 'Vui lòng nhập quận/huyện');
-      return;
-    }
-    if (!formData.ward) {
-      Alert.alert('Lỗi', 'Vui lòng nhập phường/xã');
-      return;
-    }
-    if (!formData.address_detail.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
-      return;
-    }
-
+    setSaving(true);
     try {
-      setSaving(true);
-              await AddressService.updateAddress(token, id as string, formData);
-      
-      // Show success alert
-      setShowAlert(true);
-      
-      // Set flag to show alert in address list
-      await AsyncStorage.setItem('address_added', 'true');
-      
-      // Go back to address list
-      setTimeout(() => {
-        router.back();
-      }, 1500);
+      // Build payload with full objects for province/district/ward (đủ các field cần thiết)
+      const updatePayload = {
+        fullName: formData.fullName?.trim() || '',
+        phone: formData.phone?.trim() || '',
+        street: formData.street?.trim() || '',
+        province: selectedProvince,
+        district: { ...selectedDistrict, provinceId: selectedProvince.code },
+        ward: { ...selectedWard, districtId: selectedDistrict.code },
+        isDefault: formData.isDefault,
+        note: formData.note,
+        type: formData.type,
+      };
+      await AddressService.updateAddress(token, id.toString(), updatePayload);
+      Alert.alert(t('success'), t('addressUpdatedSuccessfully'), [
+        {
+          text: t('ok'),
+          onPress: async () => {
+            await AsyncStorage.setItem('address_updated', 'true');
+            router.push('/address-list');
+          },
+        },
+      ]);
     } catch (error) {
       console.error('Error updating address:', error);
-      Alert.alert('Lỗi', 'Không thể cập nhật địa chỉ');
+      showErrorToast(t('error'), t('cannotUpdateAddressPleaseTryAgain'));
     } finally {
       setSaving(false);
     }
@@ -131,12 +164,10 @@ const EditAddressScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>Đang tải thông tin địa chỉ...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3255FB" />
+        <Text style={styles.loadingText}>{t('loadingAddress')}</Text>
+      </View>
     );
   }
 
@@ -146,145 +177,117 @@ const EditAddressScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chỉnh sửa địa chỉ</Text>
+        <Text style={styles.headerTitle}>{t('editAddress')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <BottomAlert
-        title="Cập nhật địa chỉ thành công!"
-        visible={showAlert}
-        onHide={() => setShowAlert(false)}
-      />
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
-          
+          <Text style={styles.sectionTitle}>{t('contactInformation')}</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tên người nhận *</Text>
+            <Text style={styles.label}>{t('fullName')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.receiver_name}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, receiver_name: text }))}
-              placeholder="Nhập tên người nhận"
+              value={formData.fullName}
+              onChangeText={text => setFormData(prev => ({ ...prev, fullName: text }))}
+              placeholder={t('enterFullName')}
             />
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Số điện thoại *</Text>
+            <Text style={styles.label}>{t('phoneNumber')} *</Text>
             <TextInput
               style={styles.input}
-              value={formData.phone_number}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, phone_number: text }))}
-              placeholder="Nhập số điện thoại"
+              value={formData.phone}
+              onChangeText={text => setFormData(prev => ({ ...prev, phone: text }))}
+              placeholder={t('enterPhoneNumber')}
               keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.email}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
-              placeholder="Nhập email (không bắt buộc)"
-              keyboardType="email-address"
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
-          
+          <Text style={styles.sectionTitle}>{t('shippingAddress')}</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tỉnh/Thành phố *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.province}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, province: text }))}
-              placeholder="Nhập tỉnh/thành phố"
+            <Text style={styles.label}>{t('address')} *</Text>
+            <AddressAutocomplete
+              onAddressSelect={(address) => {
+                setSelectedProvince(address.province || { code: '', name: '' });
+                setSelectedWard(address.ward || { code: '', name: '' });
+                setFormData(prev => ({
+                  ...prev,
+                  province: address.province?.code || '',
+                  ward: address.ward?.code || '',
+                }));
+              }}
             />
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Quận/Huyện *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.district}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, district: text }))}
-              placeholder="Nhập quận/huyện"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phường/Xã *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.ward}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, ward: text }))}
-              placeholder="Nhập phường/xã"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Đường</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.street}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, street: text }))}
-              placeholder="Nhập đường (không bắt buộc)"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Địa chỉ chi tiết *</Text>
+            <Text style={styles.label}>{t('street')} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              value={formData.address_detail}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, address_detail: text }))}
-              placeholder="Số nhà, tên tòa nhà, v.v."
+              value={formData.street}
+              onChangeText={text => setFormData(prev => ({ ...prev, street: text }))}
+              placeholder={t('enterStreet')}
               multiline
-              numberOfLines={3}
             />
           </View>
+        </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings')}</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ghi chú</Text>
+            <Text style={styles.label}>{t('note')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={formData.note}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, note: text }))}
-              placeholder="Ghi chú giao hàng (không bắt buộc)"
+              onChangeText={text => setFormData(prev => ({ ...prev, note: text }))}
+              placeholder={t('noteForShipper')}
               multiline
-              numberOfLines={2}
             />
           </View>
-
-          {/* Thêm phần chọn loại địa chỉ */}
+          <TouchableOpacity
+            style={styles.defaultToggle}
+            onPress={() => setFormData(prev => ({ ...prev, isDefault: !prev.isDefault }))}
+          >
+            <Ionicons
+              name={formData.isDefault ? 'checkbox' : 'square-outline'}
+              size={24}
+              color={formData.isDefault ? '#3255FB' : '#666'}
+            />
+            <Text style={styles.defaultText}>{t('setAsDefaultAddress')}</Text>
+          </TouchableOpacity>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Loại địa chỉ</Text>
+            <Text style={styles.label}>{t('addressType')}</Text>
             <View style={styles.typeButtons}>
-              <TouchableOpacity
-                style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
-              >
-                <Text style={[styles.typeText, formData.type === 'office' && styles.typeTextActive]}>
-                  🏢 Văn phòng
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeButton, formData.type === 'home' && styles.typeButtonActive]}
                 onPress={() => setFormData(prev => ({ ...prev, type: 'home' }))}
               >
-                <Text style={[styles.typeText, formData.type === 'home' && styles.typeTextActive]}>
-                  🏠 Nhà riêng
+                <Text
+                  style={[
+                    styles.typeText,
+                    formData.type === 'home' && styles.typeTextActive,
+                  ]}
+                >
+                  Nhà
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, formData.type === 'office' && styles.typeButtonActive]}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'office' }))}
+              >
+                <Text
+                  style={[
+                    styles.typeText,
+                    formData.type === 'office' && styles.typeTextActive,
+                  ]}
+                >
+                  Văn phòng
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-
-        {/* Xóa phần toggle star (mặc định) khỏi UI */}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -296,7 +299,7 @@ const EditAddressScreen = () => {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Cập nhật địa chỉ</Text>
+            <Text style={styles.saveButtonText}>{t('updateAddress')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -372,6 +375,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  addressSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+  },
+  addressText: {
+    fontSize: 16,
+    color: '#333',
+    flexShrink: 1,
   },
   textArea: {
     minHeight: 80,

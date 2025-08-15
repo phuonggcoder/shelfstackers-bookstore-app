@@ -1,25 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ReviewCard from '../components/ReviewCard';
 import { useAuth } from '../context/AuthContext';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
 import ReviewService, { Review } from '../services/reviewService';
 import { getProductId } from '../utils/reviewUtils';
 
 const MyReviewsScreen = () => {
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const router = useRouter();
+  const { showErrorToast, showSuccessToast, showDeleteDialog } = useUnifiedModal();
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +67,7 @@ const MyReviewsScreen = () => {
       setPage(pageNum);
     } catch (error) {
       console.error('Error loading reviews:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đánh giá');
+      showErrorToast(t('error'), t('myReviews.cannotLoadReviews'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,26 +115,17 @@ const MyReviewsScreen = () => {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa đánh giá này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await ReviewService.deleteReview(reviewId, token || undefined);
-              Alert.alert('Thành công', 'Đánh giá đã được xóa');
-              handleRefresh();
-            } catch (error) {
-              console.error('Error deleting review:', error);
-              Alert.alert('Lỗi', 'Không thể xóa đánh giá');
-            }
-          },
-        },
-      ]
+    showDeleteDialog(
+      async () => {
+        try {
+          await ReviewService.deleteReview(reviewId, token || undefined);
+          showSuccessToast(t('success'), t('myReviews.reviewDeleted'), 2000);
+          handleRefresh();
+        } catch (error) {
+          console.error('Error deleting review:', error);
+          showErrorToast(t('error'), t('myReviews.cannotDeleteReview'));
+        }
+      }
     );
   };
 
@@ -150,7 +144,7 @@ const MyReviewsScreen = () => {
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Đánh giá của tôi</Text>
+      <Text style={styles.headerTitle}>{t('myReviews.myReviews')}</Text>
       <View style={styles.headerRight} />
     </View>
   );
@@ -158,9 +152,9 @@ const MyReviewsScreen = () => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
-      <Text style={styles.emptyStateText}>Bạn chưa có đánh giá nào</Text>
+      <Text style={styles.emptyStateText}>{t('myReviews.noReviewsYet')}</Text>
       <Text style={styles.emptyStateSubtext}>
-        Hãy mua sản phẩm và đánh giá để chia sẻ trải nghiệm
+        {t('myReviews.noReviewsMessage')}
       </Text>
     </View>
   );
@@ -170,7 +164,7 @@ const MyReviewsScreen = () => {
     return (
       <View style={styles.loadingFooter}>
         <ActivityIndicator size="small" color="#3255FB" />
-        <Text style={styles.loadingText}>Đang tải thêm...</Text>
+        <Text style={styles.loadingText}>{t('myReviews.loadingMore')}</Text>
       </View>
     );
   };
@@ -181,7 +175,7 @@ const MyReviewsScreen = () => {
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3255FB" />
-          <Text style={styles.loadingText}>Đang tải đánh giá...</Text>
+          <Text style={styles.loadingText}>{t('myReviews.loadingReviews')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -208,7 +202,7 @@ const MyReviewsScreen = () => {
         onEndReachedThreshold={0.1}
         ListHeaderComponent={
           <Text style={styles.reviewsTitle}>
-            Đánh giá của tôi ({reviews.length})
+            {t('myReviews.myReviewsWithCount', { count: reviews.length })}
           </Text>
         }
         ListEmptyComponent={renderEmptyState()}

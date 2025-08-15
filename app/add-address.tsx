@@ -1,124 +1,149 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import AutocompleteInput from '../components/AutocompleteInput';
+import AddressSelector from '../components/AddressSelector';
 import { useAuth } from '../context/AuthContext';
-import AddressService, { LocationItem } from '../services/addressService';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
+import AddressService, { AddressData } from '../services/addressService';
 
 const AddAddress = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { token } = useAuth();
-  const [isDefault, setIsDefault] = useState(false); // luôn là false
+  const { showErrorToast } = useUnifiedModal();
+  const [loading, setLoading] = useState(false);
   const [addressType, setAddressType] = useState<'office' | 'home'>('office');
   const [receiverName, setReceiverName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [province, setProvince] = useState<LocationItem | null>(null);
-  const [district, setDistrict] = useState<LocationItem | null>(null);
-  const [ward, setWard] = useState<LocationItem | null>(null);
   const [addressDetail, setAddressDetail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      const getLocationFromStorage = async () => {
-        try {
-          const p = await AsyncStorage.getItem('selected_province');
-          const d = await AsyncStorage.getItem('selected_district');
-          const w = await AsyncStorage.getItem('selected_ward');
-          if (p) setProvince(JSON.parse(p));
-          if (d) setDistrict(JSON.parse(d));
-          if (w) setWard(JSON.parse(w));
-        } catch (error) {
-          console.error('Error loading location from storage:', error);
-        }
-      };
-      getLocationFromStorage();
-    }, [])
-  );
+  const handleAddressChange = (address: any) => {
+    setSelectedAddress(address);
+  };
 
   const handleSubmit = async () => {
     if (!token) {
-      Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm địa chỉ');
+      showErrorToast(t('error'), t('pleaseLoginToAddAddress'));
       return;
     }
 
+    // Validate fields strictly as backend expects
     if (!receiverName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập họ và tên');
+      Alert.alert(t('error'), t('pleaseEnterFullName'));
       return;
     }
-
     if (!phoneNumber.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      Alert.alert(t('error'), t('pleaseEnterPhoneNumber'));
       return;
     }
-
-    if (!province || !district || !ward) {
-      Alert.alert('Lỗi', 'Vui lòng chọn đầy đủ địa chỉ');
+    // Vietnamese phone validation (10 digits, valid prefix)
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const validPrefixes = [
+      '086','096','097','098','032','033','034','035','036','037','038','039',
+      '088','091','094','083','084','085','081','082',
+      '089','090','093','070','079','077','076','078',
+      '092','056','058','099','059',
+    ];
+    if (cleanPhone.length !== 10 || !validPrefixes.some(prefix => cleanPhone.startsWith(prefix))) {
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
-
+    if (!selectedAddress || !selectedAddress.province || !selectedAddress.district || !selectedAddress.ward) {
+      showErrorToast(t('error'), t('pleaseSelectCompleteAddress'));
+      return;
+    }
     if (!addressDetail.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      Alert.alert(t('error'), t('pleaseEnterDetailedAddress'));
+      return;
+    }
+    // Validate province/district/ward are objects with code+name
+    const { province, district, ward } = selectedAddress;
+    if (!province.code || !province.name) {
+      Alert.alert(t('error'), t('pleaseSelectProvince'));
+      return;
+    }
+    if (!district.code || !district.name) {
+      Alert.alert(t('error'), t('pleaseSelectDistrict'));
+      return;
+    }
+    if (!ward.code || !ward.name) {
+      Alert.alert(t('error'), t('pleaseSelectWard'));
       return;
     }
 
     setLoading(true);
     try {
-      await AddressService.createAddress(token, {
-        receiver_name: receiverName.trim(),
-        phone_number: phoneNumber.trim(),
-        province: province.name,
-        district: district.name,
-        ward: ward.name,
-        address_detail: addressDetail.trim(),
-        is_default: false, // luôn là false khi thêm mới
+      // FE sends province/district/ward as objects, BE will format fullAddress
+      const addressPayload = {
+        fullName: receiverName.trim(),
+        phone: cleanPhone,
+        street: addressDetail.trim(),
+        province: {
+          code: province.code,
+          name: province.name,
+          type: province.type,
+          typeText: province.typeText,
+          slug: province.slug,
+          autocompleteType: province.autocompleteType
+        },
+        district: {
+          code: district.code,
+          name: district.name,
+          provinceId: province.code,
+          type: district.type,
+          typeText: district.typeText,
+          autocompleteType: district.autocompleteType
+        },
+        ward: {
+          code: ward.code,
+          name: ward.name,
+          districtId: district.code,
+          type: ward.type,
+          typeText: ward.typeText,
+          autocompleteType: ward.autocompleteType,
+          fullName: ward.fullName,
+          path: ward.path
+        },
+        isDefault: false,
         type: addressType,
-      });
-
-      // Clear stored location data
-      await AsyncStorage.multiRemove([
-        'selected_province',
-        'selected_district',
-        'selected_ward',
-      ]);
-
-      // Set flag to show success alert in address list
-      await AsyncStorage.setItem('address_added', 'true');
-      
-      Alert.alert('Thành công', 'Địa chỉ đã được thêm thành công', [
+        note: ''
+      };
+      await AddressService.addAddress(token, addressPayload);
+      Alert.alert(t('success'), t('addressAddedSuccessfully'), [
         {
-          text: 'OK',
-          onPress: () => {
-            // Go back to address list instead of order review
-            router.back();
-          },
+          text: t('ok'),
+          onPress: () => router.back(),
         },
       ]);
     } catch (error) {
       console.error('Create address failed:', error);
-      Alert.alert('Lỗi', 'Không thể thêm địa chỉ. Vui lòng thử lại.');
+      showErrorToast(t('error'), t('cannotAddAddressPleaseTryAgain'));
     } finally {
       setLoading(false);
     }
   };
 
+  // No need to format fullAddress on FE, BE will handle it
   const formatAddress = () => {
-    const parts = [];
-    if (addressDetail) parts.push(addressDetail);
-    if (ward) parts.push(ward.name);
-    if (district) parts.push(district.name);
-    if (province) parts.push(province.name);
+    if (!selectedAddress) return '';
+    const parts = [
+      addressDetail,
+      selectedAddress.ward?.name,
+      selectedAddress.district?.name,
+      selectedAddress.province?.name
+    ].filter(Boolean);
     return parts.join(', ');
   };
 
@@ -127,30 +152,30 @@ const AddAddress = () => {
       style={styles.container}
               behavior={undefined}
     >
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { marginTop: 24 }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Quay lại</Text>
+          <Text style={styles.backText}>← {t('goBack')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Địa chỉ mới</Text>
+        <Text style={styles.headerTitle}>{t('newAddress')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView
         style={styles.body}
-        contentContainerStyle={styles.formContainer}
+        contentContainerStyle={[styles.formContainer, { paddingBottom: 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
+        <Text style={styles.sectionTitle}>{t('recipientInformation')}</Text>
 
         <View style={styles.inputGroup}>
           <TextInput
-            placeholder="Họ và tên"
+            placeholder={t('fullName')}
             style={styles.input}
             value={receiverName}
             onChangeText={setReceiverName}
           />
           <TextInput
-            placeholder="Số điện thoại"
+            placeholder={t('phoneNumber')}
             keyboardType="phone-pad"
             style={styles.input}
             value={phoneNumber}
@@ -158,39 +183,17 @@ const AddAddress = () => {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Địa chỉ</Text>
+        <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
 
-        <View style={styles.inputGroup}>
-          <AutocompleteInput
-            label="Tỉnh/Thành phố"
-            placeholder="Chọn Tỉnh/Thành phố"
-            value={province}
-            onSelect={setProvince}
-            level="province"
-          />
-          
-          <AutocompleteInput
-            label="Quận/Huyện"
-            placeholder="Chọn Quận/Huyện"
-            value={district}
-            onSelect={setDistrict}
-            level="district"
-            provinceId={province?.id}
-            disabled={!province}
-          />
-          
-          <AutocompleteInput
-            label="Phường/Xã"
-            placeholder="Chọn Phường/Xã"
-            value={ward}
-            onSelect={setWard}
-            level="ward"
-            districtId={district?.id}
-            disabled={!district}
-          />
-          
+
+
+        <View style={styles.section}>
+          <AddressSelector onChange={handleAddressChange} />
+        </View>
+
+        <View style={styles.section}>
           <TextInput
-            placeholder="Tên đường, Tòa nhà, Số nhà..."
+            placeholder={t('streetBuildingHouseNumber')}
             style={styles.input}
             value={addressDetail}
             onChangeText={setAddressDetail}
@@ -200,14 +203,22 @@ const AddAddress = () => {
 
         {formatAddress() && (
           <View style={styles.addressPreview}>
-            <Text style={styles.previewTitle}>Địa chỉ đã chọn:</Text>
+            <Text style={styles.previewTitle}>{t('selectedAddress')}:</Text>
             <Text style={styles.previewText}>{formatAddress()}</Text>
           </View>
         )}
 
         <View style={styles.typeContainer}>
-          <Text style={styles.switchLabel}>Loại địa chỉ</Text>
+          <Text style={styles.switchLabel}>{t('addressType')}</Text>
           <View style={styles.typeButtons}>
+            <TouchableOpacity
+              style={[styles.typeButton, addressType === 'home' && styles.typeButtonActive]}
+              onPress={() => setAddressType('home')}
+            >
+              <Text style={[styles.typeText, addressType === 'home' && styles.typeTextActive]}>
+                Nhà
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeButton, addressType === 'office' && styles.typeButtonActive]}
               onPress={() => setAddressType('office')}
@@ -216,29 +227,27 @@ const AddAddress = () => {
                 Văn phòng
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, addressType === 'home' && styles.typeButtonActive]}
-              onPress={() => setAddressType('home')}
-            >
-              <Text style={[styles.typeText, addressType === 'home' && styles.typeTextActive]}>
-                Nhà riêng
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          <Text style={styles.submitText}>
-            {loading ? 'Đang thêm...' : 'Hoàn thành'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3255FB" />
+        </View>
+      ) : (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.submitText}>
+              {t('complete')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -273,6 +282,19 @@ const styles = StyleSheet.create({
   },
   formContainer: { 
     padding: 16 
+  },
+  section: {
+    marginBottom: 24,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   sectionTitle: { 
     fontSize: 16, 
@@ -313,6 +335,7 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
+
   switchContainer: {
     backgroundColor: '#f9f9f9',
     borderRadius: 12,
@@ -365,7 +388,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: '#3255FB',
     borderRadius: 24,
-    paddingVertical: 16,
+    paddingVertical: 24, // tăng chiều cao nút
     alignItems: 'center',
   },
   submitButtonDisabled: {
@@ -375,6 +398,38 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: 'bold', 
     fontSize: 16 
+  },
+  addressSelector: {
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  addressSelectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+  },
+  addressSelectorContent: {
+    flex: 1,
+  },
+  addressSelectorLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  addressSelectorValue: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+  },
+  addressSelectorPlaceholder: {
+    fontSize: 16,
+    color: '#999',
   },
 });
 

@@ -19,32 +19,29 @@ function getDiscountPercent(id: string) {
 }
 
 const BookGrid2Col: React.FC<Props> = ({ book, onPress }) => {
-  const percent = getDiscountPercent(book._id || '');
+  const discount = getDiscountPercent(book._id || '');
+  const fakeOriginalPrice = Math.round(book.price / (1 - discount / 100));
+  
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress && onPress(book)} activeOpacity={0.85}>
-      {/* Badge giảm giá + hash id */}
-      {book._id && (
-        <View style={styles.badgeDiscount}>
-          <Text style={styles.badgeDiscountText}>-{percent}%</Text>
-        </View>
-      )}
-      <Image source={{ uri: book.thumbnail || (book.cover_image && book.cover_image[0]) || 'https://i.imgur.com/gTzT0hA.jpeg' }} style={styles.image} resizeMode="cover" />
-      <View style={styles.info}>
+      {/* Badge giảm giá ở góc trên bên phải */}
+      <View style={styles.badgeTopRight}>
+        <Text style={styles.badgeText}>-{discount}%</Text>
+      </View>
+      <View style={styles.imagesRow}>
+        <Image
+          source={{ uri: book.thumbnail || (book.cover_image && book.cover_image[0]) || '' }}
+          style={styles.mainImage}
+          resizeMode="cover"
+        />
+      </View>
+      <View style={styles.infoSection}>
         <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
         {book.author && <Text style={styles.author} numberOfLines={1}>{book.author}</Text>}
         <View style={styles.priceRow}>
-          <Text style={styles.price}>{book.price.toLocaleString()} đ</Text>
-          {book.price && <Text style={styles.oldPrice}>{(book.price * 1.2).toLocaleString()} đ</Text>}
+          <Text style={styles.price}>{book.price?.toLocaleString()} đ</Text>
+          <Text style={styles.oldPrice}>{fakeOriginalPrice.toLocaleString()} đ</Text>
         </View>
-        {book.categories && book.categories.length > 0 && (
-          <Text style={styles.category} numberOfLines={1}>
-            {Array.isArray(book.categories)
-              ? (typeof book.categories[0] === 'object' && book.categories[0] && 'name' in book.categories[0]
-                  ? book.categories[0].name
-                  : String(book.categories[0]))
-              : ''}
-          </Text>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -52,79 +49,80 @@ const BookGrid2Col: React.FC<Props> = ({ book, onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
+    width: 150,
+    height: 270,
     backgroundColor: '#fff',
+    borderRadius: 14,
+    margin: 8,
+    padding: 8,
+    elevation: 3,
+  },
+  imagesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 170,
+    backgroundColor: '#fff',
+    position: 'relative',
+  },
+  mainImage: {
+    width: 120,
+    height: 165,
     borderRadius: 12,
-    overflow: 'hidden',
-    margin: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    height: 300,
-  },
-  image: {
     alignSelf: 'center',
-    width: '100%',
-    aspectRatio: 0.7,
-    maxHeight: 180,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
   },
-  info: {
-    padding: 10,
-    minHeight: 90,
-    justifyContent: 'flex-start',
+  infoSection: {
+    flex: 1,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    justifyContent: 'space-between',
+    height: 80,
   },
   title: {
+    fontSize: 14,
     fontWeight: 'bold',
-    fontSize: 15,
     color: '#222',
     marginBottom: 2,
-    minHeight: 44, // Đảm bảo luôn chiếm 2 dòng
-    lineHeight: 22,
+    minHeight: 34,
   },
   author: {
-    fontSize: 13,
-    color: '#8D6E63', // nâu nhạt
+    fontSize: 12,
+    color: '#888',
     marginBottom: 2,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginTop: 2,
   },
   price: {
-    color: '#FF5252', // màu đỏ
+    color: '#E53935',
     fontWeight: 'bold',
     fontSize: 15,
     marginRight: 6,
   },
   oldPrice: {
     color: '#aaa',
-    fontSize: 13,
+    fontSize: 11,
     textDecorationLine: 'line-through',
+    marginRight: 4,
+    marginLeft: 0,
   },
-  category: {
-    color: '#888',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  badgeDiscount: {
+  badgeTopRight: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#FF5252',
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    backgroundColor: '#E53935',
+    borderRadius: 4,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    zIndex: 2,
+    zIndex: 10,
   },
-  badgeDiscountText: {
+  badgeText: {
     color: '#fff',
-    fontSize: 12,
     fontWeight: 'bold',
-    letterSpacing: 1,
+    fontSize: 11,
   },
 });
 
