@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import RenderHTML from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
 import Header from '../../components/Header';
@@ -115,7 +114,7 @@ const CampaignDetailScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={name as string} showBackButton />
+      <Header title={campaign?.name || 'Chiến dịch'} showBackButton />
       <ScrollView>
         {/* Ảnh campaign */}
         {images.length > 0 && (
@@ -130,68 +129,10 @@ const CampaignDetailScreen = () => {
             ))}
           </ScrollView>
         )}
-        {/* Mô tả campaign */}
-        {campaign?.description && (
-          <View style={styles.descriptionContainer}>
-            <Text style={styles.descriptionTitle}>Mô tả chiến dịch</Text>
-            <RenderHTML
-              contentWidth={width - 32}
-              source={{ html: campaign.description }}
-              tagsStyles={tagsStyles}
-            />
-          </View>
-        )}
-        {/* Thông tin campaign */}
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Thông tin chiến dịch</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Loại:</Text>
-            <Text style={styles.infoValue}>{campaign?.type}</Text>
-          </View>
-          {campaign?.startDate && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Ngày bắt đầu:</Text>
-              <Text style={styles.infoValue}>
-                {new Date(campaign.startDate).toLocaleDateString('vi-VN')}
-              </Text>
-            </View>
-          )}
-          {campaign?.endDate && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Ngày kết thúc:</Text>
-              <Text style={styles.infoValue}>
-                {new Date(campaign.endDate).toLocaleDateString('vi-VN')}
-              </Text>
-            </View>
-          )}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Số lượng sách:</Text>
-            <Text style={styles.infoValue}>{books.length}</Text>
-          </View>
-        </View>
-        {/* Danh sách voucher */}
-        <View style={{ marginVertical: 10, paddingHorizontal: 16 }}>
-          <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>Voucher cho chiến dịch</Text>
-          {vouchers.length === 0 ? (
-            <Text>Không có voucher nào</Text>
-          ) : (
-            vouchers.map((v, idx) => (
-              <View key={v._id || idx} style={{ backgroundColor: '#fffbe6', padding: 10, borderRadius: 8, marginTop: 5, marginBottom: 8 }}>
-                <Text style={{ fontWeight: 'bold' }}>{v.title || v.voucher_id}</Text>
-                <Text>{v.description}</Text>
-                <Text>Giảm: {v.voucher_type === 'percentage' ? `${v.discount_value}%` : `${v.discount_value?.toLocaleString()}đ`}</Text>
-                <Text>Đơn tối thiểu: {v.min_order_value?.toLocaleString()}đ</Text>
-                <Text>HSD: {v.end_date ? new Date(v.end_date).toLocaleDateString('vi-VN') : ''}</Text>
-                <TouchableOpacity onPress={() => handleUseVoucher(v)} style={{ marginTop: 8, backgroundColor: '#5E5CE6', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start' }}>
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Dùng voucher</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
-        </View>
+ 
         {/* Danh sách sách theo campaign */}
         <View style={styles.booksContainer}>
-          <Text style={styles.booksTitle}>Sách trong chiến dịch</Text>
+            <Text style={styles.booksTitle}>Sách trong chiến dịch</Text>
           {books.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Không có sách nào trong chiến dịch này</Text>
@@ -329,4 +270,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CampaignDetailScreen; 
+export default CampaignDetailScreen;

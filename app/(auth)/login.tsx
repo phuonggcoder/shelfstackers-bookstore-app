@@ -5,7 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -229,9 +228,9 @@ export default function Login() {
               </View>
               <Text style={styles.rememberText}>{t("rememberLogin")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity>
+            {/* <TouchableOpacity>
               <Text style={styles.forgotText}>{t("forgotPassword")}</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           <TouchableOpacity

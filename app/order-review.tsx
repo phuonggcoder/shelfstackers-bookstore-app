@@ -1036,22 +1036,6 @@ export default function OrderReviewScreen() {
                   <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.bottomSheetItem,
-                  selectedPaymentMethod === PAYMENT_METHODS.PAYOS && styles.bottomSheetItemSelected
-                ]}
-                onPress={() => setSelectedPaymentMethod(PAYMENT_METHODS.PAYOS)}
-              >
-                <Ionicons name="globe-outline" size={24} color="#3255FB" style={{ marginRight: 12 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.paymentText}>PayOS</Text>
-                  <Text style={styles.paymentDescription}>Thanh toán qua PayOS</Text>
-                </View>
-                {selectedPaymentMethod === PAYMENT_METHODS.PAYOS && (
-                  <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
-                )}
-              </TouchableOpacity>
               <View style={styles.bottomSheetActions}>
                 <TouchableOpacity style={styles.bottomSheetBtn} onPress={() => setPaymentModalVisible(false)}>
                   <Text style={styles.bottomSheetBtnText}>{t('orderReview.confirm')}</Text>
