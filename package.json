@@ -7,7 +7,8 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -31,7 +32,7 @@
     "expo-blur": "~14.1.5",
     "expo-clipboard": "^7.1.5",
     "expo-constants": "~17.1.6",
-    "expo-dev-client": "^5.2.4",
+    "expo-dev-client": "~5.2.4",
     "expo-device": "~7.1.4",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.1.4",
