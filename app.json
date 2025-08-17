@@ -4,7 +4,7 @@
     "slug": "shelfstackers-bookstore-app-fix",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/splashscreen_logo.png",
     "scheme": "shelfstackersbookstoreappfix",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

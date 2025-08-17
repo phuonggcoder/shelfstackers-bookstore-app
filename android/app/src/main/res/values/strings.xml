@@ -1,7 +1,14 @@
 <resources>
-  <string name="app_name">ShelfStacker</string>
+  &#xD;
+  &#xD;
+  &#xD;
+  shelfstackers-bookstore-app-fix&#xD;
+  &#xD;
+  &#xD;
+
+  <string name="app_name">shelfstackers-bookstore-app-fix</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
-  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>shelfstackers-bookstore-app-fix
+  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
   <string name="server_client_id">346115100070-bk0aon0gtdm610c0f9hp1s161u2sr8ct.apps.googleusercontent.com</string>
 </resources>

@@ -34,6 +34,13 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+// @generated begin notifeeAndroidWorkaround - expo prebuild (DO NOT MODIFY) sync-0e75cfcaeb22e37f891ede3e4f3643f599f4f21e
+
+    maven { 
+        url "$rootDir/../node_modules/@notifee/react-native/android/libs" 
+    }
+
+// @generated end notifeeAndroidWorkaround
   }
 }
 

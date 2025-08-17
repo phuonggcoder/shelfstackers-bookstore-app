@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
+// import { useVideoPlayer, VideoView } from 'expo-video';
 import { changeLanguage } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
