@@ -543,6 +543,7 @@
   "completed": "Hoàn thành",
   "expired": "Hết hạn",
   "viewOrderHistory": "Xem lịch sử đơn hàng",
-  "backToHome": "Về trang chủ"
-  
+  "backToHome": "Về trang chủ",
+  "payViaZaloPay":"Thanh toán qua ZaloPay"
+
 }

@@ -189,7 +189,6 @@ export default function Login() {
             editable={!isLoading}
           />
 
-          
           <View style={styles.passwordLabelRow}>
             <Text style={styles.label}>{t("password")}</Text>
           </View>
@@ -306,13 +305,12 @@ const styles = StyleSheet.create({
   headerCentered: {
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
   },
   passwordLabelRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    // marginBottom: 8,
   },
   eyeIconLabel: {
     padding: 4,
@@ -321,13 +319,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    // marginBottom: 10,
   },
   loginLaterButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    // paddingVertical: 4,
   },
   loginLaterText: {
     color: "#3255FB",
@@ -342,16 +340,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-    marginTop: 50,
+    marginTop: 40,
     justifyContent: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 150,
+    height: 150,
     marginBottom: 20,
   },
   title: {

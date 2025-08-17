@@ -586,5 +586,6 @@
   "completed": "Completed",
   "expired": "Expired",
   "viewOrderHistory": "View Order History",
-  "backToHome": "Back to Home"
+  "backToHome": "Back to Home",
+  "payViaZaloPay": "Pay via ZaloPay"
 }

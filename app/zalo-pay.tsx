@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
@@ -34,14 +35,14 @@ export default function ZaloPayScreen() {
         // Ưu tiên lấy order_url theo thứ tự
         const paymentUrl = zaloPay.order_url || payment.order_url || response.paymentUrl || '';
         setOrder({ ...orderData, zaloPay, payment, paymentUrl });
-      } catch (e) {
+      } catch {
         showErrorToast(t('error'), t('cannotLoadOrderInfo'));
       } finally {
         setLoading(false);
       }
     };
     fetchOrder();
-  }, [orderId, token, t]);
+  }, [orderId, token, t, showErrorToast]);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
   if (!order) return <Text>{t('orderNotFound')}</Text>;
@@ -53,8 +54,6 @@ export default function ZaloPayScreen() {
   const expireAt = payment.expireAt || payment.expire_time || order.zaloPay.expire_time;
   const expireTime = expireAt ? new Date(expireAt).toLocaleString('vi-VN') : null;
   const paymentMethod = payment.payment_method || order.payment_method || '';
-
-
 
   // Copy order_url
   const handleCopyOrderUrl = async () => {
@@ -103,28 +102,10 @@ export default function ZaloPayScreen() {
             <View style={styles.qrBoxTop}>
               <Text style={styles.qrTitle}>{t('zaloPayPaymentLink')}</Text>
               <View style={{ alignItems: 'center', position: 'relative' }}>
-                <View style={{ 
-                  width: 220, 
-                  height: 120, 
-                  backgroundColor: '#f8f9fa', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: '#e9ecef',
-                  borderStyle: 'dashed'
-                }}>
-                  <Ionicons name="link-outline" size={48} color="#3255FB" />
-                  <Text style={{ 
-                    color: '#666', 
-                    fontSize: 12, 
-                    textAlign: 'center', 
-                    marginTop: 8,
-                    paddingHorizontal: 10
-                  }}>
-                    {t('tapButtonToOpenZaloPay')}
-                  </Text>
-                </View>
+                <QRCode
+                  value={paymentUrl}
+                  size={120}
+                />
                 <View style={styles.qrActionRow}>
                   <TouchableOpacity onPress={handleCopyOrderUrl} style={styles.qrIconBtn}>
                     <Ionicons name="copy-outline" size={28} color="#3255FB" />
@@ -217,4 +198,4 @@ const styles = StyleSheet.create({
   statusValue: { fontSize: 18, fontWeight: 'bold' },
   buttonOutline: { borderColor: '#3255FB', borderWidth: 2, borderRadius: 25, paddingVertical: 12, paddingHorizontal: 30, width: '100%', alignItems: 'center' },
   buttonOutlineText: { color: '#3255FB', fontWeight: 'bold', fontSize: 16 },
-}); 
+});

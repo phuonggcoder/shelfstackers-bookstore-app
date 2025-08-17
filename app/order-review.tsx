@@ -299,7 +299,7 @@ export default function OrderReviewScreen() {
     if (!manualVoucherCode) return;
     setManualVoucherError('');
     try {
-      const validateRes = await import('../services/voucherService').then(m => m.validateVoucher(token, manualVoucherCode, subtotal));
+      const validateRes = await import('../services/voucherService').then(m => m.validateVoucher(token || '', manualVoucherCode, subtotal));
       if (validateRes.valid && validateRes.voucher) {
         setSelectedVoucher(validateRes.voucher);
         setManualVoucherError('');
@@ -487,21 +487,13 @@ export default function OrderReviewScreen() {
           }
         }
       }
-      if (zaloPayData && zaloPayData.order_url) {
-        // Nếu chọn PayOS thì chuyển sang PayOSScreen
-        if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
-          router.replace({ pathname: '/PayOSScreen', params: { orderId } });
-        } else if (selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY) {
-          router.replace({ pathname: '/zalo-pay', params: { orderId } });
-        } else {
-          router.replace({ pathname: '/order-success', params: { orderId: orderCode || orderId } });
-        }
+      if (zaloPayData?.order_url) {
+        router.replace({ pathname: '/zalo-pay', params: { orderId } });
         return;
       }
-      // Nếu không có, fallback sang order-success
-      // Ưu tiên truyền order_id đẹp nếu có, fallback sang _id
-      router.replace({ pathname: '/order-success', params: { orderId: orderCode || orderId } });
-      return;
+
+      // Điều hướng sang trang thành công nếu không có ZaloPay
+      router.replace({ pathname: '/order-success', params: { orderId } });
     } catch (error: any) {
       console.error('Order creation error:', error);
       

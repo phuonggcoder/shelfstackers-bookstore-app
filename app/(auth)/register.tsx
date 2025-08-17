@@ -207,9 +207,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
+    padding: 20,
+    width: 100,
+    height: 100,
+    // marginHorizontal: 220,
+    marginTop:30
   },
   title: {
     fontSize: 22,
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   form: {
     marginTop: 20,
@@ -255,7 +257,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 15,
     top: '50%',
-    transform: [{ translateY: -12 }],
+    transform: [{ translateY: -10 }],
   },
   registerButton: {
     backgroundColor: '#3255FB',

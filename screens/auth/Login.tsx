@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +12,15 @@ const Login = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScrollView
+      contentContainerStyle={styles.container}
+      extraScrollHeight={150}
+      enableOnAndroid={true}
+      enableAutomaticScroll={true}
+      resetScrollToCoords={{ x: 0, y: 0 }}
+      onKeyboardWillShow={(frames) => console.log('Keyboard event', frames)}
+      onKeyboardWillHide={() => console.log('Keyboard hidden')}
+    >
       <Text style={styles.title}>Login</Text>
       <TextInput
         style={styles.input}
@@ -34,7 +43,7 @@ const Login = () => {
       <TouchableOpacity onPress={() => router.push('/register')}>
         <Text style={styles.link}>Don&apos;t have an account? Register</Text>
       </TouchableOpacity>
-    </View>
+    </KeyboardAwareScrollView>
   );
 };
 
