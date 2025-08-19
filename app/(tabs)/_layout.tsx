@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DataProvider } from '../../context/DataContext';
 
 const { width } = Dimensions.get('window');
@@ -10,6 +11,7 @@ const { width } = Dimensions.get('window');
 const TabsLayout = () => {
   const { t } = useTranslation();
   const slideAnim = React.useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   const slideToTab = (direction: 'left' | 'right') => {
     const toValue = direction === 'right' ? width : -width;
@@ -48,9 +50,10 @@ const TabsLayout = () => {
             backgroundColor: 'white',
             borderTopWidth: 1,
             borderTopColor: '#e9ecef',
-            paddingBottom: 30,
+            // ensure tab bar accounts for device safe area and appears taller
+            paddingBottom: Math.max(24, insets.bottom + 14),
             paddingTop: 10,
-            height: 90,
+            height: Math.max(90, insets.bottom + 75),
             position: 'absolute',
             bottom: 0,
             left: 0,

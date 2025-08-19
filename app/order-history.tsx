@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import i18n from 'i18next';
+import OrderStatusBadge from '../components/OrderStatusBadge';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -169,8 +170,8 @@ const OrderHistoryScreen = () => {
             <Text style={styles.orderCode}>{t('orderNumber')}: {item.order_id || item._id}</Text>
             <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}> 
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          <View style={{ flex: 1 }}>
+            <OrderStatusBadge status={item.status} shipperName={item.assigned_shipper_name || item.assigned_shipper_id} />
           </View>
         </View>
         {/* Danh sách sách trong đơn */}

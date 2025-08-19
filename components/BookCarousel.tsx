@@ -48,6 +48,7 @@ const BookCarousel = ({ title, books, categoryId, categoryName }: Props) => {
         snapToInterval={SNAP_INTERVAL}
         decelerationRate="fast"
         disableIntervalMomentum
+  contentContainerStyle={{ paddingRight: 24 }}
       />
     </View>
   );

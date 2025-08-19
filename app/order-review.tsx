@@ -492,7 +492,14 @@ export default function OrderReviewScreen() {
         return;
       }
 
-      // Điều hướng sang trang thành công nếu không có ZaloPay
+      // Nếu payment method là PAYOS, điều hướng tới màn PayOS để lấy link/QR
+      if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
+        // cast to any to avoid typed-route union restrictions
+        (router.replace as any)(`/payos?orderId=${orderId}`);
+        return;
+      }
+
+      // Điều hướng sang trang thành công nếu không có ZaloPay hoặc PayOS
       router.replace({ pathname: '/order-success', params: { orderId } });
     } catch (error: any) {
       console.error('Order creation error:', error);
@@ -829,9 +836,19 @@ export default function OrderReviewScreen() {
           style={styles.paymentSelectBtn}
           onPress={() => setPaymentModalVisible(true)}
         >
-          <Ionicons name={selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY ? 'card-outline' : 'cash-outline'} size={20} color="#3255FB" style={{ marginRight: 8 }} />
+          {/* icon mapping: card for ZaloPay/PayOS, cash for COD */}
+          <Ionicons
+            name={
+              selectedPaymentMethod === PAYMENT_METHODS.COD ? 'cash-outline' : 'card-outline'
+            }
+            size={20}
+            color="#3255FB"
+            style={{ marginRight: 8 }}
+          />
           <Text style={{ color: '#3255FB', fontWeight: 'bold' }}>
-            {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY ? t('orderReview.payViaZaloPay') : t('orderReview.payOnDelivery')}
+            {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY && t('orderReview.payViaZaloPay')}
+            {selectedPaymentMethod === PAYMENT_METHODS.PAYOS && (t('orderReview.payViaPayOS') || 'Thanh toán qua PayOS')}
+            {selectedPaymentMethod === PAYMENT_METHODS.COD && t('orderReview.payOnDelivery')}
           </Text>
         </TouchableOpacity>
         {/* Thay thế Modal voucher và payment bằng bottom sheet custom đẹp */}
@@ -1025,6 +1042,22 @@ export default function OrderReviewScreen() {
                   <Text style={styles.paymentDescription}>{t('orderReview.payViaZaloPayDescription')}</Text>
                 </View>
                 {selectedPaymentMethod === PAYMENT_METHODS.ZALOPAY && (
+                  <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.bottomSheetItem,
+                  selectedPaymentMethod === PAYMENT_METHODS.PAYOS && styles.bottomSheetItemSelected
+                ]}
+                onPress={() => setSelectedPaymentMethod(PAYMENT_METHODS.PAYOS)}
+              >
+                <Ionicons name="card" size={24} color="#3255FB" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.paymentText}>{t('orderReview.payViaPayOS', { defaultValue: 'Thanh toán qua PayOS' })}</Text>
+                  <Text style={styles.paymentDescription}>{t('orderReview.payViaPayOSDescription', { defaultValue: 'Thanh toán qua cổng PayOS (VietQR / Webcheckout)' })}</Text>
+                </View>
+                {selectedPaymentMethod === PAYMENT_METHODS.PAYOS && (
                   <Ionicons name="checkmark-circle" size={22} color="#3255FB" />
                 )}
               </TouchableOpacity>

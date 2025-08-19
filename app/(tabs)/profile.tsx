@@ -1,13 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useRef, useState } from 'react';
-
-// ... trong component
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -75,13 +72,24 @@ const AnimatedSplash = ({ children }: { children: React.ReactNode }) => {
 
 const WelcomeScreen = () => {
   const { t } = useTranslation();
-  
+  const { user } = useAuth();
+
+  // compute a friendly display name when available (use fields declared in User type)
+  let displayName = '';
+  if (user) {
+    const full = (user.full_name || user.username || '').toString().trim();
+    if (full) {
+      const parts = full.split(' ').filter(Boolean);
+      displayName = parts.length > 0 ? parts[0] : full;
+    }
+  }
+
   return (
     <AnimatedSplash>
       <View style={{ alignItems: 'center', width: '100%' }}>
         <Ionicons name="person-circle-outline" size={100} color="#fff" style={{ marginBottom: 24 }} />
         <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 10, textAlign: 'center' }}>
-          {t('welcomeMessage')}
+          {t('welcomeMessage')}{displayName ? `, ${displayName}` : ''}
         </Text>
         <Text style={{ fontSize: 16, color: '#fff', textAlign: 'center', marginBottom: 30 }}>
           {t('loginToManage')}

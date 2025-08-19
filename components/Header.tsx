@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import CartIconWithBadge from './CartIconWithBadge';
@@ -16,14 +17,20 @@ interface HeaderProps {
 const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps) => {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const fullName = user?.full_name;
+  const fullName = user?.full_name || '';
   const isLoggedIn = !!user;
-  const displayName = (isLoggedIn && fullName) ? fullName : t('you');
+  let displayName = t('you');
+  if (isLoggedIn && fullName) {
+    // prefer first name if available, trim whitespace safely
+    const parts = String(fullName).trim().split(' ').filter(Boolean);
+    displayName = parts.length > 0 ? parts[0] : String(fullName).trim();
+  }
   const { cartCount, cartJustAdded } = useCart();
 
   return (
-    <View style={styles.container}>
+  <View style={[styles.container, { paddingTop: Math.max(12, insets.top) }] }>
       <View style={styles.leftSection}>
         {showBackButton && (
           <TouchableOpacity 
@@ -39,7 +46,7 @@ const Header = ({ title, showBackButton = false, showIcons = true }: HeaderProps
           ) : (
             <>
               <Text style={styles.greeting}>
-                {t('welcomeMessage', { name: displayName })}
+                {t('welcomeMessage')}{isLoggedIn ? `, ${displayName}` : ''}
               </Text>
               <Text style={styles.title}>{t('whatDoYouWantToReadToday')}</Text>
             </>

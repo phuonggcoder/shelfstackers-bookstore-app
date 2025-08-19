@@ -101,7 +101,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
-        
+        // Set manifest placeholders for API keys; use project properties if available.
+        manifestPlaceholders = [ MAPS_API_KEY: (project.hasProperty('MAPS_API_KEY') ? project.property('MAPS_API_KEY') : "") ]
     }
     signingConfigs {
         debug {
@@ -138,6 +139,18 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+    // Allow MAPS_API_KEY to be configured via gradle.properties or local.properties
+}
+
+// Force a consistent Play Services Location version for all configurations to
+// avoid runtime IncompatibleClassChangeError between different Play Services
+// versions pulled by transitive dependencies.
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'com.google.android.gms' && details.requested.name == 'play-services-location') {
+            details.useVersion rootProject.ext.playServicesLocationVersion
+        }
     }
 }
 

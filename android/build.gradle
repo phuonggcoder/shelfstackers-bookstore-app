@@ -14,6 +14,11 @@ buildscript {
 }
 
 ext.ndkVersion = '27.1.12297006'
+// Force a consistent Google Play Services version across all modules to avoid
+// runtime mismatch errors (IncompatibleClassChangeError) for FusedLocationProviderClient.
+// If you need a different version, update both properties to the same value.
+ext.playServicesVersion = '21.3.0'
+ext.playServicesLocationVersion = '21.3.0'
 
 def reactNativeAndroidDir = new File(
   providers.exec {

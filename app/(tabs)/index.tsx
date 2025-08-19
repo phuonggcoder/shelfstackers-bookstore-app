@@ -1,9 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCarousel from "../../components/BookCarousel";
 import CoverFlowCarousel3D from "../../components/CoverFlowCarousel3D";
 import HomeTopSection from '../../components/HomeTopSection';
@@ -24,6 +25,14 @@ const Index = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [simpleFilter, setSimpleFilter] = useState<{ price: number; sort: 'az' | 'za' | null } | null>(null);
   const [hasShownLoginPopup, setHasShownLoginPopup] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // Slide-down cue state
+  const [showSlideCue, setShowSlideCue] = useState(false);
+  const cueY = useRef<number | null>(null);
+  const scrollViewHeight = useRef<number>(0);
+  const hasAutoOpened = useRef(false);
+  const autoOpenTimeout = useRef<any | null>(null);
 
   // Reset login popup state when user logs in
   useEffect(() => {
@@ -101,7 +110,11 @@ const Index = () => {
   // Lấy sách nổi bật (top 5 sách có rating cao nhất)
   const featuredBooks = useMemo(() => {
     return [...filteredBooks]
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .sort((a, b) => {
+        const ra = (a as any).rating || 0;
+        const rb = (b as any).rating || 0;
+        return rb - ra;
+      })
       .slice(0, 5);
   }, [filteredBooks]);
 
@@ -113,14 +126,44 @@ const Index = () => {
     )
   }
 
+  const mergedContentStyle = { ...styles.scrollContent, paddingBottom: (styles.scrollContent.paddingBottom || 0) + insets.bottom + 120 };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top","left","right","bottom"]}>
+      {/** merge bottom safe area into content style so nav doesn't cover content */}
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={mergedContentStyle}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          const offsetY = e.nativeEvent.contentOffset.y;
+          const layoutHeight = e.nativeEvent.layoutMeasurement.height;
+          scrollViewHeight.current = layoutHeight;
+          if (cueY.current != null) {
+            const threshold = 30; // smaller threshold for auto-open
+            const atCue = offsetY + layoutHeight >= cueY.current - threshold;
+            setShowSlideCue(atCue);
+
+            if (atCue && !hasAutoOpened.current) {
+              // debounce a little before auto-opening to avoid accidental quick triggers
+              if (autoOpenTimeout.current) clearTimeout(autoOpenTimeout.current);
+              autoOpenTimeout.current = setTimeout(() => {
+                // trigger auto open to filtered-books with no click
+                hasAutoOpened.current = true;
+                router.push({ pathname: '/filtered-books', params: { /* no params */ } });
+              }, 350);
+            } else {
+              if (autoOpenTimeout.current) {
+                clearTimeout(autoOpenTimeout.current);
+                autoOpenTimeout.current = null;
+              }
+            }
+          }
+        }}
+        scrollEventThrottle={16}
       >
         <HomeTopSection
           campaigns={campaigns}
@@ -152,6 +195,28 @@ const Index = () => {
             />
           )
         })}
+
+        {/* Slide-down cue: appears when user scrolls near the bottom of the page */}
+        <View
+          onLayout={(e) => {
+            const y = e.nativeEvent.layout.y + e.nativeEvent.layout.height;
+            cueY.current = y;
+          }}
+          style={{ alignItems: 'center', marginTop: 8, paddingVertical: 12 }}
+        >
+          <TouchableOpacity
+            onPress={() => router.push('/allcategories')}
+            style={{ alignItems: 'center', opacity: showSlideCue ? 1 : 0.6 }}
+          >
+            <Text style={{ fontSize: 14, color: '#666', marginBottom: 6 }}>{t('slideDownToSeeAllBooks')}</Text>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="chevron-down" size={22} color="#333" />
+            </View>
+          </TouchableOpacity>
+  </View>
+
+  {/* explicit spacer so bottom tab / navigation doesn't cover last content */}
+  <View style={{ height: Math.max(80, insets.bottom + 40) }} />
       </ScrollView>
     </SafeAreaView>
   );

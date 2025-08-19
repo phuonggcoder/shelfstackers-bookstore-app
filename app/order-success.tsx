@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-// import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { changeLanguage } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getOrderDetail } from '../services/orderService';
 import { formatVND } from '../utils/format';
+import OrderStatusBadge from '../components/OrderStatusBadge';
+import OrderActions from '../components/OrderActions';
 
 const videoSource = require('../assets/lottie/shoppingCart.mp4');
 
@@ -100,6 +102,29 @@ export default function OrderSuccessScreen() {
           <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
           <Text style={styles.infoLabel}>{t('paymentAmount')}</Text>
           <Text style={styles.infoValue}>{formatVND(paymentAmount)}</Text>
+          <Text style={styles.infoLabel}>{t('orderStatus')}</Text>
+          <Text style={styles.infoValue}>{
+            // canonicalize status for display
+            (function() {
+              const s = order.order_status || order.status || paymentStatus || 'Pending';
+              const map: Record<string, string> = {
+                Pending: t('pending'),
+                AwaitingPickup: t('awaitingPickup'),
+                OutForDelivery: t('outForDelivery'),
+                Delivered: t('delivered'),
+                Returned: t('returned'),
+                Cancelled: t('cancelled'),
+                Refunded: t('refunded'),
+              };
+              return map[s] || s;
+            })()
+          }</Text>
+          {order.assigned_shipper_id && (
+            <>
+              <Text style={styles.infoLabel}>{t('assignedShipper')}</Text>
+              <Text style={styles.infoValue}>{order.assigned_shipper_name || order.assigned_shipper_id}</Text>
+            </>
+          )}
           {transactionId && <>
             <Text style={styles.infoLabel}>{t('transactionId')}</Text>
             <Text style={styles.infoValue}>{transactionId}</Text>
@@ -112,18 +137,23 @@ export default function OrderSuccessScreen() {
           </>}
         </View>
         <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>{t('paymentStatus')}</Text>
-          <Text style={[styles.statusValue, {color: paymentStatus === 'Completed' ? '#4CAF50' : '#FFA500'}]}>
-            {paymentStatus === 'Completed' ? t('processing') : t('processing')}
-          </Text>
+          <Text style={styles.statusTitle}>{t('currentStatus')}</Text>
+          <OrderStatusBadge status={order.order_status || order.status || paymentStatus} shipperName={order.assigned_shipper_name || order.assigned_shipper_id} shipperAck={order.shipper_ack} />
+          <Text style={{ color: '#666', marginTop: 8, textAlign: 'center' }}>{t((order.order_status || order.status || paymentStatus) === 'Pending' ? 'orderIsPendingHelp' : (order.order_status || order.status || paymentStatus) === 'AwaitingPickup' ? 'orderAwaitingPickupHelp' : (order.order_status || order.status || paymentStatus) === 'OutForDelivery' ? 'orderOutForDeliveryHelp' : (order.order_status || order.status || paymentStatus) === 'Delivered' ? 'orderDeliveredHelp' : '')}</Text>
         </View>
         <View style={styles.buttonContainer}>
+          {/* Primary action: view order history / details */}
           <TouchableOpacity style={styles.button} onPress={() => router.replace('/order-history')}>
             <Text style={styles.buttonText}>{t('viewOrderHistory')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.buttonOutline} onPress={() => router.replace('/') }>
+
+          {/* Secondary actions dependent on status */}
+
+
+          <TouchableOpacity style={[styles.buttonOutline, { marginTop: 10 }]} onPress={() => router.replace('/') }>
             <Text style={styles.buttonOutlineText}>{t('backToHome')}</Text>
           </TouchableOpacity>
+          <OrderActions status={order.order_status || order.status || paymentStatus} orderId={order.order_id || order._id} />
         </View>
       </ScrollView>
     </SafeAreaView>

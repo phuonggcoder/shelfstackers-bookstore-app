@@ -13,6 +13,7 @@ import CancelOrderModal from '../components/CancelOrderModal';
 import RefundStatusNotification from '../components/RefundStatusNotification';
 import ReviewForm from '../components/ReviewForm';
 import ThankYouModal from '../components/ThankYouModal';
+import OrderStatusBadge from '../components/OrderStatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useOrderDetail } from '../hooks/useOrders';
@@ -470,21 +471,10 @@ const OrderDetailScreen = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Order Status */}
         <View style={styles.section}>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusIcon, { backgroundColor: getStatusColor(order.status) }]}>
-              <Ionicons name="checkmark" size={24} color="white" />
-            </View>
-            <View style={styles.statusInfo}>
-              <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
-              <Text style={styles.statusDescription}>
-                {isOrderCompleted() 
-
-                  ? t('orderDeliveredSuccessfully')
-                  : t('orderProcessing')
-                }
-              </Text>
-            </View>
-          </View>
+          <OrderStatusBadge status={order.status} shipperName={order.assigned_shipper_name || order.assigned_shipper_id} shipperAck={order.shipper_ack} />
+          <Text style={styles.statusDescription}>
+            {isOrderCompleted() ? t('orderDeliveredSuccessfully') : t('orderProcessing')}
+          </Text>
         </View>
 
         {/* Order Information */}

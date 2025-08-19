@@ -1,0 +1,344 @@
+openapi: 3.0.3
+info:
+  title: ShelfStackers Backend Contract (Payments & Address)
+  version: 1.0.0
+  description: OpenAPI contract for the minimal backend endpoints FE needs: PayOS payment creation, provinces/districts/wards, search/autocomplete, reverse geocode (proxy) and create address.
+servers:
+  - url: https://api.example.com
+    description: Production (replace with real host)
+paths:
+  /api/payments/create:
+    post:
+      summary: Create payment session (PayOS)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateRequest'
+      responses:
+        '200':
+          description: Payment session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/v1/address/provinces:
+    get:
+      summary: List provinces (optionally filtered)
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional text filter for autocomplete
+      responses:
+        '200':
+          description: Array of provinces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Province'
+
+  /api/v1/address/districts:
+    get:
+      summary: List districts for a province
+      parameters:
+        - name: province-code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Province code
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional text filter
+      responses:
+        '200':
+          description: Array of districts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/District'
+
+  /api/v1/address/wards:
+    get:
+      summary: List wards for a district
+      parameters:
+        - name: districtId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of wards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ward'
+
+  /api/v1/address/search-all:
+    get:
+      summary: Search provinces/districts/wards (autocomplete)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchItem'
+
+  /api/v1/address/reverse:
+    post:
+      summary: Reverse geocode (proxy to Nominatim/Vietmap) and attempt to resolve admin codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+      responses:
+        '200':
+          description: Reverse geocode result with optional resolved codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressReverseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/addresses:
+    post:
+      summary: Create user address
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressCreateRequest'
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    PaymentCreateRequest:
+      type: object
+      required: [orderId, amount, currency]
+      properties:
+        orderId:
+          type: string
+        amount:
+          type: number
+          description: Amount in smallest currency unit (e.g. VND)
+        currency:
+          type: string
+        returnUrl:
+          type: string
+        metadata:
+          type: object
+
+    PaymentCreateResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        paymentId:
+          type: string
+        paymentUrl:
+          type: string
+        expiresAt:
+          type: string
+
+    Province:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        typeText:
+          type: string
+        slug:
+          type: string
+        autocompleteType:
+          type: string
+
+    District:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        provinceId:
+          type: string
+        type:
+          type: string
+        typeText:
+          type: string
+
+    Ward:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        districtId:
+          type: string
+        type:
+          type: string
+        typeText:
+          type: string
+        fullName:
+          type: string
+        path:
+          type: string
+
+    SearchItem:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        level:
+          type: string
+          enum: [province, district, ward]
+        displayText:
+          type: string
+        parentInfo:
+          type: object
+
+    AddressReverseResponse:
+      type: object
+      properties:
+        display_name:
+          type: string
+        address:
+          type: object
+        resolved:
+          type: object
+          properties:
+            province:
+              $ref: '#/components/schemas/Province'
+            district:
+              $ref: '#/components/schemas/District'
+            ward:
+              $ref: '#/components/schemas/Ward'
+
+    AddressCreateRequest:
+      type: object
+      required: [fullName, phone, street, province, district, ward]
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        street:
+          type: string
+        province:
+          $ref: '#/components/schemas/Province'
+        district:
+          $ref: '#/components/schemas/District'
+        ward:
+          $ref: '#/components/schemas/Ward'
+        isDefault:
+          type: boolean
+        type:
+          type: string
+          enum: [home, office]
+        location:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadGateway:
+      description: Upstream service error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string

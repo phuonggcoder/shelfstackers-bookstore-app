@@ -76,3 +76,20 @@ export const PAYMENT_METHOD_ICONS = {
   [PAYMENT_METHODS.BANK_TRANSFER]: '🏦',
   [PAYMENT_METHODS.CREDIT_CARD]: '💳'
 } as const;
+
+// Create PayOS payment (server should create PayOS checkout / vietqr and return payload)
+export const createPayOSPayment = async (token: string, orderId: string) => {
+  try {
+    const response = await axios.post(getApiUrl('/api/payments/create'), {
+      order_id: orderId,
+      payment_method: PAYMENT_METHODS.PAYOS,
+    }, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('createPayOSPayment response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('createPayOSPayment error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to create PayOS payment');
+  }
+};
