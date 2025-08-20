@@ -1,24 +1,16 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 // Wrapper screen that navigates to the WebView-based map implementation.
 export default function MapScreen() {
   const router = useRouter();
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.center}>
-  <Text style={{ marginBottom: 12 }}>Open map to pick an address.</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => (router.replace as any)('/osmmap')}>
-          <Text style={styles.btnText}>Open Map</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnSecondary} onPress={() => router.back()}>
-          <Text style={styles.btnTextSecondary}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  // Auto-redirect directly to the OSM WebView map so "Open map" goes straight there.
+  React.useEffect(() => {
+    // use a micro-task to avoid React warning about navigation during render
+    setTimeout(() => (router.replace as any)('/osmmap'), 0);
+  }, [router]);
+  return <View style={styles.container} />;
 }
 
 const styles = StyleSheet.create({

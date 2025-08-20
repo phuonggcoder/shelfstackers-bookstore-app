@@ -434,12 +434,38 @@ class AddressService {
           }
         }
       );
-      return response.data;
+  console.log('[AddressService] addAddress payload', payload);
+  console.log('[AddressService] addAddress response status', response.status);
+  console.log('[AddressService] addAddress response data', response.data);
+  return response.data;
     } catch (error: any) {
       console.error('Error adding address:', error);
       if (error.response) {
         console.error('API error response:', error.response.data);
       }
+      throw error;
+    }
+  }
+
+  // Create a draft (map-only) address. This method skips FE-side validation and sends the minimal payload.
+  static async createDraft(token: string, draftData: any): Promise<any> {
+    try {
+      console.log('[AddressService] createDraft payload', draftData);
+      const response = await axios.post(
+        `${BASE_URL}/api/addresses`,
+        draftData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('[AddressService] createDraft response', response.status, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error creating draft address:', error);
+      if (error.response) console.error('API error response:', error.response.data);
       throw error;
     }
   }
