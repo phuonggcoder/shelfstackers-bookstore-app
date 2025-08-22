@@ -1,6 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 export default function VietmapScreen() {
   const router = useRouter();

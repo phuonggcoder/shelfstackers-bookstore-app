@@ -1,5 +1,8 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -16,6 +19,7 @@ import AddressSelector from '../components/AddressSelector';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService, { AddressData } from '../services/addressService';
+import { mapNominatimAddress, stripPrefixes } from '../utils/addressMapping';
 
 const AddAddress = () => {
   const { t } = useTranslation();
@@ -27,14 +31,108 @@ const AddAddress = () => {
   const [receiverName, setReceiverName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [addressDetail, setAddressDetail] = useState('');
+  
+  // Debug log để theo dõi addressDetail state
+  useEffect(() => {
+    console.log('[AddAddress] addressDetail state changed:', addressDetail);
+  }, [addressDetail]);
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
+  
+  // Load selectedAddress from storage on mount
+  useEffect(() => {
+    const loadSelectedAddress = async () => {
+      try {
+        const savedAddress = await AsyncStorage.getItem('tempSelectedAddress');
+        if (savedAddress) {
+          const parsedAddress = JSON.parse(savedAddress);
+          console.log('[AddAddress] Restored selectedAddress from storage:', parsedAddress);
+          setSelectedAddress(parsedAddress);
+          setAddressManuallySelected(true);
+        }
+      } catch (e) {
+        console.warn('[AddAddress] Failed to load selectedAddress from storage:', e);
+      }
+    };
+    
+    loadSelectedAddress();
+    console.log('[AddAddress] Component mounted/params changed');
+    
+    return () => {
+      console.log('[AddAddress] Component unmounting or params changing');
+    };
+  }, []);
+
+  // Save selectedAddress to storage whenever it changes
+  useEffect(() => {
+    const saveSelectedAddress = async () => {
+      try {
+        if (selectedAddress) {
+          await AsyncStorage.setItem('tempSelectedAddress', JSON.stringify(selectedAddress));
+          console.log('[AddAddress] Saved selectedAddress to storage');
+        } else {
+          await AsyncStorage.removeItem('tempSelectedAddress');
+          console.log('[AddAddress] Removed selectedAddress from storage');
+        }
+      } catch (e) {
+        console.warn('[AddAddress] Failed to save selectedAddress to storage:', e);
+      }
+    };
+    
+    saveSelectedAddress();
+  }, [selectedAddress]);
+  const [houseNumber, setHouseNumber] = useState('');
+  const [streetName, setStreetName] = useState('');
+  // when true, do not let map reverse-geocode overwrite province/district/ward
+  const [addressManuallySelected, setAddressManuallySelected] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [processedOsmParam, setProcessedOsmParam] = useState<string | null>(null);
   const params = useLocalSearchParams();
+
+
   const latParam = params.lat as string | undefined;
   const lngParam = params.lng as string | undefined;
   const osmParam = params.osm as string | undefined;
+  const wardParam = params.ward as string | undefined;
+  const districtParam = params.district as string | undefined;
+  const provinceParam = params.province as string | undefined;
   const [pickedCoords, setPickedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [showMapSearch, setShowMapSearch] = useState(false);
+  const [mapInitialPos, setMapInitialPos] = useState<{ lat: number; lon: number } | null>(null);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   // use refs to guard duplicate processing reliably
   const lastProcessedRef = useRef<string | null>(null);
+
+  // Handle ward, district, province from params (from address-detail page) - OUTSIDE useEffect
+  useEffect(() => {
+    if (wardParam && districtParam && provinceParam) {
+      const wardObj = { code: wardParam, name: wardParam, districtId: districtParam } as any;
+      const districtObj = { code: districtParam, name: districtParam, provinceId: provinceParam } as any;
+      const provinceObj = { code: provinceParam, name: provinceParam } as any;
+      
+      console.log('[AddAddress] Setting ward/district/province from params:', { wardParam, districtParam, provinceParam });
+      
+      setSelectedAddress(prev => ({
+        ...prev,
+        province: provinceObj,
+        district: districtObj,
+        ward: wardObj,
+        fullAddress: `${wardParam}, ${districtParam}, ${provinceParam}`,
+      } as any));
+      setAddressManuallySelected(true); // Đánh dấu là đã chọn thủ công
+    }
+  }, [wardParam, districtParam, provinceParam]);
+
+  // Debug useEffect để theo dõi selectedAddress
+  useEffect(() => {
+    console.log('[AddAddress] selectedAddress changed:', {
+      hasSelectedAddress: !!selectedAddress,
+      fullAddress: selectedAddress?.fullAddress,
+      province: selectedAddress?.province?.name,
+      district: selectedAddress?.district?.name,
+      ward: selectedAddress?.ward?.name,
+      addressManuallySelected
+    });
+  }, [selectedAddress, addressManuallySelected]);
 
   useEffect(() => {
     // determine incoming coordinates (priority: osmParam payload > latParam/lngParam)
@@ -57,12 +155,73 @@ const AddAddress = () => {
       incomingLng = Number(lngParam);
     }
 
-    if (incomingLat === null || incomingLng === null) return;
-
     // guard against duplicate processing (synchronous, reliable)
-    const key = `${incomingLat.toFixed(6)},${incomingLng.toFixed(6)}`;
-    if (lastProcessedRef.current === key) return;
+    const key = `${incomingLat?.toFixed(6) || 'null'},${incomingLng?.toFixed(6) || 'null'},${osmParam || 'null'}`;
+    if (lastProcessedRef.current === key) {
+      console.log('[AddAddress] Duplicate processing detected, skipping:', key);
+      return;
+    }
     lastProcessedRef.current = key;
+
+    // Check if addressDetail is provided in the payload (from address-detail page or map picker)
+    const payloadInfo = osmParam ? (() => {
+      try {
+        const decoded = decodeURIComponent(osmParam);
+        const payload = JSON.parse(decoded);
+        return {
+          addressDetail: payload.addressDetail || '',
+          addressDetailOnly: payload.addressDetailOnly || false,
+          lat: payload.lat || null,
+          lng: payload.lng || null
+        };
+      } catch (e) {
+        return { addressDetail: '', addressDetailOnly: false, lat: null, lng: null };
+      }
+    })() : { addressDetail: '', addressDetailOnly: false, lat: null, lng: null };
+    
+    // Nếu chỉ cập nhật addressDetail (từ map picker với preserveAddress)
+    if (payloadInfo.addressDetailOnly) {
+      // Guard để tránh xử lý lại cùng một osmParam
+      if (processedOsmParam === osmParam) {
+        console.log('[AddAddress] Already processed this osmParam, skipping');
+        return;
+      }
+      
+      console.log('[AddAddress] Updating addressDetail only, preserving existing ward/district/province');
+      console.log('[AddAddress] payloadInfo:', payloadInfo);
+      
+      // Đánh dấu đã xử lý osmParam này
+      setProcessedOsmParam(osmParam || null);
+      
+      // Cập nhật addressDetail
+      console.log('[AddAddress] Setting addressDetail to:', payloadInfo.addressDetail);
+      setAddressDetail(payloadInfo.addressDetail);
+      
+      // Đảm bảo selectedAddress không bị mất
+      console.log('[AddAddress] Current selectedAddress before update:', {
+        hasSelectedAddress: !!selectedAddress,
+        fullAddress: selectedAddress?.fullAddress,
+        province: selectedAddress?.province?.name,
+        district: selectedAddress?.district?.name,
+        ward: selectedAddress?.ward?.name
+      });
+      
+      // Force component re-render
+      setForceUpdate(prev => prev + 1);
+      
+      // Cập nhật coordinates nếu có
+      if (payloadInfo.lat && payloadInfo.lng) {
+        setPickedCoords({ lat: payloadInfo.lat, lng: payloadInfo.lng });
+        console.log('[AddAddress] Updated coordinates:', { lat: payloadInfo.lat, lng: payloadInfo.lng });
+      }
+      
+      return;
+    }
+
+    if (incomingLat === null || incomingLng === null) {
+      // If no coordinates but we have ward params, just return (ward params already handled above)
+      return;
+    }
 
     setPickedCoords({ lat: incomingLat, lng: incomingLng });
 
@@ -72,22 +231,37 @@ const AddAddress = () => {
         console.log('[AddAddress] osm param detected', { lat: incomingLat, lng: incomingLng });
         const nom = await (await import('../services/osmService')).reverseGeocodeNominatim(incomingLat, incomingLng);
         console.log('[AddAddress] nominatim result', nom && { display_name: nom.display_name, address: nom?.address });
-        if (nom && nom.display_name && !addressDetail) setAddressDetail(nom.display_name);
+        // Extract street/house from nominatim and set addressDetail if empty
+        const nomAddr = nom && nom.address ? nom.address : null;
+        const detectedRoad = nomAddr ? (nomAddr.road || nomAddr.pedestrian || nomAddr.cycleway || nomAddr.residential || nomAddr.street || '') : '';
+        const detectedHouse = nomAddr ? (nomAddr.house_number || nomAddr.housenumber || '') : '';
+        if (detectedRoad && !streetName) setStreetName(detectedRoad);
+        if (detectedHouse && !houseNumber) setHouseNumber(detectedHouse);
+        
+        if (payloadInfo.addressDetail && payloadInfo.addressDetail.trim()) {
+          setAddressDetail(payloadInfo.addressDetail);
+        } else if ((!addressDetail || !addressDetail.trim()) && (detectedRoad || detectedHouse)) {
+          setAddressDetail([detectedHouse, detectedRoad].filter(Boolean).join(' '));
+        }
+        
+        // Nếu không có ward/district/province params, chỉ cập nhật addressDetail
+        // không cập nhật ward/district/province từ OSM
+        if (!wardParam && !districtParam && !provinceParam) {
+          console.log('[AddAddress] Only updating addressDetail, preserving existing ward/district/province');
+          return;
+        }
 
-        const addr = nom && nom.address ? nom.address : null;
+        const addr = nomAddr;
         if (!addr) {
-              return;
-            }
+          return;
+        }
 
-        // Prefer city for Vietnamese Nominatim responses
-        const provinceName = addr.state || addr.city || addr.county || addr.region || null;
-        const districtName = addr.city_district || addr.suburb || addr.town || addr.county || null;
-        const wardName = addr.suburb || addr.village || addr.hamlet || addr.neighbourhood || null;
+        // Map Nominatim address to Vietnamese administrative units
+        const { province: provinceName, district: districtName, ward: wardName } = mapNominatimAddress(addr);
 
         const normalize = (s?: string | null) => {
           if (!s) return '';
-          const stripPrefixes = s.replace(/^(phuong|xã|xa|thị trấn|thi tran|thị xã|thi xa|thanh pho|thành phố|tp|quận|quan|huyện|huye?n)\s*/i, '');
-          return stripPrefixes.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          return stripPrefixes(s);
         };
 
         try {
@@ -154,10 +328,11 @@ const AddAddress = () => {
           console.log('[AddAddress] resolved address objects', newSelected);
           setSelectedAddress(prev => ({
             ...prev,
-            province: newSelected.province,
-            district: newSelected.district,
-            ward: newSelected.ward,
-            fullAddress: newSelected.fullAddress || prev?.fullAddress,
+            // Chỉ cập nhật nếu chưa có hoặc không phải manual selection
+            province: (addressManuallySelected && prev?.province) ? prev.province : (newSelected.province || prev?.province),
+            district: (addressManuallySelected && prev?.district) ? prev.district : (newSelected.district || prev?.district),
+            ward: (addressManuallySelected && prev?.ward) ? prev.ward : (newSelected.ward || prev?.ward),
+            fullAddress: (addressManuallySelected && prev?.fullAddress) ? prev.fullAddress : (newSelected.fullAddress || prev?.fullAddress),
           } as any));
         } catch (e) {
           console.warn('Failed to resolve administrative units', e);
@@ -167,20 +342,132 @@ const AddAddress = () => {
           console.log('[AddAddress] fallback address names', { province, district, ward });
           setSelectedAddress(prev => ({
             ...prev,
-            province: province || prev?.province,
-            district: district || prev?.district,
-            ward: ward || prev?.ward,
+            province: (addressManuallySelected && prev?.province) ? prev.province : (province || prev?.province),
+            district: (addressManuallySelected && prev?.district) ? prev.district : (district || prev?.district),
+            ward: (addressManuallySelected && prev?.ward) ? prev.ward : (ward || prev?.ward),
+            fullAddress: (addressManuallySelected && prev?.fullAddress) ? prev.fullAddress : ((nom && nom.display_name) || prev?.fullAddress),
           } as any));
-  }
+        }
       } catch (e) {
         console.warn('Failed to reverse nominatim', e);
-        setOsmProcessed(true);
+        // keep current state if reverse fails
       }
     })();
-  }, [latParam, lngParam, osmParam, addressDetail]);
+  }, [latParam, lngParam, osmParam, addressManuallySelected, houseNumber, streetName, processedOsmParam]);
 
-  const handleAddressChange = (address: any) => {
+  const handleAddressChange = async (address: any) => {
+    // user explicitly selected address parts (province/district/ward) => treat as manual selection
     setSelectedAddress(address);
+    setAddressManuallySelected(true);
+    
+    // Không tự động mở map picker khi chọn địa chỉ
+    // Map picker chỉ mở khi người dùng nhập địa chỉ chi tiết
+  };
+
+  const handleMapSearchSelect = (res: { lat: number; lon: number; display_name: string; address?: any }) => {
+    setPickedCoords({ lat: res.lat, lng: res.lon });
+    // fill street/house when available
+    const nomAddr = res.address || {};
+    const detectedRoad = nomAddr.road || nomAddr.pedestrian || nomAddr.residential || nomAddr.street || '';
+    const detectedHouse = nomAddr.house_number || nomAddr.housenumber || '';
+    if (detectedRoad) setStreetName(prev => prev || detectedRoad);
+    if (detectedHouse) setHouseNumber(prev => prev || detectedHouse);
+    
+    // Map address using the same helper function
+    const { province, district, ward } = mapNominatimAddress(nomAddr);
+    
+    // set full address preview with mapped administrative units
+    setSelectedAddress(prev => ({ 
+      ...(prev || {}), 
+      fullAddress: prev?.fullAddress || res.display_name,
+      province: prev?.province || (province ? { code: province, name: province } : undefined),
+      district: prev?.district || (district ? { code: district, name: district } : undefined),
+      ward: prev?.ward || (ward ? { code: ward, name: ward } : undefined)
+    } as any));
+    setShowMapSearch(false);
+  };
+
+  const handleAddressSuggestionSelect = (suggestion: any) => {
+    setPickedCoords({ lat: suggestion.lat, lng: suggestion.lon });
+    setAddressDetail(suggestion.display_name);
+    setShowAddressSuggestions(false);
+  };
+
+  // Hàm mở map picker khi nhập địa chỉ chi tiết
+  const openMapPicker = async () => {
+    if (!selectedAddress?.ward?.name) {
+      showErrorToast(t('error'), 'Vui lòng chọn phường/xã trước');
+      return;
+    }
+
+    try {
+      let searchQuery = '';
+      let initialLat = 0;
+      let initialLng = 0;
+
+      if (addressDetail.trim()) {
+        // Nếu có địa chỉ chi tiết, tìm kiếm theo đó
+        searchQuery = `${addressDetail}, ${selectedAddress.ward.name}, ${selectedAddress.district?.name}, ${selectedAddress.province?.name}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(searchQuery)}&countrycodes=vn&limit=1&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'User-Agent': 'shelfstackers-app/1.0 (youremail@example.com)' } });
+        const data = await res.json();
+        
+        if (data && data.length) {
+          initialLat = Number(data[0].lat);
+          initialLng = Number(data[0].lon);
+        }
+      }
+
+      // Nếu không tìm thấy hoặc không có địa chỉ chi tiết, sử dụng vị trí trung tâm ward
+      if (!initialLat && !initialLng) {
+        const wardQuery = `${selectedAddress.ward.name}, ${selectedAddress.district?.name}, ${selectedAddress.province?.name}`;
+        const wardUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(wardQuery)}&countrycodes=vn&limit=1`;
+        const wardRes = await fetch(wardUrl, { headers: { 'User-Agent': 'shelfstackers-app/1.0 (youremail@example.com)' } });
+        const wardData = await wardRes.json();
+        
+        if (wardData && wardData.length) {
+          initialLat = Number(wardData[0].lat);
+          initialLng = Number(wardData[0].lon);
+        }
+      }
+
+      // Fallback: sử dụng vị trí hiện tại nếu có
+      if (!initialLat && !initialLng) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const location = await Location.getCurrentPositionAsync({});
+            initialLat = location.coords.latitude;
+            initialLng = location.coords.longitude;
+          }
+        } catch (e) {
+          console.warn('Failed to get current location', e);
+        }
+      }
+
+      // Tạo bbox giới hạn trong phạm vi ward
+      const latMin = initialLat - 0.01;
+      const latMax = initialLat + 0.01;
+      const lonMin = initialLng - 0.01;
+      const lonMax = initialLng + 0.01;
+      const bboxParam = encodeURIComponent(JSON.stringify([latMin, latMax, lonMin, lonMax]));
+      
+      router.push({ 
+        pathname: '/map-picker', 
+        params: { 
+          lat: String(initialLat), 
+          lng: String(initialLng), 
+          allowed: bboxParam,
+          ward: selectedAddress.ward.name,
+          district: selectedAddress.district?.name,
+          province: selectedAddress.province?.name,
+          addressDetail: addressDetail.trim()
+        } 
+      });
+    } catch (e) {
+      console.warn('[AddAddress] failed to open map picker', e);
+      showErrorToast(t('error'), 'Không thể mở bản đồ. Vui lòng thử lại.');
+    }
   };
 
   const handleSubmit = async () => {
@@ -235,8 +522,8 @@ const AddAddress = () => {
 
     setLoading(true);
     try {
-      // FE sends province/district/ward as objects, BE will format fullAddress
-      const addressPayload = {
+      // Prepare address payload according to backend schema
+      const addressPayload: any = {
         fullName: receiverName.trim(),
         phone: cleanPhone,
         street: addressDetail.trim(),
@@ -246,7 +533,7 @@ const AddAddress = () => {
           type: province.type,
           typeText: province.typeText,
           slug: province.slug,
-          autocompleteType: province.autocompleteType
+          autocompleteType: province.autocompleteType || 'oapi'
         },
         district: {
           code: district.code,
@@ -254,7 +541,7 @@ const AddAddress = () => {
           provinceId: province.code,
           type: district.type,
           typeText: district.typeText,
-          autocompleteType: district.autocompleteType
+          autocompleteType: district.autocompleteType || 'oapi'
         },
         ward: {
           code: ward.code,
@@ -262,16 +549,47 @@ const AddAddress = () => {
           districtId: district.code,
           type: ward.type,
           typeText: ward.typeText,
-          autocompleteType: ward.autocompleteType,
+          autocompleteType: ward.autocompleteType || 'oapi',
           fullName: ward.fullName,
           path: ward.path
         },
-  isDefault: false,
-  type: addressType,
-  ...(pickedCoords ? { location: { lat: pickedCoords.lat, lng: pickedCoords.lng } } : {}),
-  note: ''
+        isDefault: false,
+        type: addressType,
+        note: ''
       };
+
+      // Add location data if coordinates are available
+      if (pickedCoords) {
+        addressPayload.location = {
+          lat: pickedCoords.lat,
+          lng: pickedCoords.lng
+        };
+      }
+
+      // Add OSM data if available from Nominatim
+      if (pickedCoords && selectedAddress.fullAddress) {
+        addressPayload.osm = {
+          lat: pickedCoords.lat,
+          lng: pickedCoords.lng,
+          displayName: selectedAddress.fullAddress,
+          raw: {
+            display_name: selectedAddress.fullAddress,
+            lat: pickedCoords.lat,
+            lon: pickedCoords.lng
+          }
+        };
+      }
+
       await AddressService.addAddress(token, addressPayload);
+      
+      // Clear temp storage on success
+      try {
+        await AsyncStorage.removeItem('tempSelectedAddress');
+        console.log('[AddAddress] Cleared temp storage on success');
+      } catch (e) {
+        console.warn('[AddAddress] Failed to clear temp storage:', e);
+      }
+      
       Alert.alert(t('success'), t('addressAddedSuccessfully'), [
         {
           text: t('ok'),
@@ -290,7 +608,7 @@ const AddAddress = () => {
   const formatAddress = () => {
     if (!selectedAddress) return '';
     const parts = [
-      addressDetail,
+      [houseNumber, streetName].filter(Boolean).join(' '),
       selectedAddress.ward?.name,
       selectedAddress.district?.name,
       selectedAddress.province?.name
@@ -301,7 +619,7 @@ const AddAddress = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-              behavior={undefined}
+      behavior={undefined}
     >
       <View style={[styles.headerContainer, { marginTop: 24 }]}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -336,48 +654,86 @@ const AddAddress = () => {
 
         <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
 
-
-
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1 }}>
               <AddressSelector value={selectedAddress || undefined} onChange={handleAddressChange} />
-            </View>
-            <View style={{ marginLeft: 8, flexDirection: 'column' }}>
-              <TouchableOpacity style={{ padding: 6 }} onPress={() => (router.push as any)('/osmmap') }>
-                <Text style={{ color: '#3255FB', fontWeight: '600' }}>Open map</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={{ padding: 6 }} onPress={async () => {
-                // Save draft only if we have pickedCoords or selectedAddress.fullAddress
-                if (!token) { showErrorToast(t('error'), t('pleaseLoginToAddAddress')); return; }
-                if (!pickedCoords && !selectedAddress?.fullAddress) { showErrorToast(t('error'), 'No location selected to save'); return; }
-                try {
-                  setLoading(true);
-                  const draftPayload: any = { isDraft: true };
-                  if (pickedCoords) draftPayload.location = { type: 'Point', coordinates: [pickedCoords.lng, pickedCoords.lat] };
-                  if (selectedAddress?.fullAddress) draftPayload.osm = { lat: pickedCoords?.lat, lng: pickedCoords?.lng, displayName: selectedAddress.fullAddress };
-                  const res = await AddressService.createDraft(token, draftPayload);
-                  console.log('[AddAddress] draft created', res);
-                  Alert.alert(t('success'), t('addressSavedAsDraft'), [{ text: t('ok'), onPress: () => router.back() }]);
-                } catch (e) {
-                  console.error('Create draft failed', e);
-                  showErrorToast(t('error'), t('cannotAddAddressPleaseTryAgain'));
-                } finally { setLoading(false); }
-              }}>
-                <Text style={{ color: '#999', fontSize: 12 }}>Save location</Text>
-              </TouchableOpacity>
+              {/* Debug info */}
+              <Text style={{ fontSize: 10, color: 'blue', marginTop: 4 }}>
+                Debug: selectedAddress={selectedAddress ? 'SET' : 'NULL'} | 
+                fullAddress="{selectedAddress?.fullAddress || 'NONE'}"
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <TextInput
-            placeholder={t('streetBuildingHouseNumber')}
-            style={styles.input}
-            value={addressDetail}
-            onChangeText={setAddressDetail}
-            multiline
-          />
+          <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
+          
+          <TouchableOpacity
+            style={styles.addressDetailContainer}
+            onPress={() => {
+              if (selectedAddress?.ward?.name) {
+                router.push({
+                  pathname: '/address-detail',
+                  params: {
+                    ward: selectedAddress.ward.name,
+                    district: selectedAddress.district?.name || '',
+                    province: selectedAddress.province?.name || ''
+                  }
+                });
+              }
+            }}
+            disabled={!selectedAddress?.ward?.name}
+          >
+            <View style={styles.addressDetailInputContainer}>
+              <Text style={addressDetail ? styles.addressDetailText : styles.addressDetailPlaceholder}>
+                {addressDetail || "Tên đường, Toà nhà, Số nhà."}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+            </View>
+            {/* Debug info */}
+            <Text style={{ fontSize: 10, color: 'red', marginTop: 4 }}>
+              Debug: addressDetail="{addressDetail}" | forceUpdate={forceUpdate}
+            </Text>
+          </TouchableOpacity>
+
+
+
+          {/* Hướng dẫn sử dụng */}
+          {selectedAddress?.ward?.name && (
+            <View style={styles.suggestionsContainer}>
+              <Text style={styles.suggestionsTitle}>
+                Hướng dẫn sử dụng
+              </Text>
+              <View style={styles.suggestionsList}>
+                <View style={styles.suggestionItem}>
+                  <Ionicons name="information-circle" size={16} color="#3255FB" style={styles.suggestionIcon} />
+                  <Text style={styles.suggestionText}>
+                    1. Nhấn vào ô "Địa chỉ chi tiết" để tìm kiếm
+                  </Text>
+                </View>
+                <View style={styles.suggestionItem}>
+                  <Ionicons name="information-circle" size={16} color="#3255FB" style={styles.suggestionIcon} />
+                  <Text style={styles.suggestionText}>
+                    2. Nhập số nhà, tên đường để tìm vị trí chính xác
+                  </Text>
+                </View>
+                <View style={styles.suggestionItem}>
+                  <Ionicons name="information-circle" size={16} color="#3255FB" style={styles.suggestionIcon} />
+                  <Text style={styles.suggestionText}>
+                    3. Chọn địa chỉ và xác nhận vị trí trên bản đồ
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          <View style={{ marginBottom: 8 }}>
+            <Text style={{ color: '#666', fontSize: 12 }}>
+              Nhấn vào ô địa chỉ chi tiết để tìm kiếm và chọn vị trí chính xác
+            </Text>
+          </View>
         </View>
 
         {formatAddress() && (
@@ -389,7 +745,7 @@ const AddAddress = () => {
 
         {pickedCoords && (
           <View style={[styles.addressPreview, { backgroundColor: '#e8f5e9' }]}>
-            <Text style={styles.previewTitle}>Selected location</Text>
+            <Text style={styles.previewTitle}>Vị trí đã chọn:</Text>
             <Text style={styles.previewText}>Lat: {pickedCoords.lat.toFixed(6)}, Lng: {pickedCoords.lng.toFixed(6)}</Text>
           </View>
         )}
@@ -498,12 +854,15 @@ const styles = StyleSheet.create({
   input: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
     fontSize: 16,
     color: '#000',
     marginBottom: 12,
+    backgroundColor: '#fff',
   },
+
   addressPreview: {
     backgroundColor: '#f0f8ff',
     padding: 16,
@@ -521,7 +880,6 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
-
   switchContainer: {
     backgroundColor: '#f9f9f9',
     borderRadius: 12,
@@ -574,7 +932,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: '#3255FB',
     borderRadius: 24,
-    paddingVertical: 24, // tăng chiều cao nút
+    paddingVertical: 24,
     alignItems: 'center',
   },
   submitButtonDisabled: {
@@ -615,6 +973,79 @@ const styles = StyleSheet.create({
   },
   addressSelectorPlaceholder: {
     fontSize: 16,
+    color: '#999',
+  },
+  addressDetailContainer: {
+    marginBottom: 12,
+  },
+  addressDetailInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 60,
+  },
+  addressDetailInput: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+
+  suggestionsContainer: {
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  suggestionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  suggestionsList: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  suggestionIcon: {
+    marginRight: 8,
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  addressDetailButton: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+
+  addressDetailContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addressDetailText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  addressDetailPlaceholder: {
     color: '#999',
   },
 });

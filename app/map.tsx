@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 // Wrapper screen that navigates to the WebView-based map implementation.
 export default function MapScreen() {

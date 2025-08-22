@@ -4,11 +4,11 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import i18n from 'i18next';
-import OrderStatusBadge from '../components/OrderStatusBadge';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import OrderStatusBadge from '../components/OrderStatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../hooks/useOrders';
 
@@ -17,7 +17,7 @@ interface OrderItem {
   orderCode: string;
   status: string;
   totalAmount: number;
-  items: Array<{
+  items: {
     book: {
       _id: string;
       title: string;
@@ -27,7 +27,7 @@ interface OrderItem {
     };
     quantity: number;
     price: number;
-  }>;
+  }[];
   createdAt: string;
   updatedAt: string;
 }

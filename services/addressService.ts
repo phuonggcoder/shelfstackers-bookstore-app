@@ -340,6 +340,13 @@ class AddressService {
     isDefault?: boolean;
     note?: string;
     type?: 'home' | 'office';
+    location?: { lat: number; lng: number };
+    osm?: {
+      lat: number;
+      lng: number;
+      displayName: string;
+      raw: any;
+    };
   }): Promise<UserAddress> {
     try {
       // Validate input data
@@ -420,7 +427,10 @@ class AddressService {
         note: (addressData.note || '').substring(0, 500),
         type: addressData.type || 'home',
         adminType: "new",
-        autocomplete34: autocomplete34
+        autocomplete34: autocomplete34,
+        // Add location and OSM data if provided
+        ...(addressData.location && { location: addressData.location }),
+        ...(addressData.osm && { osm: addressData.osm })
         // Không gửi fullAddress, để BE tự sinh
       };
 

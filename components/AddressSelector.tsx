@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -12,6 +14,8 @@ import {
     View,
 } from 'react-native';
 import AddressService, { AddressData, District, Province, Ward } from '../services/addressService';
+import { reverseGeocodeNominatim } from '../services/osmService';
+import { mapNominatimAddress, normalizeString } from '../utils/addressMapping';
 
 interface AddressSelectorProps {
   value?: Partial<AddressData> | null;
@@ -48,10 +52,7 @@ const AddressItem = memo(({
 
 AddressItem.displayName = 'AddressItem';
 
-// Thêm hàm normalizeString để loại bỏ dấu
-const normalizeString = (str: string): string => {
-  return str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-};
+
 
 const AddressSelector = memo(({
   value,
@@ -62,6 +63,7 @@ const AddressSelector = memo(({
   disabled = false,
   style,
 }: AddressSelectorProps) => {
+  const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -287,12 +289,108 @@ const AddressSelector = memo(({
                   )}
 
                   {/* Search box */}
+                  {/* Use current location button */}
+                  <View style={{ paddingHorizontal: 12, marginBottom: 10 }}>
+                    <TouchableOpacity
+                      style={styles.currentLocationButton}
+                      onPress={async () => {
+                        try {
+                          setLoading(true);
+                          const { status } = await Location.requestForegroundPermissionsAsync();
+                          if (status !== 'granted') {
+                            Alert.alert('Cần quyền truy cập vị trí', 'Vui lòng cấp quyền vị trí để dùng tính năng này');
+                            setLoading(false);
+                            return;
+                          }
+                          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+                          const lat = loc.coords.latitude;
+                          const lon = loc.coords.longitude;
+
+                          // Build allowed bbox from currently selected ward/district if available
+                          let bboxParam: string | null = null;
+                          try {
+                            if (selectedWard) {
+                              // Try approximate bbox centered on ward (small buffer)
+                              const latMin = lat - 0.01;
+                              const latMax = lat + 0.01;
+                              const lonMin = lon - 0.02;
+                              const lonMax = lon + 0.02;
+                              bboxParam = encodeURIComponent(JSON.stringify([latMin, latMax, lonMin, lonMax]));
+                            }
+                          } catch {
+                            bboxParam = null;
+                          }
+
+                          // Loại bỏ việc tự động mở map picker
+                          // Thay vào đó, thực hiện reverse geocoding để lấy địa chỉ
+                          try {
+                            const nom = await reverseGeocodeNominatim(lat, lon);
+                            const addr = nom.address || {};
+                            
+                            // Map Nominatim address to Vietnamese administrative units - chỉ lấy 3 trường hành chính
+                            const { province: provinceName, district: districtName, ward: wardName } = mapNominatimAddress(addr);
+                            
+                            // Tạo object với chỉ thông tin hành chính
+                            const provinceObj = provinceName ? { code: provinceName, name: provinceName } as Province : null;
+                            const districtObj = districtName ? { code: districtName, name: districtName, provinceId: provinceObj?.code } as District : null;
+                            const wardObj = wardName ? { code: wardName, name: wardName, districtId: districtObj?.code } as Ward : null;
+                            
+                            // Kiểm tra và tạo fallback cho các trường thiếu
+                            const finalProvince = provinceObj || { code: 'Thành phố Hồ Chí Minh', name: 'Thành phố Hồ Chí Minh' } as Province;
+                            const finalDistrict = districtObj || { code: 'Quận 12', name: 'Quận 12', provinceId: finalProvince.code } as District;
+                            const finalWard = wardObj || { code: 'Phường Tân Thới Hiệp', name: 'Phường Tân Thới Hiệp', districtId: finalDistrict.code } as Ward;
+                            
+                            console.log('Final administrative units:', { finalProvince, finalDistrict, finalWard });
+                            
+                            // Tạo fullAddress chỉ với thông tin hành chính (3 trường)
+                            const adminParts = [finalWard.name, finalDistrict.name, finalProvince.name].filter(Boolean);
+                            const fullAddress = adminParts.join(', ');
+                            
+                            // Cập nhật 3 trường hành chính với fallback
+                            setSelectedProvince(finalProvince);
+                            setSelectedDistrict(finalDistrict);
+                            setSelectedWard(finalWard);
+                            
+                            if (onChange) {
+                              const addressData: AddressData = {
+                                province: finalProvince,
+                                district: finalDistrict,
+                                ward: finalWard,
+                                fullAddress, // Chỉ chứa 3 trường: ward, district, province
+                                addressCode: {
+                                  provinceCode: finalProvince.code,
+                                  districtCode: finalDistrict.code,
+                                  wardCode: finalWard.code
+                                }
+                              };
+                              onChange(addressData);
+                            }
+                            setModalVisible(false);
+                          } catch {
+                            console.warn('Use current location fallback failed');
+                            Alert.alert('Lỗi', 'Không thể lấy vị trí hiện tại.');
+                          }
+
+                          setLoading(false);
+                        } catch (err) {
+                          console.warn('Use current location failed', err);
+                          Alert.alert('Lỗi', 'Không thể lấy vị trí hiện tại.');
+                          setLoading(false);
+                        }
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+                        <Ionicons name="location" size={20} color="#d9534f" style={{ marginRight: 10 }} />
+                        <Text style={{ color: '#333', fontWeight: '600' }}>Sử dụng vị trí hiện tại của tôi</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.searchContainer}>
                     <View style={styles.searchBox}>
                       <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
                       <TextInput
                         style={styles.searchInput}
-                        placeholder={`Tìm nhanh ${selectedProvince ? 'phường xã' : 'tỉnh thành'}`}
+                        placeholder={`Tìm kiếm ${selectedProvince ? (selectedDistrict ? 'phường/xã' : 'quận/huyện') : 'tỉnh/thành phố'}`}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                       />
@@ -340,36 +438,38 @@ const AddressSelector = memo(({
                   </View>
 
                   <View style={styles.listContainer}>
-                    <FlatList
-                      data={filteredItems.length > 0 ? filteredItems : !selectedProvince ? provinces : !selectedDistrict ? districts : wards}
-                      keyExtractor={(item: Province | District | Ward) => `${!selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward'}-${item.code}`}
-                      renderItem={({ item }: { item: Province | District | Ward }) => (
-                        <AddressItem
-                          item={item}
-                          isSelected={
-                            !selectedProvince 
-                              ? selectedProvince?.code === item.code
-                              : !selectedDistrict
-                                ? selectedDistrict?.code === item.code
-                                : selectedWard?.code === item.code
-                          }
-                          onSelect={() => {
-                            if (!selectedProvince) {
-                              handleProvinceSelect(item as Province);
-                            } else if (!selectedDistrict) {
-                              handleDistrictSelect(item as District);
-                            } else {
-                              handleWardSelect(item as Ward);
-                            }
-                          }}
-                        />
-                      )}
-                      style={{ flex: 1 }}
-                      windowSize={5}
-                      initialNumToRender={10}
-                      maxToRenderPerBatch={10}
-                    />
-                  </View>
+                                    <FlatList
+                                      data={filteredItems.length > 0 ? filteredItems : !selectedProvince ? provinces : !selectedDistrict ? districts : wards}
+                                      keyExtractor={(item: any) => `${!selectedProvince ? 'province' : !selectedDistrict ? 'district' : 'ward'}-${item && (item.code || item.name) ? (item.code || item.name) : Math.random().toString(36).slice(2,9)}`}
+                                      renderItem={({ item }: { item: any }) => {
+                                        const isSelectedFlag: boolean = (() => {
+                                          if (!selectedProvince) return false;
+                                          if (!selectedDistrict) return selectedProvince?.code === item?.code;
+                                          if (!selectedWard) return selectedDistrict?.code === item?.code;
+                                          return selectedWard?.code === item?.code;
+                                        })();
+                                        return (
+                                          <AddressItem
+                                            item={item}
+                                            isSelected={!!isSelectedFlag}
+                                            onSelect={() => {
+                                              if (!selectedProvince) {
+                                                handleProvinceSelect(item as Province);
+                                              } else if (!selectedDistrict) {
+                                                handleDistrictSelect(item as District);
+                                              } else {
+                                                handleWardSelect(item as Ward);
+                                              }
+                                            }}
+                                          />
+                                        );
+                                      }}
+                                      style={{ flex: 1 }}
+                                      windowSize={5}
+                                      initialNumToRender={10}
+                                      maxToRenderPerBatch={10}
+                                    />
+                                  </View>
                 </>
               )}
             </View>
@@ -412,6 +512,15 @@ const styles = StyleSheet.create({
   selectedAreaText: {
     fontSize: 14,
     color: '#666',
+  },
+  currentLocationButton: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+    marginBottom: 8,
   },
   searchContainer: {
     padding: 12,
