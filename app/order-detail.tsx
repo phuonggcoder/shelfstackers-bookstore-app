@@ -65,6 +65,9 @@ const PAYMENT_METHOD_NAMES: { [key: string]: string } = {
   zalopay: 'ZaloPay',
   payos: 'PayOS',
   cod: 'Thanh toán khi nhận hàng',
+  COD: 'Thanh toán khi nhận hàng',
+  ZALOPAY: 'ZaloPay',
+  PAYOS: 'PayOS',
   // Thêm các phương thức thanh toán khác nếu cần
 };
 
@@ -103,14 +106,9 @@ const OrderDetailScreen = () => {
     const actualOrderId = order._id;
     setCancelling(true);
     try {
-      // Hủy đơn hàng hoặc thay đổi địa chỉ
-      if (reason === 'Cần thay đổi địa chỉ' && newAddress) {
-        await cancelOrder(token, actualOrderId, reason, newAddress);
-        showSuccessToast(t('success'), t('addressChangeRequestSent'), 2000);
-      } else {
-        await cancelOrder(token, actualOrderId, reason);
-        showSuccessToast(t('success'), t('orderCancelled'), 2000);
-      }
+      // Hủy đơn hàng
+      await cancelOrder(token, actualOrderId, reason);
+      showSuccessToast(t('success'), t('orderCancelled'), 2000);
 
       // Xử lý hoàn tiền tự động cho ZaloPay và PayOS
       if (
@@ -411,14 +409,32 @@ const OrderDetailScreen = () => {
     ward?: string;
     district?: string;
     province?: string;
+    addressDetail?: string;
   }) => {
-    const { street, ward, district, province } = address;
+    if (!address) {
+      return 'Address details unavailable';
+    }
+    
+    const { street, ward, district, province, addressDetail } = address;
+    
+    // Nếu có addressDetail, sử dụng nó trước
+    if (addressDetail && typeof addressDetail === 'string') {
+      const parts = [addressDetail, street, ward, district, province]
+        .filter(Boolean)
+        .filter(part => typeof part === 'string');
+      return parts.join(', ');
+    }
+    
+    // Nếu không có addressDetail, sử dụng các trường riêng lẻ
     if (!street && !ward && !district && !province) {
       return 'Address details unavailable';
     }
-    return [street || 'Unknown street', ward || 'Unknown ward', district || 'Unknown district', province || 'Unknown province']
+    
+    const parts = [street, ward, district, province]
       .filter(Boolean)
-      .join(', ');
+      .filter(part => typeof part === 'string');
+    
+    return parts.join(', ');
   };
 
   if (loading) {
@@ -475,6 +491,26 @@ const OrderDetailScreen = () => {
           <Text style={styles.statusDescription}>
             {isOrderCompleted() ? t('orderDeliveredSuccessfully') : t('orderProcessing')}
           </Text>
+          
+          {/* Shipper Information - Hiển thị khi có shipper được gán */}
+          {(order.assigned_shipper_name || order.assigned_shipper_id) && (
+            <View style={styles.shipperInfo}>
+              <Text style={styles.shipperTitle}>{t('shipperInformation')}</Text>
+              <Text style={styles.shipperName}>{t('shipperName')}: {order.assigned_shipper_name || order.assigned_shipper_id}</Text>
+              {order.assigned_shipper_phone && (
+                <TouchableOpacity 
+                  style={styles.shipperPhone}
+                  onPress={() => Linking.openURL(`tel:${order.assigned_shipper_phone}`)}
+                >
+                  <Ionicons name="call-outline" size={16} color="#667eea" />
+                  <Text style={styles.shipperPhoneText}>{order.assigned_shipper_phone}</Text>
+                </TouchableOpacity>
+              )}
+              {order.shipper_note && (
+                <Text style={styles.shipperNote}>{t('shipperNote')}: {order.shipper_note}</Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Order Information */}
@@ -985,6 +1021,42 @@ const styles = StyleSheet.create({
   },
   multiItemAlignment: {
     justifyContent: 'flex-start',
+  },
+  // Shipper information styles
+  shipperInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#667eea',
+  },
+  shipperTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  shipperName: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  shipperPhone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  shipperPhoneText: {
+    fontSize: 14,
+    color: '#667eea',
+    marginLeft: 4,
+    textDecorationLine: 'underline',
+  },
+  shipperNote: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    fontStyle: 'italic',
   },
 
 });

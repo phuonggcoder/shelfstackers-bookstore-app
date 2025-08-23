@@ -28,6 +28,16 @@ export interface Book {
   updatedAt: string;
   __v: number;
   thumbnail: string;
+  isbn?: string;
+  averageRating?: number;
+  ratingsCount?: number;
+  pageCount?: number;
+  previewLink?: string;
+  infoLink?: string;
+  buyLink?: string;
+  source?: 'local' | 'google_books';
+  isLocal?: boolean;
+  isGoogle?: boolean;
 }
 
 export interface Campaign {

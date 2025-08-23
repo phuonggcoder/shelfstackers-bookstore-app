@@ -153,6 +153,12 @@ const BookDetailsScreen = () => {
         try {
           const fetchedBook = await getBookById(id as string);
           setBook(fetchedBook);
+          
+          // Kiểm tra stock ngay sau khi fetch book
+          if (fetchedBook && (fetchedBook.stock === 0 || fetchedBook.stock === undefined || fetchedBook.stock < 1)) {
+            setOutOfStock(true);
+            console.log('Book out of stock detected:', { title: fetchedBook.title, stock: fetchedBook.stock });
+          }
         } catch (error) {
           console.error('Failed to fetch book details:', error);
         }
@@ -177,8 +183,14 @@ const BookDetailsScreen = () => {
   }, [book, token]);
 
   useEffect(() => {
-    if (book && (book.stock === 0 || book.stock === undefined)) {
-      setOutOfStock(true);
+    if (book) {
+      // Kiểm tra stock ngay khi book được load
+      if (book.stock === 0 || book.stock === undefined || book.stock < 1) {
+        setOutOfStock(true);
+        console.log('Book out of stock:', { title: book.title, stock: book.stock });
+      } else {
+        setOutOfStock(false);
+      }
     }
   }, [book]);
 
@@ -674,7 +686,12 @@ const BookDetailsScreen = () => {
             <View style={styles.separator} />
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Tồn kho:</Text>
-              <Text style={styles.detailValue}>{book.stock}</Text>
+              <Text style={[
+                styles.detailValue,
+                outOfStock && { color: '#E53935', fontWeight: 'bold' }
+              ]}>
+                {outOfStock ? 'Hết hàng' : book.stock}
+              </Text>
             </View>
           </View>
           
@@ -990,42 +1007,68 @@ const BookDetailsScreen = () => {
         <View style={{ flex: 1, alignItems: 'center' }}>
           <View style={styles.qtyGroup}>
             <TouchableOpacity
-              style={[styles.qtyBtn, quantity === 1 && { opacity: 0.5 }]}
+              style={[
+                styles.qtyBtn, 
+                (quantity === 1 || outOfStock) && { opacity: 0.5 }
+              ]}
               onPress={handleDecrease}
               onPressIn={() => startHold('dec')}
               onPressOut={stopHold}
-              disabled={quantity === 1}
+              disabled={quantity === 1 || outOfStock}
             >
               <Text style={{ color: '#bbb', fontSize: 22, fontWeight: 'bold' }}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.qtyText}>{quantity}</Text>
+            <Text style={[
+              styles.qtyText,
+              outOfStock && { color: '#ccc' }
+            ]}>
+              {outOfStock ? '0' : quantity}
+            </Text>
             <TouchableOpacity
-              style={styles.qtyBtn}
+              style={[
+                styles.qtyBtn,
+                outOfStock && { opacity: 0.5 }
+              ]}
               onPress={handleIncrease}
               onPressIn={() => startHold('inc')}
               onPressOut={stopHold}
+              disabled={outOfStock}
             >
               <Text style={{ color: '#bbb', fontSize: 22, fontWeight: 'bold' }}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', height: '100%' }}
+          style={[
+            { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', height: '100%' },
+            outOfStock && { backgroundColor: '#f5f5f5' }
+          ]}
           onPress={handleAddToCart}
           disabled={addingCart || showLoginAlert || outOfStock}
-          activeOpacity={0.7}
+          activeOpacity={outOfStock ? 1 : 0.7}
         >
-          <Text style={{ color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
-            {t('addToCart')}{"\n"}
+          <Text style={[
+            { color: '#1890FF', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
+            outOfStock && { color: '#ccc' }
+          ]}>
+            {outOfStock ? 'Hết hàng' : t('addToCart')}{"\n"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={{ width: 130, backgroundColor: '#1890FF', justifyContent: 'center', alignItems: 'center', height: '100%' }}
+          style={[
+            { width: 130, backgroundColor: '#1890FF', justifyContent: 'center', alignItems: 'center', height: '100%' },
+            outOfStock && { backgroundColor: '#ccc' }
+          ]}
           onPress={handleBuyNow}
           disabled={showLoginAlert || outOfStock}
-          activeOpacity={0.7}
+          activeOpacity={outOfStock ? 1 : 0.7}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{t('buyNow')}</Text>
+          <Text style={[
+            { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+            outOfStock && { color: '#999' }
+          ]}>
+            {outOfStock ? 'Hết hàng' : t('buyNow')}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
       {insets.bottom > 0 && (
@@ -1042,7 +1085,13 @@ const BookDetailsScreen = () => {
         />
       )}
 
-      <CustomOutOfStockAlert visible={outOfStock} onClose={() => router.back()} />
+      <CustomOutOfStockAlert 
+        visible={outOfStock} 
+        onClose={() => {
+          setOutOfStock(false);
+          router.back();
+        }} 
+      />
       {/* CartAddedDialog removed - using UnifiedCustomComponent instead */}
       
       {/* Fullscreen Image Modal */}

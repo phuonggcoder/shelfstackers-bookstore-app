@@ -16,6 +16,7 @@ import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
 import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
+import ShippingService, { ShippingAddress, ShippingFeeRequest } from '../services/shippingService';
 import { getAvailableVouchers, validateVoucher } from '../services/voucherService';
 import { formatVND, getBookImageUrl } from '../utils/format';
   // Khi quay lại màn hình, luôn lấy địa chỉ mới nhất từ AsyncStorage (nếu có)
@@ -197,6 +198,8 @@ export default function OrderReviewScreen() {
           }).map((item: any) => ({
             ...item,
             book: item.book_id, // Map book_id to book for consistency
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.book_id?.price) || 0
           }));
           
           console.log('OrderReview selected items:', selectedItems);
@@ -205,6 +208,11 @@ export default function OrderReviewScreen() {
           // Single book checkout
           if (bookId.trim() !== '') {
             const bookData = await getBookById(bookId);
+            // Ensure price is a valid number
+            if (bookData && typeof bookData.price !== 'number') {
+              bookData.price = Number(bookData.price) || 0;
+            }
+            console.log('Book data loaded:', bookData);
             setBook(bookData);
           }
         } else if (Array.isArray(bookId) && bookId.length > 0) {
@@ -212,6 +220,11 @@ export default function OrderReviewScreen() {
           const firstBookId = bookId[0];
           if (firstBookId && typeof firstBookId === 'string') {
             const bookData = await getBookById(firstBookId);
+            // Ensure price is a valid number
+            if (bookData && typeof bookData.price !== 'number') {
+              bookData.price = Number(bookData.price) || 0;
+            }
+            console.log('Book data loaded:', bookData);
             setBook(bookData);
           }
         } else {
@@ -227,7 +240,10 @@ export default function OrderReviewScreen() {
               const formattedItems = parsedCartItems.map((item: any) => ({
                 ...item,
                 book: item.book_id,
+                quantity: Number(item.quantity) || 1,
+                price: Number(item.book_id?.price) || 0
               }));
+              console.log('Formatted cart items:', formattedItems);
               setCartItems(formattedItems);
               
               // Clear stored data
@@ -277,11 +293,15 @@ export default function OrderReviewScreen() {
         if (!item || !item.book) {
           return sum;
         }
-        const price = item.book.price || 0;
-        const quantity = item.quantity || 1;
-        return sum + (price * quantity);
+        const price = Number(item.book.price) || 0;
+        const quantity = Number(item.quantity) || 1;
+        const itemTotal = price * quantity;
+        console.log(`Item calculation: ${item.book.title} - Price: ${price}, Quantity: ${quantity}, Total: ${itemTotal}`);
+        return sum + itemTotal;
       }, 0)
-    : (book?.price || 0);
+    : (Number(book?.price) || 0);
+
+  console.log('Subtotal calculation:', { subtotal, cartItemsLength: cartItems.length, bookPrice: book?.price });
 
   const shippingFee = shipping === 'free' ? 0 : 30000;
   const discount = selectedVoucher
@@ -290,6 +310,8 @@ export default function OrderReviewScreen() {
         : selectedVoucher.discount_value)
     : 0;
   const total = subtotal - discount + shippingFee;
+
+  console.log('Total calculation:', { subtotal, discount, shippingFee, total });
 
   // Nhập mã voucher thủ công
   const [manualVoucherCode, setManualVoucherCode] = useState('');
@@ -395,10 +417,24 @@ export default function OrderReviewScreen() {
         payment_method: selectedPaymentMethod,
         voucher_code: selectedVoucher?.voucher_id,
         subtotal: subtotal,
+        total: total,
         cart_items_count: cartItems.length,
         has_book: !!book,
         has_cart_items: cartItems.length > 0
       });
+
+      // Validate that subtotal and total are valid numbers
+      if (isNaN(subtotal) || subtotal < 0) {
+        console.error('Invalid subtotal:', subtotal);
+        showErrorToast('Lỗi', 'Giá trị đơn hàng không hợp lệ. Vui lòng thử lại.');
+        return;
+      }
+
+      if (isNaN(total) || total < 0) {
+        console.error('Invalid total:', total);
+        showErrorToast('Lỗi', 'Tổng tiền đơn hàng không hợp lệ. Vui lòng thử lại.');
+        return;
+      }
 
       // Validate voucher if selected
       if (selectedVoucher) {
@@ -427,10 +463,59 @@ export default function OrderReviewScreen() {
         }
       }
 
+      // Calculate shipping fee
+      let shippingFee = 0;
+      try {
+        const fromAddress: ShippingAddress = {
+          street: 'ShelfStackers Store',
+          ward: 'Phường Bách Khoa',
+          district: 'Quận Hai Bà Trưng',
+          province: 'Hà Nội',
+          latitude: 21.0285,
+          longitude: 105.8542
+        };
+        
+        const toAddress: ShippingAddress = {
+          street: address.street || '',
+          ward: address.ward?.name || address.ward || '',
+          district: address.district?.name || address.district || '',
+          province: address.province?.name || address.province || '',
+          latitude: address.latitude,
+          longitude: address.longitude
+        };
+        
+        // Calculate total weight of items
+        let totalWeight = 0;
+        if (cartItems.length > 0) {
+          totalWeight = cartItems.reduce((sum, item) => sum + (item.book.weight || 0.5) * item.quantity, 0);
+        } else if (book) {
+          totalWeight = book.weight || 0.5;
+        }
+        
+        const shippingRequest: ShippingFeeRequest = {
+          fromAddress,
+          toAddress,
+          weight: totalWeight,
+          carrier: 'GHN' // Default to GHN
+        };
+        
+        const shippingResult = await ShippingService.calculateShippingFeeAPI(shippingRequest);
+        if (shippingResult.success && shippingResult.fees.length > 0) {
+          shippingFee = shippingResult.fees[0].fee; // Use the cheapest option
+        }
+      } catch (error) {
+        console.error('Error calculating shipping fee:', error);
+        // Fallback to default shipping fee
+        shippingFee = 15000;
+      }
+
       // Create order using the correct API endpoint
       const orderData = {
         address_id: address._id,
         payment_method: selectedPaymentMethod,
+        subtotal: Number(subtotal),
+        shipping_fee: shippingFee,
+        total: Number(subtotal) + shippingFee,
         ...(selectedOrderVoucher && { voucher_code_order: selectedOrderVoucher.voucher_id }),
         ...(selectedShippingVoucher && { voucher_code_shipping: selectedShippingVoucher.voucher_id })
       };
@@ -438,12 +523,12 @@ export default function OrderReviewScreen() {
       // Add book_id for single book purchase (buy now)
       if (cartItems.length === 0 && book) {
         orderData.book_id = book._id;
-        orderData.quantity = 1;
+        orderData.quantity = Number(1);
       } else if (cartItems.length > 0) {
         // Add cart items for multi-item purchase
         orderData.cart_items = cartItems.map(item => ({
           book_id: item.book._id,
-          quantity: item.quantity
+          quantity: Number(item.quantity) || 1
         }));
       }
 
@@ -495,7 +580,7 @@ export default function OrderReviewScreen() {
       // Nếu payment method là PAYOS, điều hướng tới màn PayOS để lấy link/QR
       if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
         // cast to any to avoid typed-route union restrictions
-        (router.replace as any)(`/payos?orderId=${orderId}`);
+        (router.replace as any)(`/payos?orderId=${orderId}&amount=${total}`);
         return;
       }
 

@@ -105,10 +105,15 @@ export const useOrderDetail = (orderId: string) => {
           phoneNumber: shippingAddressRaw.phone || shippingAddressRaw.phone_number || '',
           addressDetail: shippingAddressRaw.address || shippingAddressRaw.address_detail || '',
           street: shippingAddressRaw.street || '',
-          ward: shippingAddressRaw.ward || '',
-          district: shippingAddressRaw.district || '',
-          province: shippingAddressRaw.province || ''
+          ward: typeof shippingAddressRaw.ward === 'object' ? shippingAddressRaw.ward.name : shippingAddressRaw.ward || '',
+          district: typeof shippingAddressRaw.district === 'object' ? shippingAddressRaw.district.name : shippingAddressRaw.district || '',
+          province: typeof shippingAddressRaw.province === 'object' ? shippingAddressRaw.province.name : shippingAddressRaw.province || ''
         },
+        // Shipper information
+        assigned_shipper_name: order.assigned_shipper_name || order.assigned_shipper_id?.full_name || '',
+        assigned_shipper_phone: order.assigned_shipper_phone || order.assigned_shipper_id?.phone_number || '',
+        shipper_note: order.shipper_note || '',
+        shipper_ack: order.shipper_ack || '',
         createdAt: order.order_date || order.createdAt,
         updatedAt: order.updatedAt,
         orderHistory: order.order_history || [],

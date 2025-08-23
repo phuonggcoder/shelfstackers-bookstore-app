@@ -1,207 +1,330 @@
-import { Ionicons } from '@expo/vector-icons';
-import dayjs from 'dayjs';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { changeLanguage } from 'i18next';
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import OrderActions from '../components/OrderActions';
-import OrderStatusBadge from '../components/OrderStatusBadge';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getOrderDetail } from '../services/orderService';
-import { formatVND } from '../utils/format';
 
-const videoSource = require('../assets/lottie/shoppingCart.mp4');
-
-
-export default function OrderSuccessScreen() {
-  const { t } = useTranslation();
-  const { token } = useAuth();
-  const { showErrorToast } = useUnifiedModal();
+export default function OrderSuccessRoute() {
   const { orderId } = useLocalSearchParams();
-  const [order, setOrder] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  // Ensure default language is set to Vietnamese
-  useEffect(() => {
-    changeLanguage('vi');
-  }, []);
-
-  const player = useVideoPlayer(videoSource, player => {
-    player.loop = true;
-    player.play();
-  });
+  const { token } = useAuth();
+  const [orderData, setOrderData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadOrderDetail = async () => {
-      if (!token || !orderId) return;
-      try {
-        setLoading(true);
-        const response = await getOrderDetail(token, orderId as string);
+    if (orderId && token) {
+      getOrderData();
+    }
+  }, [orderId, token]);
 
-        if (response.success && response.order) {
-          setOrder(response.order);
-        } else {
-          setOrder(response);
-        }
-      } catch {
-        showErrorToast(t('error'), t('cannotLoadOrderInfo'));
-      } finally {
-        setLoading(false);
+  const getOrderData = async () => {
+    try {
+      setLoading(true);
+      const response = await getOrderDetail(token as string, orderId as string);
+      if (response?.success) {
+        setOrderData(response.order);
+        console.log('Order success data:', response.order);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching order data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadOrderDetail();
-  }, [token, orderId, t, showErrorToast]);
+  const handleViewOrder = () => {
+    // Navigate to order detail or order history
+    router.replace('/order-history');
+  };
 
-  if (loading) return (
-    <View style={styles.loaderContainer}>
-      <Ionicons name="cart" size={48} color="#3255FB" />
-    </View>
-  );
-  if (!order) return <Text>{t('orderNotFound')}</Text>;
+  const handleContinueShopping = () => {
+    // Navigate back to home
+    router.replace('/');
+  };
 
-  // Lấy thông tin payment nếu có - Safe access với fallback
-  const payment = order.payment_id || order.payment || {};
-  const zaloPay = order.zaloPay || {};
-  
-  // Safe access cho các trường payment
-  const paymentAmount = payment.amount || order.total_amount || 0;
-  const paymentStatus = payment.payment_status || order.payment_status || 'Pending';
-  const transactionId = payment.transaction_id || null;
-  const paymentNotes = payment.notes || null;
-  
-  // Safe access cho thời gian hết hạn
-  const expireAt = payment.expireAt || payment.expire_time || zaloPay.expire_time;
-  const now = dayjs();
-  const isExpired = expireAt ? dayjs(expireAt).isBefore(now) : false;
+  const formatPaymentMethod = (method: string) => {
+    switch (method) {
+      case 'PAYOS':
+        return 'PayOS (VietQR/Webcheckout)';
+      case 'COD':
+        return 'Thanh toán khi nhận hàng';
+      case 'ZALOPAY':
+        return 'ZaloPay';
+      default:
+        return method;
+    }
+  };
 
-  // Cải thiện UI/UX của trang
+  const getOrderStatusText = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'Đã thanh toán';
+      case 'pending':
+        return 'Chờ thanh toán';
+      case 'processing':
+        return 'Đang xử lý';
+      case 'shipped':
+        return 'Đã gửi hàng';
+      case 'delivered':
+        return 'Đã giao hàng';
+      case 'cancelled':
+        return 'Đã hủy';
+      default:
+        return status;
+    }
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return '#28a745';
+      case 'pending':
+        return '#ffc107';
+      case 'processing':
+        return '#17a2b8';
+      case 'shipped':
+        return '#007bff';
+      case 'delivered':
+        return '#28a745';
+      case 'cancelled':
+        return '#dc3545';
+      default:
+        return '#666';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Đang tải...</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.verticalContainer}>
-        <View style={styles.headerBox}>
-          <Text style={styles.headerTitle}>{t('orderSuccess')}</Text>
-          <Text style={styles.headerSubtitle}>{t('thankYouForYourOrder')}</Text>
+    <View style={styles.container}>
+      <View style={styles.content}>
+        {/* Success Icon */}
+        <View style={styles.iconContainer}>
+          <Text style={styles.successIcon}>✅</Text>
         </View>
-        <View style={styles.animationBox}>
-          <VideoView
-            style={styles.animationVideo}
-            player={player}
-            allowsFullscreen
-            allowsPictureInPicture
-            nativeControls={false}
-          />
-        </View>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoLabel}>{t('orderValue')}</Text>
-          <Text style={styles.infoValue}>{formatVND(order.total_amount || 0)}</Text>
-          <Text style={styles.infoLabel}>{t('paymentAmount')}</Text>
-          <Text style={styles.infoValue}>{formatVND(paymentAmount)}</Text>
-          <Text style={styles.infoLabel}>{t('orderStatus')}</Text>
-          <Text style={styles.infoValue}>{
-            // canonicalize status for display
-            (function() {
-              const s = order.order_status || order.status || paymentStatus || 'Pending';
-              const map: Record<string, string> = {
-                Pending: t('pending'),
-                AwaitingPickup: t('awaitingPickup'),
-                OutForDelivery: t('outForDelivery'),
-                Delivered: t('delivered'),
-                Returned: t('returned'),
-                Cancelled: t('cancelled'),
-                Refunded: t('refunded'),
-              };
-              return map[s] || s;
-            })()
-          }</Text>
-          {order.assigned_shipper_id && (
-            <>
-              <Text style={styles.infoLabel}>{t('assignedShipper')}</Text>
-              <Text style={styles.infoValue}>{order.assigned_shipper_name || order.assigned_shipper_id}</Text>
-            </>
-          )}
-          {transactionId && <>
-            <Text style={styles.infoLabel}>{t('transactionId')}</Text>
-            <Text style={styles.infoValue}>{transactionId}</Text>
-          </>}
-          <Text style={styles.infoLabel}>{t('orderNumber')}</Text>
-          <Text style={styles.infoValue}>{order.order_id || order._id}</Text>
-          {paymentNotes && <>
-            <Text style={styles.infoLabel}>{t('content')}</Text>
-            <Text style={styles.infoValue}>{paymentNotes}</Text>
-          </>}
-        </View>
-        <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>{t('currentStatus')}</Text>
-          <OrderStatusBadge status={order.order_status || order.status || paymentStatus} shipperName={order.assigned_shipper_name || order.assigned_shipper_id} shipperAck={order.shipper_ack} />
-          <Text style={{ color: '#666', marginTop: 8, textAlign: 'center' }}>{t((order.order_status || order.status || paymentStatus) === 'Pending' ? 'orderIsPendingHelp' : (order.order_status || order.status || paymentStatus) === 'AwaitingPickup' ? 'orderAwaitingPickupHelp' : (order.order_status || order.status || paymentStatus) === 'OutForDelivery' ? 'orderOutForDeliveryHelp' : (order.order_status || order.status || paymentStatus) === 'Delivered' ? 'orderDeliveredHelp' : '')}</Text>
-        </View>
+
+        {/* Success Message */}
+        <Text style={styles.title}>Thanh toán thành công!</Text>
+        <Text style={styles.subtitle}>
+          Đơn hàng của bạn đã được xử lý thành công
+        </Text>
+
+        {/* Order Info */}
+        {orderData && (
+          <View style={styles.orderInfo}>
+            <Text style={styles.orderLabel}>Mã đơn hàng:</Text>
+            <Text style={styles.orderNumber}>{orderData.order_id}</Text>
+            
+            <Text style={styles.orderLabel}>Tổng tiền:</Text>
+            <Text style={styles.orderAmount}>
+              {orderData.total_amount?.toLocaleString()} VND
+            </Text>
+            
+            <Text style={styles.orderLabel}>Phương thức thanh toán:</Text>
+            <Text style={styles.paymentMethod}>
+              {formatPaymentMethod(orderData.payment_method)}
+            </Text>
+            
+            <Text style={styles.orderLabel}>Trạng thái:</Text>
+            <Text style={[styles.orderStatus, { color: getOrderStatusColor(orderData.status) }]}>
+              {getOrderStatusText(orderData.status)}
+            </Text>
+
+            {/* Product Details */}
+            {orderData.order_items && orderData.order_items.length > 0 && (
+              <View style={styles.productSection}>
+                <Text style={styles.sectionTitle}>Sản phẩm đã mua:</Text>
+                {orderData.order_items.map((item: any, index: number) => (
+                  <View key={index} style={styles.productItem}>
+                    <Text style={styles.productName}>
+                      {item.book_id?.title || 'Sản phẩm không xác định'}
+                    </Text>
+                    <Text style={styles.productDetails}>
+                      Số lượng: {item.quantity} x {item.price?.toLocaleString()} VND
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Shipping Address */}
+            {orderData.shipping_address && (
+              <View style={styles.addressSection}>
+                <Text style={styles.sectionTitle}>Địa chỉ giao hàng:</Text>
+                <Text style={styles.addressText}>
+                  {orderData.shipping_address.fullName}
+                </Text>
+                <Text style={styles.addressText}>
+                  {orderData.shipping_address.fullAddress}
+                </Text>
+                <Text style={styles.addressText}>
+                  SĐT: {orderData.shipping_address.phone}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
-          {/* Primary action: view order history / details */}
-          <TouchableOpacity style={styles.button} onPress={() => router.replace('/order-history')}>
-            <Text style={styles.buttonText}>{t('viewOrderHistory')}</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleViewOrder}>
+            <Text style={styles.primaryButtonText}>Xem đơn hàng</Text>
           </TouchableOpacity>
-
-          {/* Secondary actions dependent on status */}
-
-
-          <TouchableOpacity style={[styles.buttonOutline, { marginTop: 10 }]} onPress={() => router.replace('/') }>
-            <Text style={styles.buttonOutlineText}>{t('backToHome')}</Text>
+          
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleContinueShopping}>
+            <Text style={styles.secondaryButtonText}>Tiếp tục mua sắm</Text>
           </TouchableOpacity>
-          <OrderActions status={order.order_status || order.status || paymentStatus} orderId={order.order_id || order._id} />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f9f9f9' },
-  verticalContainer: { flexGrow: 1, alignItems: 'center', padding: 20, backgroundColor: '#f9f9f9' },
-  headerBox: { alignItems: 'center', marginBottom: 20 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#3255FB' },
-  headerSubtitle: { fontSize: 16, color: '#666', marginTop: 8 },
-  animationBox: { alignItems: 'center', marginBottom: 20 },
-  animationVideo: { width: 150, height: 150, borderRadius: 60 },
-  infoBox: { width: '100%', backgroundColor: '#fff', borderRadius: 12, padding: 18, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  infoLabel: { color: '#888', fontSize: 14, marginTop: 6 },
-  infoValue: { color: '#222', fontWeight: 'bold', fontSize: 16, marginBottom: 2 },
-  statusBox: { width: '100%', backgroundColor: '#fffbe6', borderRadius: 12, padding: 18, marginBottom: 20, alignItems: 'center', borderWidth: 1, borderColor: '#ffe082', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  statusTitle: { color: '#FFA500', fontWeight: 'bold', fontSize: 15, marginBottom: 6 },
-  statusValue: { fontSize: 18, fontWeight: 'bold' },
-  buttonContainer: { width: '100%', alignItems: 'center' },
-  button: { backgroundColor: '#3255FB', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 30, marginBottom: 10, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  buttonOutline: {
-    borderColor: '#3255FB',
-    borderWidth: 2,
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    width: '100%',
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff', // Change background to white
+    paddingHorizontal: 24,
+  },
+  iconContainer: {
+    marginBottom: 24,
+  },
+  successIcon: {
+    fontSize: 80,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#28a745',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  orderInfo: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 32,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  buttonOutlineText: {
-    color: '#3255FB',
-    fontWeight: 'bold',
+  orderLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  orderNumber: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
   },
-  scrollView: { marginTop: 0, flex: 1 },
-  qrBox: { alignItems: 'center', marginBottom: 18, marginTop: 10 },
-  qrBoxTop: { alignItems: 'center', marginBottom: 18, marginTop: 10 },
-  qrTitle: { fontWeight: 'bold', fontSize: 18, color: '#3255FB', marginBottom: 8 },
-  qrActionRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
-  qrIconBtn: { marginHorizontal: 10, backgroundColor: '#f2f2f2', borderRadius: 20, padding: 8 },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  orderAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#28a745',
+    marginBottom: 16,
+  },
+  orderStatus: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#28a745',
+  },
+  paymentMethod: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginBottom: 16,
+  },
+  productSection: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  productItem: {
+    marginBottom: 8,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  productDetails: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  addressSection: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  addressText: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 4,
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
 });

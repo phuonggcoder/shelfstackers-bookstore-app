@@ -1,5 +1,5 @@
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRef, forwardRef, useImperativeHandle } from 'react';
 import { WebView } from 'react-native-webview';
 
 interface Props {
@@ -89,25 +89,58 @@ const AddressMapSearch = forwardRef<any, Props>(({ initialQuery = '', initialLat
           // Center on me button
           var centerBtn = document.createElement('button');
           centerBtn.id = 'centerBtn';
-          centerBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#666"/></svg>';
+          centerBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
           centerBtn.style.position = 'absolute';
           centerBtn.style.right = '10px';
           centerBtn.style.bottom = '10px';
           centerBtn.style.zIndex = 1001;
-          centerBtn.style.padding = '8px';
+          centerBtn.style.padding = '12px';
           centerBtn.style.background = '#fff';
-          centerBtn.style.border = '1px solid #ccc';
+          centerBtn.style.border = '2px solid #3255FB';
           centerBtn.style.borderRadius = '50%';
-          centerBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+          centerBtn.style.boxShadow = '0 4px 12px rgba(50, 85, 251, 0.3)';
           centerBtn.style.cursor = 'pointer';
+          centerBtn.style.transition = 'all 0.2s ease';
+          centerBtn.title = 'Định vị vị trí hiện tại';
+          
+          // Add hover effect
+          centerBtn.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.1)';
+            this.style.boxShadow = '0 6px 16px rgba(50, 85, 251, 0.4)';
+          });
+          
+          centerBtn.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+            this.style.boxShadow = '0 4px 12px rgba(50, 85, 251, 0.3)';
+          });
+          
+          // Add click effect
+          centerBtn.addEventListener('mousedown', function() {
+            this.style.transform = 'scale(0.95)';
+          });
+          
+          centerBtn.addEventListener('mouseup', function() {
+            this.style.transform = 'scale(1.1)';
+          });
+          
           map.getContainer().appendChild(centerBtn);
 
           // Center on me functionality
           centerBtn.addEventListener('click', function() {
+            // Show loading state
+            this.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#3255FB" stroke-width="2" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416"><animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416" repeatCount="indefinite"/><animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416" repeatCount="indefinite"/></circle></svg>';
+            this.style.pointerEvents = 'none';
+            
             // Gửi message để React Native xử lý geolocation
             window.ReactNativeWebView.postMessage(JSON.stringify({ 
               type: 'request_location' 
             }));
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+              this.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
+              this.style.pointerEvents = 'auto';
+            }, 3000);
           });
 
           function postCenterSelection(extraName) {
@@ -223,11 +256,45 @@ const AddressMapSearch = forwardRef<any, Props>(({ initialQuery = '', initialLat
               return;
             }
             
+            // Handle location update from React Native
+            if (msg.type === 'location_update') {
+              // Update map center to new location
+              if (webViewRef.current) {
+                const script = `
+                  if (window.map) {
+                    console.log('Moving map to location_update:', ${msg.lat}, ${msg.lon});
+                    window.map.setView([${msg.lat}, ${msg.lon}], 17);
+                    
+                    // Trigger position update after map moves
+                    setTimeout(function() {
+                      var center = window.map.getCenter();
+                      window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                        type: 'position_update', 
+                        lat: center.lat, 
+                        lon: center.lng 
+                      }));
+                    }, 500);
+                    
+                    // Reset center button
+                    var centerBtn = document.getElementById('centerBtn');
+                    if (centerBtn) {
+                      centerBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
+                      centerBtn.style.pointerEvents = 'auto';
+                    }
+                  }
+                `;
+                webViewRef.current.injectJavaScript(script);
+              }
+              return;
+            }
+                         
             // forward select, confirm, and out-of-bounds (oob) messages
             if (msg.type === 'select' || msg.type === 'confirm' || msg.type === 'oob' || msg.type === 'position_update') {
               onSelect({ lat: msg.lat, lon: msg.lon, display_name: msg.display_name, address: msg.address, type: msg.type });
             }
-          } catch { /* ignore */ }
+          } catch (error) { 
+            console.warn('Error parsing WebView message:', error);
+          }
         }}
       />
     </View>

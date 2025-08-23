@@ -29,6 +29,8 @@ const OrderStatusBadge: React.FC<Props> = ({ status, shipperName, shipperAck, st
       case 'returned':
         return '#E91E63';
       case 'cancelled':
+      case 'cancelled_by_user':
+      case 'cancelled_by_admin':
       case 'refunded':
         return '#e74c3c';
       default:
@@ -46,7 +48,10 @@ const OrderStatusBadge: React.FC<Props> = ({ status, shipperName, shipperAck, st
       case 'out_for_delivery': return t('outForDelivery');
       case 'delivered': return t('delivered');
       case 'returned': return t('returned');
-      case 'cancelled': return t('cancelled');
+      case 'cancelled': 
+      case 'cancelled_by_user': 
+      case 'cancelled_by_admin': 
+        return t('cancelled');
       case 'refunded': return t('refunded');
       default: return st || t('unknown');
     }
