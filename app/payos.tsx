@@ -109,14 +109,14 @@ export default function PayOSRoute() {
     console.log('WebView load start');
     setWebViewLoading(true);
     
-    // Set timeout for WebView loading (30 seconds)
+    // Set timeout for WebView loading (5 minutes)
     setTimeout(() => {
       if (webViewLoading) {
         console.log('WebView loading timeout');
         setWebViewLoading(false);
         setError('Trang thanh toán tải quá lâu. Vui lòng thử lại.');
       }
-    }, 30000);
+    }, 300000); // 5 minutes = 300,000ms
   };
 
   const handleWebViewLoadEnd = () => {

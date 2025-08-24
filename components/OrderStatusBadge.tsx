@@ -14,73 +14,125 @@ const OrderStatusBadge: React.FC<Props> = ({ status, shipperName, shipperAck, st
   const { t } = useTranslation();
   const s = (status || '').toString();
 
-  const getColor = (st: string) => {
-    switch (st.toLowerCase()) {
+  const getStatusConfig = (st: string) => {
+    const normalized = st.toLowerCase();
+    switch (normalized) {
       case 'pending':
-        return '#f39c12';
+        return {
+          color: '#f39c12',
+          icon: 'time-outline',
+          label: t('pending'),
+          description: t('orderPendingDescription')
+        };
       case 'awaitingpickup':
       case 'awaiting_pickup':
-        return '#1976D2';
+        return {
+          color: '#1976D2',
+          icon: 'bag-outline',
+          label: t('awaitingPickup'),
+          description: t('orderAwaitingPickupDescription')
+        };
       case 'outfordelivery':
       case 'out_for_delivery':
-        return '#FF9800';
+        return {
+          color: '#FF9800',
+          icon: 'bicycle-outline',
+          label: t('outForDelivery'),
+          description: t('orderOutForDeliveryDescription')
+        };
       case 'delivered':
-        return '#4CAF50';
+        return {
+          color: '#4CAF50',
+          icon: 'checkmark-circle-outline',
+          label: t('delivered'),
+          description: t('orderDeliveredDescription')
+        };
       case 'returned':
-        return '#E91E63';
+        return {
+          color: '#E91E63',
+          icon: 'arrow-undo-outline',
+          label: t('returned'),
+          description: t('orderReturnedDescription')
+        };
       case 'cancelled':
       case 'cancelled_by_user':
       case 'cancelled_by_admin':
+        return {
+          color: '#e74c3c',
+          icon: 'close-circle-outline',
+          label: t('cancelled'),
+          description: t('orderCancelledDescription')
+        };
       case 'refunded':
-        return '#e74c3c';
+        return {
+          color: '#9C27B0',
+          icon: 'card-outline',
+          label: t('refunded'),
+          description: t('orderRefundedDescription')
+        };
       default:
-        return '#95a5a6';
+        return {
+          color: '#95a5a6',
+          icon: 'help-circle-outline',
+          label: st || t('unknown'),
+          description: t('orderUnknownDescription')
+        };
     }
   };
 
-  const getLabel = (st: string) => {
-    const key = (st || '').toLowerCase();
-    switch (key) {
-      case 'pending': return t('pending');
-      case 'awaitingpickup':
-      case 'awaiting_pickup': return t('awaitingPickup');
-      case 'outfordelivery':
-      case 'out_for_delivery': return t('outForDelivery');
-      case 'delivered': return t('delivered');
-      case 'returned': return t('returned');
-      case 'cancelled': 
-      case 'cancelled_by_user': 
-      case 'cancelled_by_admin': 
-        return t('cancelled');
-      case 'refunded': return t('refunded');
-      default: return st || t('unknown');
-    }
-  };
-
-  const color = getColor(s);
-  const label = getLabel(s);
+  const statusConfig = getStatusConfig(s);
 
   return (
     <View style={[styles.container, style]}>
-      <View style={[styles.icon, { backgroundColor: color }]}>
-        <Ionicons name="checkmark" size={16} color="#fff" />
+      <View style={[styles.icon, { backgroundColor: statusConfig.color }]}>
+        <Ionicons name={statusConfig.icon as any} size={16} color="#fff" />
       </View>
       <View style={styles.info}>
-        <Text style={[styles.label, { color: '#222' }]}>{label}</Text>
-        {shipperName ? (
-          <Text style={styles.sub}>{t('assignedShipper')}: {shipperName}{shipperAck ? ` (${shipperAck})` : ''}</Text>
-        ) : null}
+        <Text style={[styles.label, { color: '#222' }]}>{statusConfig.label}</Text>
+        <Text style={styles.description}>{statusConfig.description}</Text>
+        {shipperName && (
+          <Text style={styles.sub}>
+            {t('assignedShipper')}: {shipperName}
+            {shipperAck ? ` (${shipperAck})` : ''}
+          </Text>
+        )}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center' },
-  icon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  info: { flex: 1 },
-  label: { fontSize: 16, fontWeight: '700' },
-  sub: { fontSize: 12, color: '#666', marginTop: 2 },
+  container: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-start',
+    paddingVertical: 4
+  },
+  icon: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 12 
+  },
+  info: { 
+    flex: 1 
+  },
+  label: { 
+    fontSize: 16, 
+    fontWeight: '700',
+    marginBottom: 2
+  },
+  description: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2
+  },
+  sub: { 
+    fontSize: 12, 
+    color: '#666', 
+    marginTop: 2 
+  },
 });
 
 export default OrderStatusBadge;

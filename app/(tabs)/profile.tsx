@@ -200,6 +200,11 @@ const SettingsScreen = () => {
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('myReviews.myReviews')}</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => router.push('/my-ratings' as any)}>
+            <Ionicons name="car-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('myShipperRatings')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
           {/* <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('payment' as never)}>
             <Ionicons name="card-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('paymentMethod')}</Text>

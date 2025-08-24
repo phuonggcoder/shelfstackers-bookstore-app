@@ -42,10 +42,11 @@ const OrderHistoryScreen = () => {
   const tabs = [
     { key: 'all', label: t('all') },
     { key: 'pending', label: t('pending') },
-    { key: 'processing', label: t('processing') },
-    { key: 'shipped', label: t('shipped') },
+    { key: 'awaitingpickup', label: t('awaitingPickup') },
+    { key: 'outfordelivery', label: t('outForDelivery') },
     { key: 'delivered', label: t('delivered') },
     { key: 'cancelled', label: t('cancelled') },
+    { key: 'refunded', label: t('refunded') },
   ];
 
   // Refresh data when screen comes into focus
@@ -65,14 +66,18 @@ const OrderHistoryScreen = () => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'processing': return '#3498db';
-      case 'shipped': return '#9b59b6';
+      case 'awaitingpickup':
+      case 'awaiting_pickup': return '#1976D2';
+      case 'outfordelivery':
+      case 'out_for_delivery': return '#FF9800';
       case 'delivered': return '#27ae60';
       case 'cancelled':
       case 'canceled':
       case 'cancelled_by_user':
       case 'cancelled_by_admin':
         return '#e74c3c';
+      case 'refunded': return '#9C27B0';
+      case 'returned': return '#E91E63';
       default: return '#95a5a6';
     }
   };
@@ -81,14 +86,18 @@ const OrderHistoryScreen = () => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
       case 'pending': return t('pending');
-      case 'processing': return t('processing');
-      case 'shipped': return t('shipped');
+      case 'awaitingpickup':
+      case 'awaiting_pickup': return t('awaitingPickup');
+      case 'outfordelivery':
+      case 'out_for_delivery': return t('outForDelivery');
       case 'delivered': return t('delivered');
       case 'cancelled':
       case 'canceled':
       case 'cancelled_by_user':
       case 'cancelled_by_admin':
         return t('cancelled');
+      case 'refunded': return t('refunded');
+      case 'returned': return t('returned');
       default: return t('unknown');
     }
   };
@@ -142,7 +151,28 @@ const OrderHistoryScreen = () => {
 
   const filteredOrders = selectedTab === 'all' 
     ? orders 
-    : orders.filter(order => (order.status || '').toLowerCase() === selectedTab);
+    : orders.filter(order => {
+        const orderStatus = (order.status || '').toLowerCase();
+        const selectedStatus = selectedTab.toLowerCase();
+        
+        // Handle multiple status variations
+        switch (selectedStatus) {
+          case 'pending':
+            return orderStatus === 'pending';
+          case 'awaitingpickup':
+            return orderStatus === 'awaitingpickup' || orderStatus === 'awaiting_pickup';
+          case 'outfordelivery':
+            return orderStatus === 'outfordelivery' || orderStatus === 'out_for_delivery';
+          case 'delivered':
+            return orderStatus === 'delivered';
+          case 'cancelled':
+            return orderStatus === 'cancelled' || orderStatus === 'cancelled_by_user' || orderStatus === 'cancelled_by_admin';
+          case 'refunded':
+            return orderStatus === 'refunded';
+          default:
+            return orderStatus === selectedStatus;
+        }
+      });
 
   const renderOrderItem = ({ item }: { item: any }) => {
     // Lấy thông tin địa chỉ nếu có

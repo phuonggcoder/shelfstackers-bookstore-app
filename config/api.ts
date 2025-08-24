@@ -51,6 +51,33 @@ export const API_ENDPOINTS = {
   LOGIN: '/auth/login',
   REGISTER: '/auth/register',
   
+  // Email Verification
+  SEND_OTP: '/api/email-verification/send-otp',
+  VERIFY_OTP: '/api/email-verification/verify-otp',
+  RESEND_OTP: '/api/email-verification/resend-otp',
+  VERIFICATION_STATUS: '/api/email-verification/verification-status',
+  
+  // User Management
+  GET_VERIFICATION_METHODS: '/api/users/get-verification-methods',
+  FORGOT_PASSWORD: '/api/users/forgot-password',
+  VERIFY_SMS_OTP: '/api/users/verify-sms-otp',
+  RESET_PASSWORD: '/api/users/reset-password',
+  SEND_EMAIL_CHANGE_OTP: '/api/users/send-email-change-otp',
+  CHANGE_EMAIL: '/api/users/change-email',
+  
+  // Messaging
+  CONVERSATIONS: '/api/messages/conversations',
+  CONVERSATION_DETAILS: (id: string) => `/api/messages/conversations/${id}`,
+  SEND_MESSAGE: (conversationId: string) => `/api/messages/conversations/${conversationId}/messages`,
+  MARK_MESSAGE_READ: (messageId: string) => `/api/messages/messages/${messageId}/read`,
+  UPLOAD_ATTACHMENT: '/api/messages/upload',
+  
+  // Admin Messaging
+  ADMIN_CONVERSATIONS: '/api/messages/admin/conversations',
+  ADMIN_CONVERSATION_STATUS: (id: string) => `/api/messages/admin/conversations/${id}/status`,
+  ADMIN_CONVERSATION_ASSIGN: (id: string) => `/api/messages/admin/conversations/${id}/assign`,
+  ADMIN_STATS: '/api/messages/admin/stats',
+  
   // Vouchers
   VOUCHERS_AVAILABLE: '/api/vouchers/available',
   VOUCHER_DETAILS: (id: string) => `/api/vouchers/${id}`,
@@ -107,4 +134,10 @@ export const getApiUrl = (endpoint: string): string => {
 export const getAuthHeaders = (token: string) => ({
   'Authorization': `Bearer ${token}`,
   'Content-Type': 'application/json'
+});
+
+// Helper function to get multipart headers for file upload
+export const getMultipartHeaders = (token: string) => ({
+  'Authorization': `Bearer ${token}`,
+  'Content-Type': 'multipart/form-data'
 }); 

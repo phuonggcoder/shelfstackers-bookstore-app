@@ -247,3 +247,4 @@ module.exports = {
 if (require.main === module) {
   runAllProductNameTests().catch(console.error);
 }
+

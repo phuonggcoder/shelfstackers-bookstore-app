@@ -58,7 +58,7 @@ export const getOrderDetail = async (token: string, orderId: string) => {
 // Cancel order
 export const cancelOrder = async (token: string, orderId: string, reason?: string) => {
   try {
-    const response = await axios.post(getApiUrl(`/api/orders/${orderId}/cancel`), {
+    const response = await axios.patch(getApiUrl(`/api/orders/${orderId}/cancel`), {
       reason: reason || 'User requested cancellation'
     }, {
       headers: getAuthHeaders(token)

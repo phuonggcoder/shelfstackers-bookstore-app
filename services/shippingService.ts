@@ -74,7 +74,13 @@ class ShippingService {
     
     try {
       const response = await axios.get(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&key=AIzaSyCfTkVyuCEsN7C_DjS-e65IFj3TfBxjA-M`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&key=AIzaSyCfTkVyuCEsN7C_DjS-e65IFj3TfBxjA-M`,
+        {
+          timeout: 10000, // 10 seconds timeout
+          headers: {
+            'User-Agent': 'ShelfStackers-App/1.0'
+          }
+        }
       );
       
       if (response.data.results && response.data.results.length > 0) {
@@ -82,7 +88,8 @@ class ShippingService {
         return { lat: location.lat, lng: location.lng };
       }
     } catch (error) {
-      console.error('Error getting coordinates:', error);
+      console.error('Error getting coordinates from Google API:', error);
+      // Không throw error, chỉ log và sử dụng fallback coordinates
     }
     
     // Fallback coordinates (Hà Nội)
@@ -215,11 +222,28 @@ class ShippingService {
   
   async calculateShippingFeeAPI(request: ShippingFeeRequest): Promise<ShippingCalculationResult> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/orders/calculate-shipping`, request);
+      const response = await axios.post(`${API_BASE_URL}/api/orders/calculate-shipping`, request, {
+        timeout: 15000, // 15 seconds timeout
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error calling shipping API:', error);
+      
+      // Log specific error details
+      if (error.response) {
+        console.error('API Error Response:', error.response.data);
+        console.error('API Error Status:', error.response.status);
+      } else if (error.request) {
+        console.error('API Request Error:', error.request);
+      } else {
+        console.error('API Error Message:', error.message);
+      }
+      
       // Fallback to local calculation
+      console.log('Falling back to local shipping calculation...');
       return this.calculateShippingFee(request);
     }
   }

@@ -174,3 +174,4 @@ module.exports = {
 if (require.main === module) {
   runAllTests().catch(console.error);
 }
+

@@ -13,10 +13,12 @@ import CancelOrderModal from '../components/CancelOrderModal';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import RefundStatusNotification from '../components/RefundStatusNotification';
 import ReviewForm from '../components/ReviewForm';
+import ShipperRatingModal from '../components/ShipperRatingModal';
 import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useOrderDetail } from '../hooks/useOrders';
+import { useCanRateShipper, useRatingModal } from '../hooks/useShipperRating';
 import { cancelOrder } from '../services/orderService';
 import ReviewService from '../services/reviewService';
 
@@ -64,8 +66,8 @@ interface OrderDetail {
 const PAYMENT_METHOD_NAMES: { [key: string]: string } = {
   zalopay: 'ZaloPay',
   payos: 'PayOS',
-  cod: 'Thanh toán khi nhận hàng',
-  COD: 'Thanh toán khi nhận hàng',
+  cod: 'COD',
+  COD: 'COD',
   ZALOPAY: 'ZaloPay',
   PAYOS: 'PayOS',
   // Thêm các phương thức thanh toán khác nếu cần
@@ -86,6 +88,20 @@ const OrderDetailScreen = () => {
   const [existingReview, setExistingReview] = useState<any>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Shipper rating hooks
+  const {
+    isOpen: isShipperRatingModalOpen,
+    orderId: shipperRatingOrderId,
+    shipperInfo,
+    existingRating: existingShipperRating,
+    prompts,
+    promptsLoading,
+    openModal: openShipperRatingModal,
+    closeModal: closeShipperRatingModal
+  } = useRatingModal();
+
+  const { canRate, existingRating: canRateExistingRating } = useCanRateShipper(orderId as string);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -243,17 +259,36 @@ const OrderDetailScreen = () => {
     });
   };
 
+  const handleRateShipper = () => {
+    if (!order) return;
+    
+    const shipperData = {
+      _id: order.assigned_shipper_id || 'unknown',
+      full_name: order.assigned_shipper_name || '',
+      phone_number: order.assigned_shipper_phone || ''
+    };
+    
+    openShipperRatingModal(order, shipperData, canRateExistingRating);
+  };
+
+  const handleShipperRatingSubmit = () => {
+    // Refresh order detail to update UI
+    refreshOrderDetail();
+  };
+
   const isOrderCompleted = () => {
     return order?.status?.toLowerCase() === 'delivered';
   };
 
   const canCancelOrder = (status: string) => {
     const normalized = (status || '').toLowerCase();
-    return normalized === 'pending' || normalized === 'confirmed' || normalized === 'processing';
+    // Có thể hủy khi đơn hàng đang ở trạng thái chờ xử lý hoặc chờ lấy hàng
+    return normalized === 'pending' || normalized === 'awaitingpickup' || normalized === 'awaiting_pickup';
   };
 
   const canRequestRefund = (status: string) => {
     const normalized = (status || '').toLowerCase();
+    // Chỉ có thể yêu cầu hoàn tiền khi đơn hàng đã được giao
     return normalized === 'delivered';
   };
 
@@ -261,14 +296,18 @@ const OrderDetailScreen = () => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
       case 'pending': return '#f39c12';
-      case 'processing': return '#3498db';
-      case 'shipped': return '#9b59b6';
+      case 'awaitingpickup':
+      case 'awaiting_pickup': return '#1976D2';
+      case 'outfordelivery':
+      case 'out_for_delivery': return '#FF9800';
       case 'delivered': return '#27ae60';
+      case 'returned': return '#E91E63';
       case 'cancelled':
       case 'canceled':
       case 'cancelled_by_user':
       case 'cancelled_by_admin':
         return '#e74c3c';
+      case 'refunded': return '#9C27B0';
       default: return '#95a5a6';
     }
   };
@@ -276,16 +315,18 @@ const OrderDetailScreen = () => {
   const getStatusText = (status: string) => {
     const normalized = (status || '').toLowerCase();
     switch (normalized) {
-
       case 'pending': return t('pending');
-      case 'processing': return t('processing');
-      case 'shipped': return t('shipped');
+      case 'awaitingpickup':
+      case 'awaiting_pickup': return t('awaitingPickup');
+      case 'outfordelivery':
+      case 'out_for_delivery': return t('outForDelivery');
       case 'delivered': return t('delivered');
-      case 'cancelled': return t('cancelled');
-      case 'cancelled_by_user': return t('cancelled');
+      case 'returned': return t('returned');
+      case 'cancelled':
+      case 'cancelled_by_user':
       case 'cancelled_by_admin': return t('cancelled');
+      case 'refunded': return t('refunded');
       default: return t('unknown');
-        
     }
   };
 
@@ -670,6 +711,20 @@ const OrderDetailScreen = () => {
               <Ionicons name="star-outline" size={20} color="white" />
               <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
             </TouchableOpacity>
+            
+            {/* Shipper Rating Button */}
+            {canRate && order.assigned_shipper_id && (
+              <TouchableOpacity
+                style={styles.shipperRatingButton}
+                onPress={handleRateShipper}
+              >
+                <Ionicons name="car-outline" size={20} color="white" />
+                <Text style={styles.shipperRatingButtonText}>
+                  {canRateExistingRating ? t('editShipperRating') : t('rateShipper')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            
             {canRequestRefund(order.status) && order.paymentMethod !== 'cod' && (
               <TouchableOpacity
                 style={styles.refundButton}
@@ -724,6 +779,18 @@ const OrderDetailScreen = () => {
         loading={cancelling}
         paymentMethod={order?.paymentMethod || 'cod'}
         isRefund={canRequestRefund(order?.status || '')}
+      />
+
+      {/* Shipper Rating Modal */}
+      <ShipperRatingModal
+        isOpen={isShipperRatingModalOpen}
+        onClose={closeShipperRatingModal}
+        orderId={shipperRatingOrderId || ''}
+        shipperInfo={shipperInfo || { _id: '', full_name: '', phone_number: '' }}
+        existingRating={existingShipperRating}
+        prompts={prompts}
+        promptsLoading={promptsLoading}
+        onRatingSubmit={handleShipperRatingSubmit}
       />
     </SafeAreaView>
   );
@@ -971,6 +1038,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reviewButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  shipperRatingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#9b59b6',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  shipperRatingButtonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
