@@ -38,7 +38,7 @@ const MyVouchersScreen: React.FC<MyVouchersScreenProps> = ({ navigation }) => {
 
       // Fetch usage history
       if (user?._id) {
-        const historyResult = await getUserVoucherUsage(token, user._id);
+        const historyResult = await getUserVoucherUsage('', user._id);
         setUsageHistory(historyResult.usage_history || []);
       }
     } catch (error) {

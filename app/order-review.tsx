@@ -345,8 +345,7 @@ export default function OrderReviewScreen() {
     loadVouchers();
   }, [token]);
 
-  // Calculate totals
-  // Luôn tính tổng tiền đơn hàng (subtotal) để validate voucher
+  // Calculate totals with new voucher system
   const subtotal = React.useMemo(() => {
     if (cartItems.length > 0) {
       return cartItems.reduce((sum, item) => {
@@ -367,15 +366,43 @@ export default function OrderReviewScreen() {
 
   console.log('Subtotal calculation:', { subtotal, cartItemsLength: cartItems.length, bookPrice: book?.price, hasBook: !!book });
 
-  const shippingFee = shipping === 'free' ? 0 : 30000;
-  const discount = selectedVoucher
-    ? (selectedVoucher.voucher_type === 'percent'
-        ? Math.min(subtotal * selectedVoucher.discount_value / 100, selectedVoucher.max_discount_value || Infinity)
-        : selectedVoucher.discount_value)
-    : 0;
-  const total = subtotal - discount + shippingFee;
+  // Calculate shipping fee (will be updated by API)
+  const [shippingFee, setShippingFee] = useState(30000);
+  
+  // Calculate total with new voucher system
+  const total = React.useMemo(() => {
+    let finalSubtotal = subtotal;
+    let finalShippingFee = shippingFee;
+    
+    // Apply order vouchers
+    appliedVouchers.forEach(({ voucher, discountAmount }) => {
+      if (voucher.voucher_type === 'order') {
+        finalSubtotal -= discountAmount;
+      }
+    });
+    
+    // Apply shipping vouchers
+    appliedVouchers.forEach(({ voucher, discountAmount }) => {
+      if (voucher.voucher_type === 'shipping') {
+        finalShippingFee -= discountAmount;
+      }
+    });
+    
+    const calculatedTotal = finalSubtotal + finalShippingFee;
+    
+    console.log('Total calculation with new voucher system:', {
+      originalSubtotal: subtotal,
+      finalSubtotal,
+      originalShippingFee: shippingFee,
+      finalShippingFee,
+      appliedVouchers: appliedVouchers.length,
+      calculatedTotal
+    });
+    
+    return calculatedTotal;
+  }, [subtotal, shippingFee, appliedVouchers]);
 
-  console.log('Total calculation:', { subtotal, discount, shippingFee, total });
+  console.log('Total calculation:', { subtotal, shippingFee, total, appliedVouchersCount: appliedVouchers.length });
 
   // Nhập mã voucher thủ công
   const [manualVoucherCode, setManualVoucherCode] = useState('');
@@ -527,6 +554,10 @@ export default function OrderReviewScreen() {
         }
       }
 
+      // Prepare voucher codes for shipping API
+      const orderVoucher = appliedVouchers.find(v => v.voucher.voucher_type === 'order');
+      const shippingVoucher = appliedVouchers.find(v => v.voucher.voucher_type === 'shipping');
+      
       // Calculate shipping fee
       let shippingFee = 0;
       try {
@@ -572,8 +603,8 @@ export default function OrderReviewScreen() {
           carrier: 'GHN', // Default to GHN
           // Add new parameters for total price calculation
           subtotal: subtotal,
-          voucher_code_order: selectedOrderVoucher?.voucher_id,
-          voucher_code_shipping: selectedShippingVoucher?.voucher_id
+          voucher_code_order: orderVoucher?.voucher.voucher_id,
+          voucher_code_shipping: shippingVoucher?.voucher.voucher_id
         };
         
         // Try API first, fallback to local calculation
@@ -629,12 +660,12 @@ export default function OrderReviewScreen() {
       console.log('Fixed address location:', fixedAddress?.location);
       
               // Create order using the updated API endpoint with total price calculation
-        const orderData = {
+        const orderData: any = {
           address_id: fixedAddress._id,
           payment_method: selectedPaymentMethod,
           // Backend will calculate total price including shipping fee and vouchers
-          ...(selectedOrderVoucher && { voucher_code_order: selectedOrderVoucher.voucher_id }),
-          ...(selectedShippingVoucher && { voucher_code_shipping: selectedShippingVoucher.voucher_id })
+          ...(orderVoucher && { voucher_code_order: orderVoucher.voucher.voucher_id }),
+          ...(shippingVoucher && { voucher_code_shipping: shippingVoucher.voucher.voucher_id })
         };
 
       // Add book_id for single book purchase (buy now)

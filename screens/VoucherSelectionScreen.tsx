@@ -64,7 +64,7 @@ const VoucherSelectionScreen: React.FC<VoucherSelectionScreenProps> = ({
     }
   }, [orderValue]);
 
-  const fetchAvailableVouchers = async () => {
+  const fetchAvailableVouchers = async () => {   
     setLoading(true);
     try {
       const result = await getAvailableVouchers(undefined, orderValue);
@@ -133,7 +133,7 @@ const VoucherSelectionScreen: React.FC<VoucherSelectionScreenProps> = ({
         shipping_cost: shippingCost,
       };
 
-      const result = await validateMultipleVouchers(token, request);
+      const result = await validateMultipleVouchers('', request);
       
              if (result.success) {
          // Store result in AsyncStorage for CartScreen to read
@@ -542,3 +542,4 @@ const styles = StyleSheet.create({
 });
 
 export default VoucherSelectionScreen;
+ 

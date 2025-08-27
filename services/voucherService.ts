@@ -110,7 +110,7 @@ export const getAvailableVouchers = async (token?: string, minOrderValue?: numbe
       url += `?${params.toString()}`;
     }
 
-    // Public endpoint - không cần auth headers
+    // Public endpoint - không cần auth headers (Backend đã được fix)
     const response = await axios.get(url);
     
     console.log('getAvailableVouchers response:', response.data);
@@ -143,7 +143,7 @@ export const getVoucherDetails = async (token: string, voucherId: string) => {
   }
 };
 
-// Validate single voucher
+// Validate single voucher (Public endpoint - không cần auth)
 export const validateVoucher = async (token: string, voucherCode: string, orderValue: number): Promise<VoucherValidationResponse> => {
   try {
     const request: VoucherValidationRequest = {
@@ -152,9 +152,8 @@ export const validateVoucher = async (token: string, voucherCode: string, orderV
       order_value: orderValue,
     };
     
-    const response = await axios.post(getApiUrl('/api/vouchers/validate'), request, {
-      headers: getAuthHeaders(token)
-    });
+    // Public endpoint - không cần auth headers
+    const response = await axios.post(getApiUrl('/api/vouchers/validate'), request);
     console.log('validateVoucher response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -163,12 +162,11 @@ export const validateVoucher = async (token: string, voucherCode: string, orderV
   }
 };
 
-// Validate multiple vouchers
+// Validate multiple vouchers (Public endpoint - không cần auth)
 export const validateMultipleVouchers = async (token: string, request: MultipleVoucherValidationRequest): Promise<MultipleVoucherValidationResponse> => {
   try {
-    const response = await axios.post(getApiUrl('/api/vouchers/validate-multiple'), request, {
-      headers: getAuthHeaders(token)
-    });
+    // Public endpoint - không cần auth headers
+    const response = await axios.post(getApiUrl('/api/vouchers/validate-multiple'), request);
     console.log('validateMultipleVouchers response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -177,12 +175,11 @@ export const validateMultipleVouchers = async (token: string, request: MultipleV
   }
 };
 
-// Use single voucher
+// Use single voucher (Public endpoint - không cần auth)
 export const useVoucher = async (token: string, request: VoucherUsageRequest) => {
   try {
-    const response = await axios.post(getApiUrl('/api/vouchers/use'), request, {
-      headers: getAuthHeaders(token)
-    });
+    // Public endpoint - không cần auth headers
+    const response = await axios.post(getApiUrl('/api/vouchers/use'), request);
     console.log('useVoucher response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -191,12 +188,11 @@ export const useVoucher = async (token: string, request: VoucherUsageRequest) =>
   }
 };
 
-// Use multiple vouchers
+// Use multiple vouchers (Public endpoint - không cần auth)
 export const useMultipleVouchers = async (token: string, request: MultipleVoucherUsageRequest) => {
   try {
-    const response = await axios.post(getApiUrl('/api/vouchers/use-multiple'), request, {
-      headers: getAuthHeaders(token)
-    });
+    // Public endpoint - không cần auth headers
+    const response = await axios.post(getApiUrl('/api/vouchers/use-multiple'), request);
     console.log('useMultipleVouchers response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -205,12 +201,11 @@ export const useMultipleVouchers = async (token: string, request: MultipleVouche
   }
 };
 
-// Get user's voucher usage history
+// Get user's voucher usage history (Public endpoint - không cần auth)
 export const getUserVoucherUsage = async (token: string, userId: string, page = 1, limit = 10) => {
   try {
-    const response = await axios.get(getApiUrl(`/api/vouchers/my-usage/${userId}?page=${page}&limit=${limit}`), {
-      headers: getAuthHeaders(token)
-    });
+    // Public endpoint - không cần auth headers
+    const response = await axios.get(getApiUrl(`/api/vouchers/my-usage/${userId}?page=${page}&limit=${limit}`));
     console.log('getUserVoucherUsage response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -261,5 +256,42 @@ export const deleteVoucherAdmin = async (adminToken: string, voucherId: string) 
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || 'Failed to delete voucher');
+  }
+};
+
+// Order Integration Endpoints (Yêu cầu User Authentication)
+
+export interface OrderVoucherValidationRequest {
+  voucher_id: string;
+  cart_total: number;
+}
+
+export interface OrderVoucherValidationResponse {
+  valid: boolean;
+  voucher?: {
+    id: string;
+    voucher_id: string;
+    voucher_type: VoucherType;
+    discount_type?: DiscountType;
+    discount_value?: number;
+    min_order_value: number;
+    max_discount_value?: number;
+  };
+  discount_amount: number;
+  original_amount: number;
+  final_amount: number;
+}
+
+// Validate voucher trong order context (Yêu cầu User Authentication)
+export const validateVoucherInOrder = async (token: string, request: OrderVoucherValidationRequest): Promise<OrderVoucherValidationResponse> => {
+  try {
+    const response = await axios.post(getApiUrl('/api/orders/validate-voucher'), request, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('validateVoucherInOrder response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('validateVoucherInOrder error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to validate voucher in order');
   }
 }; 

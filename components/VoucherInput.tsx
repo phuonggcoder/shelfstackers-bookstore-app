@@ -45,7 +45,7 @@ const VoucherInput: React.FC<VoucherInputProps> = ({
     setError('');
 
     try {
-      const result = await validateVoucher(token, voucherCode.trim().toUpperCase(), orderValue);
+      const result = await validateVoucher('', voucherCode.trim().toUpperCase(), orderValue);
       
       if (result.valid && result.voucher) {
         const discountAmount = result.discount_amount || 0;

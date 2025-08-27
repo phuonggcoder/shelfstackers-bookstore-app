@@ -100,6 +100,20 @@ export default function ChangeEmailVerification({
       return;
     }
 
+    // Validate OTP length before sending
+    const cleanOldOtp = currentEmailOtp.replace(/\s/g, '').replace(/[^0-9]/g, '');
+    const cleanNewOtp = newEmailOtp.replace(/\s/g, '').replace(/[^0-9]/g, '');
+
+    if (cleanOldOtp.length !== 6) {
+      showErrorToast('Lỗi', `Mã OTP email hiện tại phải có 6 chữ số. Hiện tại: ${cleanOldOtp.length}/6`);
+      return;
+    }
+
+    if (cleanNewOtp.length !== 6) {
+      showErrorToast('Lỗi', `Mã OTP email mới phải có 6 chữ số. Hiện tại: ${cleanNewOtp.length}/6`);
+      return;
+    }
+
     try {
       setIsLoading(true);
       
@@ -110,9 +124,9 @@ export default function ChangeEmailVerification({
         return;
       }
       
-      // Clean OTP values - remove spaces and trim
-      const cleanOldOtp = currentEmailOtp.replace(/\s/g, '').trim();
-      const cleanNewOtp = newEmailOtp.replace(/\s/g, '').trim();
+      // Gửi OTP values trực tiếp
+      const cleanOldOtp = currentEmailOtp;
+      const cleanNewOtp = newEmailOtp;
       
       console.log('🔧 Sending OTPs:', {
         oldEmailOtp: cleanOldOtp,
@@ -217,14 +231,13 @@ export default function ChangeEmailVerification({
                 style={styles.otpInput}
                 placeholder="Nhập OTP từ email hiện tại"
                 value={currentEmailOtp}
-                onChangeText={(text) => {
-                  // Remove spaces and limit to 6 digits
-                  const cleaned = text.replace(/\s/g, '').replace(/[^0-9]/g, '').slice(0, 6);
-                  setCurrentEmailOtp(cleaned);
-                }}
+                onChangeText={setCurrentEmailOtp}
                 keyboardType="numeric"
                 maxLength={6}
               />
+              <Text style={styles.otpHint}>
+                {currentEmailOtp ? `${currentEmailOtp.replace(/\s/g, '').replace(/[^0-9]/g, '').length}/6 chữ số` : '0/6 chữ số'}
+              </Text>
             </View>
 
             {/* Email mới */}
@@ -236,14 +249,13 @@ export default function ChangeEmailVerification({
                 style={styles.otpInput}
                 placeholder="Nhập OTP từ email mới"
                 value={newEmailOtp}
-                onChangeText={(text) => {
-                  // Remove spaces and limit to 6 digits
-                  const cleaned = text.replace(/\s/g, '').replace(/[^0-9]/g, '').slice(0, 6);
-                  setNewEmailOtp(cleaned);
-                }}
+                onChangeText={setNewEmailOtp}
                 keyboardType="numeric"
                 maxLength={6}
               />
+              <Text style={styles.otpHint}>
+                {newEmailOtp ? `${newEmailOtp.replace(/\s/g, '').replace(/[^0-9]/g, '').length}/6 chữ số` : '0/6 chữ số'}
+              </Text>
             </View>
 
             {/* Nút xác thực */}
@@ -334,6 +346,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     marginTop: 10,
+  },
+  otpHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    textAlign: 'center',
   },
   sendOtpButton: {
     backgroundColor: '#667eea',
