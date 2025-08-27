@@ -66,25 +66,40 @@ export default function PayOSRoute() {
   const handleDeepLink = (url: any) => {
     console.log('Deep link received:', url);
     
-    // Xử lý kết quả thanh toán từ PayOS
-    if (url.includes('payment-return')) {
-      // Extract parameters from URL
-      const urlParams = new URLSearchParams(url.split('?')[1]);
-      const status = urlParams.get('status');
-      const orderCode = urlParams.get('orderCode');
-      const paymentLinkId = urlParams.get('paymentLinkId');
-      
-      console.log('PayOS return params:', { status, orderCode, paymentLinkId });
-      
-      if (status === 'success' || status === '00') {
-        // Navigate trực tiếp thay vì hiển thị Alert
-        router.replace({ pathname: '/order-success', params: { orderId } });
-      } else {
-        // Navigate back thay vì hiển thị Alert
+    try {
+      // Xử lý kết quả thanh toán từ PayOS
+      if (url.includes('payment-return') || url.includes('payment-cancelled')) {
+        // Extract parameters from URL
+        const urlParams = new URLSearchParams(url.split('?')[1] || '');
+        const status = urlParams.get('status');
+        const orderCode = urlParams.get('orderCode');
+        const paymentLinkId = urlParams.get('paymentLinkId');
+        const cancel = urlParams.get('cancel');
+        
+        console.log('PayOS return params:', { status, orderCode, paymentLinkId, cancel });
+        
+        // Check for cancelled payment
+        if (cancel === 'true' || status === 'CANCELLED' || url.includes('payment-cancelled')) {
+          console.log('Payment cancelled by user');
+          router.back();
+          return;
+        }
+        
+        // Check for successful payment
+        if (status === 'success' || status === '00' || status === 'SUCCESS') {
+          console.log('Payment successful');
+          router.replace({ pathname: '/order-success', params: { orderId } });
+        } else {
+          console.log('Payment failed or cancelled');
+          router.back();
+        }
+      } else if (url.includes('payment-cancel') || url.includes('cancel')) {
+        console.log('Payment cancelled');
         router.back();
       }
-    } else if (url.includes('payment-cancel')) {
-      // Navigate back thay vì hiển thị Alert
+    } catch (error) {
+      console.error('Error handling deep link:', error);
+      // Fallback: navigate back on error
       router.back();
     }
   };
@@ -149,6 +164,9 @@ export default function PayOSRoute() {
 
   const handleWebViewNavigationStateChange = (navState: any) => {
     console.log('Navigation state changed:', navState.url);
+    
+    // Prevent navigation loop by checking if we're already processing
+    if (navState.loading) return;
     
     // Kiểm tra URL để xử lý callback
     if (navState.url.includes('payment-return') || navState.url.includes('success') || navState.url.includes('complete')) {
@@ -292,18 +310,24 @@ export default function PayOSRoute() {
         allowsProtectedMedia={true}
         onShouldStartLoadWithRequest={(request) => {
           console.log('WebView request:', request.url);
+          
+          // Handle deep link requests
+          if (request.url.includes('bookshelfstacker://')) {
+            console.log('Handling deep link:', request.url);
+            handleDeepLink(request.url);
+            return false; // Prevent WebView from loading deep link
+          }
+          
           // Allow all requests to PayOS domains
           if (request.url.includes('payos.vn') || request.url.includes('pay.payos.vn')) {
             return true;
           }
-          // Allow deep link requests
-          if (request.url.includes('bookshelfstacker://')) {
-            return true;
-          }
-          // Allow relative URLs
+          
+          // Allow relative URLs and other HTTP/HTTPS requests
           if (request.url.startsWith('http') || request.url.startsWith('https')) {
             return true;
           }
+          
           return true;
         }}
       />

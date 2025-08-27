@@ -77,12 +77,13 @@ const Register = () => {
 
     setLoading(true);
     try {
-      // TODO: Implement registration logic
-      // Gửi đủ 5 trường khi gọi API
-      // { username, full_name: fullName, email, password }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const emailService = require('../../services/emailService');
+      await emailService.sendRegistrationOTP(email, {
+        username,
+        full_name: fullName,
+        password,
+        phone_number: ''
+      });
       
       // Chuyển sang bước xác thực email
       setStep('verification');
@@ -98,12 +99,8 @@ const Register = () => {
       // TODO: Complete registration after email verification
       // await completeRegistration(data);
       
-      setStep('success');
-      
-      // Auto redirect to login after 3 seconds
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
+      // Sau khi verify thành công, chuyển về trang đăng nhập
+      router.push('/login');
     } catch (error: any) {
       Alert.alert('Lỗi', error.message || 'Có lỗi xảy ra. Vui lòng thử lại');
     }
@@ -111,8 +108,8 @@ const Register = () => {
 
   const handleSendOTP = async () => {
     try {
-      // TODO: Implement send OTP logic
-      // await emailService.sendRegistrationOTP(email);
+      const emailService = require('../../services/emailService');
+      await emailService.resendVerificationOTP(email);
       Alert.alert('Thành công', 'Mã OTP đã được gửi đến email của bạn');
     } catch (error: any) {
       Alert.alert('Lỗi', error.message || 'Không thể gửi OTP. Vui lòng thử lại');
@@ -121,10 +118,57 @@ const Register = () => {
 
   const handleVerifyOTP = async (otp: string) => {
     try {
-      // TODO: Implement verify OTP logic
-      // const result = await emailService.verifyEmailOTP(email, otp);
-      return { success: true };
+      const emailService = require('../../services/emailService');
+      
+      // Kiểm tra trạng thái verify trước
+      try {
+        const status = await emailService.checkVerificationStatus(email);
+        if (status.success && status.verification?.is_verified) {
+          // User đã verify rồi, chuyển sang login
+          Alert.alert(
+            'Thông báo',
+            'Email đã được xác thực trước đó. Vui lòng đăng nhập.',
+            [
+              {
+                text: 'Đăng nhập',
+                onPress: () => router.push('/login')
+              }
+            ]
+          );
+          return { success: true, alreadyVerified: true };
+        }
+      } catch (statusError) {
+        // Nếu không kiểm tra được status, tiếp tục verify OTP
+        console.log('Không thể kiểm tra trạng thái verify:', statusError);
+      }
+      
+      // Verify OTP
+      const result = await emailService.verifyRegistrationOTP(email, otp, password);
+      return result;
     } catch (error: any) {
+      // Nếu verify thất bại, kiểm tra xem có phải user đã verify rồi không
+      if (error.message === 'Mã OTP không đúng') {
+        try {
+          const emailService = require('../../services/emailService');
+          const status = await emailService.checkVerificationStatus(email);
+          if (status.success && status.verification?.is_verified) {
+            Alert.alert(
+              'Thông báo',
+              'Email đã được xác thực trước đó. Vui lòng đăng nhập.',
+              [
+                {
+                  text: 'Đăng nhập',
+                  onPress: () => router.push('/login')
+                }
+              ]
+            );
+            return { success: true, alreadyVerified: true };
+          }
+        } catch (statusError) {
+          console.log('Không thể kiểm tra trạng thái verify:', statusError);
+        }
+      }
+      
       throw new Error(error.message || 'Mã OTP không đúng. Vui lòng thử lại');
     }
   };
@@ -362,9 +406,10 @@ const Register = () => {
     );
   }
 
-  if (step === 'success') {
-    return renderSuccess();
-  }
+  // Bỏ màn hình success, chuyển thẳng sang login
+  // if (step === 'success') {
+  //   return renderSuccess();
+  // }
 
   return renderRegistrationForm();
 };

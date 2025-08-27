@@ -13,6 +13,7 @@ import CancelOrderModal from '../components/CancelOrderModal';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import RefundStatusNotification from '../components/RefundStatusNotification';
 import ReviewForm from '../components/ReviewForm';
+import ShipperRatingCard from '../components/ShipperRatingCard';
 import ShipperRatingModal from '../components/ShipperRatingModal';
 import ThankYouModal from '../components/ThankYouModal';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +22,7 @@ import { useOrderDetail } from '../hooks/useOrders';
 import { useCanRateShipper, useRatingModal } from '../hooks/useShipperRating';
 import { cancelOrder } from '../services/orderService';
 import ReviewService from '../services/reviewService';
+import { getShipperInfo, getShipperName, getShipperPhone } from '../utils/shipperHelpers';
 
 interface OrderItem {
   book: {
@@ -259,13 +261,33 @@ const OrderDetailScreen = () => {
     });
   };
 
+  // Helper function để lấy shipper info từ order
+  const getOrderShipperInfo = () => {
+    if (!order) return null;
+    return getShipperInfo(order.assigned_shipper_id);
+  };
+
+  // Helper function để lấy shipper name từ order
+  const getOrderShipperName = () => {
+    if (!order) return '';
+    return getShipperName(order.assigned_shipper_id);
+  };
+
+  // Helper function để lấy shipper phone từ order
+  const getOrderShipperPhone = () => {
+    if (!order) return '';
+    return getShipperPhone(order.assigned_shipper_id);
+  };
+
+
+
   const handleRateShipper = () => {
     if (!order) return;
     
-    const shipperData = {
-      _id: order.assigned_shipper_id || 'unknown',
-      full_name: order.assigned_shipper_name || '',
-      phone_number: order.assigned_shipper_phone || ''
+    const shipperData = getOrderShipperInfo() || {
+      _id: 'unknown',
+      full_name: '',
+      phone_number: ''
     };
     
     openShipperRatingModal(order, shipperData, canRateExistingRating);
@@ -279,6 +301,17 @@ const OrderDetailScreen = () => {
   const isOrderCompleted = () => {
     return order?.status?.toLowerCase() === 'delivered';
   };
+
+  // Debug logs để kiểm tra shipper data
+  console.log('🔍 Debug Shipper Data:');
+  console.log('Order:', order?._id);
+  console.log('Order status:', order?.status);
+  console.log('assigned_shipper_id:', order?.assigned_shipper_id);
+  console.log('getOrderShipperInfo():', getOrderShipperInfo());
+  console.log('getOrderShipperName():', getOrderShipperName());
+  console.log('getOrderShipperPhone():', getOrderShipperPhone());
+  console.log('Will show shipper info:', !!getOrderShipperName());
+  console.log('Will show ShipperRatingCard:', isOrderCompleted() && !!getOrderShipperInfo());
 
   const canCancelOrder = (status: string) => {
     const normalized = (status || '').toLowerCase();
@@ -528,28 +561,36 @@ const OrderDetailScreen = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Order Status */}
         <View style={styles.section}>
-          <OrderStatusBadge status={order.status} shipperName={order.assigned_shipper_name || order.assigned_shipper_id} shipperAck={order.shipper_ack} />
+          <OrderStatusBadge status={order.status} shipperName={getOrderShipperName()} shipperAck={order.shipper_ack} />
           <Text style={styles.statusDescription}>
             {isOrderCompleted() ? t('orderDeliveredSuccessfully') : t('orderProcessing')}
           </Text>
           
-          {/* Shipper Information - Hiển thị khi có shipper được gán */}
-          {(order.assigned_shipper_name || order.assigned_shipper_id) && (
+          {/* Shipper Information - Hiển thị khi có shipper được gán và đơn hàng đã giao/trả */}
+          {getOrderShipperName() && (order.status.toLowerCase() === 'delivered' || order.status.toLowerCase() === 'returned') && (
             <View style={styles.shipperInfo}>
               <Text style={styles.shipperTitle}>{t('shipperInformation')}</Text>
-              <Text style={styles.shipperName}>{t('shipperName')}: {order.assigned_shipper_name || order.assigned_shipper_id}</Text>
-              {order.assigned_shipper_phone && (
+              <Text style={styles.shipperName}>{t('shipperName')}: {getOrderShipperName()}</Text>
+              {getOrderShipperPhone() && (
                 <TouchableOpacity 
                   style={styles.shipperPhone}
-                  onPress={() => Linking.openURL(`tel:${order.assigned_shipper_phone}`)}
+                  onPress={() => Linking.openURL(`tel:${getOrderShipperPhone()}`)}
                 >
                   <Ionicons name="call-outline" size={16} color="#667eea" />
-                  <Text style={styles.shipperPhoneText}>{order.assigned_shipper_phone}</Text>
+                  <Text style={styles.shipperPhoneText}>{getOrderShipperPhone()}</Text>
                 </TouchableOpacity>
               )}
               {order.shipper_note && (
                 <Text style={styles.shipperNote}>{t('shipperNote')}: {order.shipper_note}</Text>
               )}
+              
+              {/* Shipper Rating Card - Hiển thị khi đơn hàng đã giao */}
+              <ShipperRatingCard
+                orderId={orderId as string}
+                orderStatus={order.status}
+                shipperInfo={getOrderShipperInfo() || { _id: '', full_name: '', phone_number: '' }}
+                onRatePress={handleRateShipper}
+              />
             </View>
           )}
         </View>
@@ -712,18 +753,7 @@ const OrderDetailScreen = () => {
               <Text style={styles.reviewButtonText}>{t('reviewOrder')}</Text>
             </TouchableOpacity>
             
-            {/* Shipper Rating Button */}
-            {canRate && order.assigned_shipper_id && (
-              <TouchableOpacity
-                style={styles.shipperRatingButton}
-                onPress={handleRateShipper}
-              >
-                <Ionicons name="car-outline" size={20} color="white" />
-                <Text style={styles.shipperRatingButtonText}>
-                  {canRateExistingRating ? t('editShipperRating') : t('rateShipper')}
-                </Text>
-              </TouchableOpacity>
-            )}
+
             
             {canRequestRefund(order.status) && order.paymentMethod !== 'cod' && (
               <TouchableOpacity

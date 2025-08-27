@@ -2,19 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { useRatingSubmission } from '../hooks/useShipperRating';
-import { ShipperRating, ShipperRatingPrompt } from '../services/shipperRatingService';
+import { RatingPrompt, ShipperRating } from '../services/shipperRatingService';
 import RatingStars from './RatingStars';
 
 interface ShipperRatingModalProps {
@@ -27,7 +27,7 @@ interface ShipperRatingModalProps {
     phone_number?: string;
   };
   existingRating?: ShipperRating | null;
-  prompts: ShipperRatingPrompt[];
+  prompts: RatingPrompt[];
   promptsLoading: boolean;
   onRatingSubmit?: () => void;
 }
@@ -53,9 +53,32 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
   const [comment, setComment] = useState(existingRating?.comment || '');
   const [isAnonymous, setIsAnonymous] = useState(existingRating?.is_anonymous || false);
 
+  // Helper function để kiểm tra có thể chỉnh sửa đánh giá không (trong 24h và chỉ 1 lần)
+  const canEditRating = (rating: ShipperRating | null | undefined) => {
+    if (!rating?.created_at) return false;
+    
+    // Nếu đã có updated_at, nghĩa là đã chỉnh sửa rồi -> không cho phép chỉnh sửa nữa
+    if (rating.updated_at && rating.updated_at !== rating.created_at) {
+      return false;
+    }
+    
+    const createdAt = new Date(rating.created_at);
+    const now = new Date();
+    const timeDiff = now.getTime() - createdAt.getTime();
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+    
+    return hoursDiff <= 24;
+  };
+
+  // Kiểm tra xem có thể chỉnh sửa không
+  const canEdit = canEditRating(existingRating);
+
   // Reset form when modal opens/closes or existingRating changes
   useEffect(() => {
     if (isOpen) {
+      console.log('🔄 Modal opened, existingRating:', existingRating);
+      console.log('📝 Selected prompts from existingRating:', existingRating?.selected_prompts);
+      
       setRating(existingRating?.rating || 0);
       setSelectedPrompts(existingRating?.selected_prompts || []);
       setComment(existingRating?.comment || '');
@@ -63,11 +86,11 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
     }
   }, [isOpen, existingRating]);
 
-  const handlePromptToggle = (promptId: string) => {
+  const handlePromptToggle = (promptText: string) => {
     setSelectedPrompts(prev => 
-      prev.includes(promptId) 
-        ? prev.filter(id => id !== promptId)
-        : [...prev, promptId]
+      prev.includes(promptText) 
+        ? prev.filter(text => text !== promptText)
+        : [...prev, promptText]
     );
   };
 
@@ -95,9 +118,11 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
         showSuccessToast(t('success'), t('ratingUpdatedSuccessfully'));
       } else {
         await submitRating({
-          orderId,
-          shipperId: shipperInfo._id,
-          ...ratingData,
+          order_id: orderId,
+          rating,
+          selected_prompts: selectedPrompts,
+          comment: comment.trim(),
+          is_anonymous: isAnonymous,
         });
         showSuccessToast(t('success'), t('ratingSubmittedSuccessfully'));
       }
@@ -129,13 +154,28 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
     return shipperInfo?.full_name || t('shipper');
   };
 
-  const groupedPrompts = prompts.reduce((acc, prompt) => {
-    if (!acc[prompt.category]) {
-      acc[prompt.category] = [];
+  // Filter prompts based on rating
+  const getFilteredPrompts = () => {
+    if (rating === 0) return prompts; // Show all prompts when no rating selected
+    
+    if (rating < 3) {
+      // Show only negative prompts for ratings below 3
+      return prompts.filter(prompt => prompt.type === 'negative');
+    } else {
+      // Show only positive prompts for ratings 3 and above
+      return prompts.filter(prompt => prompt.type === 'positive');
     }
-    acc[prompt.category].push(prompt);
+  };
+
+  const filteredPrompts = getFilteredPrompts();
+  
+  const groupedPrompts = filteredPrompts.reduce((acc, prompt) => {
+    if (!acc[prompt.type]) {
+      acc[prompt.type] = [];
+    }
+    acc[prompt.type].push(prompt);
     return acc;
-  }, {} as Record<string, ShipperRatingPrompt[]>);
+  }, {} as Record<string, RatingPrompt[]>);
 
   return (
     <Modal
@@ -157,6 +197,16 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Time Expired Warning */}
+          {existingRating && !canEdit && (
+            <View style={styles.timeExpiredWarning}>
+              <Ionicons name="time-outline" size={20} color="#e74c3c" />
+              <Text style={styles.timeExpiredWarningText}>
+                {t('editTimeExpiredMessage')}
+              </Text>
+            </View>
+          )}
+
           {/* Shipper Info */}
           <View style={styles.shipperInfo}>
             <View style={styles.shipperAvatar}>
@@ -201,16 +251,16 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
                   <View style={styles.promptsGrid}>
                     {categoryPrompts.map((prompt) => (
                       <TouchableOpacity
-                        key={prompt._id}
+                        key={prompt.id}
                         style={[
                           styles.promptChip,
-                          selectedPrompts.includes(prompt._id) && styles.promptChipSelected
+                          selectedPrompts.includes(prompt.text) && styles.promptChipSelected
                         ]}
-                        onPress={() => handlePromptToggle(prompt._id)}
+                        onPress={() => handlePromptToggle(prompt.text)}
                       >
                         <Text style={[
                           styles.promptText,
-                          selectedPrompts.includes(prompt._id) && styles.promptTextSelected
+                          selectedPrompts.includes(prompt.text) && styles.promptTextSelected
                         ]}>
                           {prompt.text}
                         </Text>
@@ -219,6 +269,18 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
                   </View>
                 </View>
               ))}
+              
+              {/* Show message when no prompts available for current rating */}
+              {Object.keys(groupedPrompts).length === 0 && rating > 0 && (
+                <View style={styles.noPromptsContainer}>
+                  <Text style={styles.noPromptsText}>
+                    {rating < 3 
+                      ? t('noNegativePromptsAvailable') 
+                      : t('noPositivePromptsAvailable')
+                    }
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -273,9 +335,9 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
         {/* Submit Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+            style={[styles.submitButton, (submitting || (existingRating && !canEdit)) && styles.submitButtonDisabled]}
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || (!!existingRating && !canEdit)}
           >
             {submitting ? (
               <ActivityIndicator size="small" color="white" />
@@ -285,9 +347,11 @@ const ShipperRatingModal: React.FC<ShipperRatingModalProps> = ({
             <Text style={styles.submitButtonText}>
               {submitting 
                 ? t('submitting') 
-                : existingRating 
-                  ? t('updateRating') 
-                  : t('submitRating')
+                : existingRating && !canEdit
+                  ? t('editTimeExpired')
+                  : existingRating 
+                    ? t('updateRating') 
+                    : t('submitRating')
               }
             </Text>
           </TouchableOpacity>
@@ -463,6 +527,33 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
     marginTop: 8,
+  },
+  noPromptsContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  noPromptsText: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  timeExpiredWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fdf2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  timeExpiredWarningText: {
+    fontSize: 14,
+    color: '#dc2626',
+    marginLeft: 8,
+    flex: 1,
   },
   footer: {
     padding: 16,

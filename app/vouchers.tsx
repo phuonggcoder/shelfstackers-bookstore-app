@@ -28,7 +28,7 @@ const VoucherScreen = () => {
   const fetchVouchers = async () => {
     setLoading(true);
     try {
-      const response = await getAvailableVouchers(token || '');
+      const response = await getAvailableVouchers();
       let all: Voucher[] = response.vouchers || [];
       const now = new Date();
       if (tab === 'active') {

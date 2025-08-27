@@ -12,6 +12,7 @@ import OrderStatusBadge from '../components/OrderStatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../hooks/useOrders';
 
+
 interface OrderItem {
   _id: string;
   orderCode: string;
@@ -201,7 +202,7 @@ const OrderHistoryScreen = () => {
             <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <OrderStatusBadge status={item.status} shipperName={item.assigned_shipper_name || item.assigned_shipper_id} />
+            <OrderStatusBadge status={item.status} />
           </View>
         </View>
         {/* Danh sách sách trong đơn */}

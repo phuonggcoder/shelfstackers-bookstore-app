@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BookCard from '../../components/BookCard';
+import { useBookDetailLoading } from '../../hooks/useBookDetailLoading';
+import PullToRefreshLoadingScreen from '../../screens/PullToRefreshLoadingScreen';
 
 // CartAddedDialog removed - using UnifiedCustomComponent instead
 import CartIconWithBadge from '../../components/CartIconWithBadge';
@@ -54,6 +56,15 @@ const BookDetailsScreen = () => {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList | null>(null);
+  
+  // Loading state management
+  const { 
+    isLoading: bookLoading, 
+    showLoadingScreen, 
+    startLoading, 
+    stopLoading, 
+    loadBookData 
+  } = useBookDetailLoading();
 
   const footerAnim = useRef(new Animated.Value(0)).current;
   const lastOffsetY = useRef(0);
@@ -151,6 +162,9 @@ const BookDetailsScreen = () => {
     if (id) {
       const fetchBook = async () => {
         try {
+          // Show loading screen immediately - đè toàn bộ layout
+          startLoading(3000);
+          
           const fetchedBook = await getBookById(id as string);
           setBook(fetchedBook);
           
@@ -165,7 +179,7 @@ const BookDetailsScreen = () => {
       };
       fetchBook();
     }
-  }, [id]);
+  }, [id, startLoading]);
 
   useEffect(() => {
     if (book && token) {
@@ -381,7 +395,7 @@ const BookDetailsScreen = () => {
     }
   };
 
-  // Buy now: sang trang order review
+  // Buy now: chuyển thẳng đến order review, không thêm vào giỏ hàng
   const handleBuyNow = () => {
     if (!token) {
       showLoginPopup(
@@ -392,22 +406,11 @@ const BookDetailsScreen = () => {
     }
     if (!book) return;
     
-    // Add book to cart first, then navigate to order review
-    const addBookToCartAndNavigate = async () => {
-      try {
-        await addToCart(token, book._id, quantity);
-        // Navigate to order review with the book ID
-        router.push({ 
-          pathname: '/order-review', 
-          params: { bookId: book._id } 
-        });
-      } catch (error) {
-        console.error('Error adding book to cart for buy now:', error);
-        showErrorToast(t('error'), t('cannotAddProductToCart'));
-      }
-    };
-    
-    addBookToCartAndNavigate();
+    // Chuyển thẳng đến order review với book ID, không thêm vào giỏ hàng
+    router.push({ 
+      pathname: '/order-review', 
+      params: { bookId: book._id } 
+    });
   };
 
   const openFullscreenImage = (index: number) => {
@@ -449,6 +452,12 @@ const BookDetailsScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
+      {/* Loading Screen Overlay */}
+      <PullToRefreshLoadingScreen
+        isVisible={showLoadingScreen}
+        duration={3000}
+        onSlideUp={stopLoading}
+      />
 
       {overlayVisible && (
         <TouchableWithoutFeedback onPress={() => setShowLoginAlert(false)}>

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import ShipperRatingService, {
-    CreateShipperRatingData,
-    ShipperRating,
-    ShipperRatingPrompt,
-    ShipperRatingSummary,
-    UpdateShipperRatingData
+    CanRateResponse,
+    ShipperRating
 } from '../services/shipperRatingService';
 
 // Hook for managing shipper rating data
@@ -207,7 +204,13 @@ export const useRatingSubmission = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submitRating = useCallback(async (ratingData: CreateShipperRatingData) => {
+  const submitRating = useCallback(async (ratingData: {
+    order_id: string;
+    rating: number;
+    selected_prompts: string[];
+    comment: string;
+    is_anonymous: boolean;
+  }) => {
     try {
       setSubmitting(true);
       setError(null);
@@ -223,7 +226,12 @@ export const useRatingSubmission = () => {
     }
   }, []);
 
-  const updateRating = useCallback(async (orderId: string, ratingData: UpdateShipperRatingData) => {
+  const updateRating = useCallback(async (orderId: string, ratingData: {
+    rating?: number;
+    selected_prompts?: string[];
+    comment?: string;
+    is_anonymous?: boolean;
+  }) => {
     try {
       setSubmitting(true);
       setError(null);
@@ -243,8 +251,7 @@ export const useRatingSubmission = () => {
     try {
       setSubmitting(true);
       setError(null);
-      const result = await ShipperRatingService.deleteRating(orderId);
-      return result;
+      await ShipperRatingService.deleteRating(orderId);
     } catch (error) {
       console.error('Error deleting rating:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete rating';
@@ -278,7 +285,7 @@ export const useCanRateShipper = (orderId: string) => {
     try {
       setLoading(true);
       setError(null);
-      const result = await ShipperRatingService.canRateShipper(orderId);
+      const result: CanRateResponse = await ShipperRatingService.canRateShipper(orderId);
       setCanRate(result.canRate);
       setReason(result.reason || null);
       setExistingRating(result.existingRating || null);

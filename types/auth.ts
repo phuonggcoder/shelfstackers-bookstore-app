@@ -41,4 +41,5 @@ export interface User {
   avatar?: string;
   gender?: string;
   birthday?: string;
+  is_verified?: boolean;
 }

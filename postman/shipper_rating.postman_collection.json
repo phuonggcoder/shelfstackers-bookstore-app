@@ -1,0 +1,153 @@
+{
+  "info": {
+    "name": "Shipper Rating System",
+    "_postman_id": "shipper-rating-collection",
+    "description": "Collection để test chức năng đánh giá shipper cho app user",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Rating Prompts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/prompts",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "prompts"]
+        }
+      }
+    },
+    {
+      "name": "Check Rating Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/order/{{ORDER_ID}}",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "order", "{{ORDER_ID}}"]
+        }
+      }
+    },
+    {
+      "name": "Create Shipper Rating",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": \"{{ORDER_ID}}\",\n  \"rating\": 4.5,\n  \"selected_prompts\": [\"Giao hàng nhanh chóng\", \"Thái độ phục vụ tốt\"],\n  \"comment\": \"Shipper rất nhiệt tình và giao hàng đúng giờ. Rất hài lòng với dịch vụ!\",\n  \"is_anonymous\": false\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/rate",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "rate"]
+        }
+      }
+    },
+    {
+      "name": "Update Shipper Rating",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rating\": 5.0,\n  \"selected_prompts\": [\"Giao hàng nhanh chóng\", \"Thái độ phục vụ tốt\", \"Đóng gói cẩn thận\"],\n  \"comment\": \"Cập nhật: Shipper rất xuất sắc! Giao hàng nhanh và cẩn thận.\",\n  \"is_anonymous\": false\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/update/{{ORDER_ID}}",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "update", "{{ORDER_ID}}"]
+        }
+      }
+    },
+    {
+      "name": "Delete Shipper Rating",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/delete/{{ORDER_ID}}",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "delete", "{{ORDER_ID}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Shipper Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/api/shipper-ratings/shipper/{{SHIPPER_ID}}",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "shipper-ratings", "shipper", "{{SHIPPER_ID}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Order Details (for shipper_id)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "orders", "{{ORDER_ID}}"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "USER_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "ORDER_ID",
+      "value": ""
+    },
+    {
+      "key": "SHIPPER_ID",
+      "value": ""
+    }
+  ]
+}

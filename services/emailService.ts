@@ -11,6 +11,10 @@ export interface EmailVerificationResponse {
   message: string;
   expiresIn?: string;
   requiresVerification?: boolean;
+  user?: {
+    id: string;
+    email: string;
+  };
 }
 
 export interface OTPVerificationRequest {
@@ -68,20 +72,31 @@ export interface EmailChangeResponse {
   email?: string;
 }
 
+export interface EmailChangeVerificationRequest {
+  old_email_otp: string;
+  new_email_otp: string;
+}
+
 class EmailService {
-  private baseUrl = `${API_BASE_URL}/api`;
+  private baseUrl = API_BASE_URL;
 
   // Gửi OTP email cho đăng ký
-  async sendRegistrationOTP(email: string): Promise<EmailVerificationResponse> {
+  async sendRegistrationOTP(email: string, userData?: { username?: string, full_name?: string, password?: string, phone_number?: string }): Promise<EmailVerificationResponse> {
     try {
       console.log('🔧 Sending registration OTP to:', email);
       
-      const response = await fetch(`${this.baseUrl}/email-verification/send-otp`, {
+      const response = await fetch(`${this.baseUrl}/api/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ 
+          email,
+          password: userData?.password || 'temp_password',
+          full_name: userData?.full_name || '',
+          username: userData?.username || email.split('@')[0],
+          phone_number: userData?.phone_number || ''
+        }),
       });
       
       const data = await response.json();
@@ -91,51 +106,86 @@ class EmailService {
         throw new Error(data.message || 'Failed to send OTP');
       }
       
-      return data;
+      return {
+        success: true,
+        message: data.message,
+        requiresVerification: data.requiresVerification
+      };
     } catch (error: any) {
       console.error('❌ Registration OTP error:', error);
       throw new Error(error.message || 'Không thể gửi mã OTP');
     }
   }
 
-  // Xác thực OTP email
-  async verifyEmailOTP(email: string, otp: string): Promise<OTPVerificationResponse> {
+  // Kiểm tra trạng thái verify của user
+  async checkVerificationStatus(email: string): Promise<any> {
     try {
-      console.log('🔧 Verifying email OTP:', { email, otp });
+      console.log('🔧 Checking verification status for:', email);
       
-      const response = await fetch(`${this.baseUrl}/email-verification/verify-otp`, {
+      const response = await fetch(`${this.baseUrl}/api/users/verification-status?email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      console.log('✅ Verification status response:', data);
+      
+      return data;
+    } catch (error: any) {
+      console.error('❌ Check verification status error:', error);
+      throw new Error(error.message || 'Không thể kiểm tra trạng thái verify');
+    }
+  }
+
+  // Xác thực OTP email cho đăng ký
+  async verifyRegistrationOTP(email: string, otp: string, password?: string): Promise<OTPVerificationResponse> {
+    try {
+      console.log('🔧 Verifying registration OTP:', { email, otp, hasPassword: !!password });
+      
+      const requestBody: any = { email, otp };
+      if (password) {
+        requestBody.password = password;
+        console.log('🔧 Including password in verification request');
+      }
+      
+      console.log('🔧 Request body:', JSON.stringify(requestBody, null, 2));
+      
+      const response = await fetch(`${this.baseUrl}/api/users/verify-email-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();
-      console.log('✅ Email OTP verification response:', data);
+      console.log('✅ Registration OTP verification response:', data);
+      console.log('✅ Response status:', response.status);
       
       if (!response.ok) {
-        throw new Error(data.message || 'OTP verification failed');
+        throw new Error(data.message || 'Failed to verify OTP');
       }
       
-      // Lưu token nếu có
-      if (data.token) {
-        await this.storeAuthData(data);
-      }
-      
-      return data;
+      return {
+        success: true,
+        message: data.message,
+        user: data.user,
+        isVerified: data.user?.is_verified
+      };
     } catch (error: any) {
-      console.error('❌ Email OTP verification error:', error);
-      throw new Error(error.message || 'Xác thực OTP thất bại');
+      console.error('❌ Registration OTP verification error:', error);
+      throw new Error(error.message || 'Không thể xác thực OTP');
     }
   }
 
-  // Gửi lại OTP
+  // Gửi lại OTP email
   async resendOTP(email: string): Promise<EmailVerificationResponse> {
     try {
       console.log('🔧 Resending OTP to:', email);
       
-      const response = await fetch(`${this.baseUrl}/email-verification/resend-otp`, {
+      const response = await fetch(`${this.baseUrl}/api/users/resend-verification-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,263 +200,312 @@ class EmailService {
         throw new Error(data.message || 'Failed to resend OTP');
       }
       
-      return data;
+      return {
+        success: true,
+        message: data.message
+      };
     } catch (error: any) {
       console.error('❌ Resend OTP error:', error);
-      throw new Error(error.message || 'Không thể gửi lại mã OTP');
+      throw new Error(error.message || 'Không thể gửi lại OTP');
     }
   }
 
-  // Lấy phương thức xác thực có sẵn
-  async getVerificationMethods(identifier: string): Promise<VerificationMethodsResponse> {
+  // Đổi email
+  async changeEmail(newEmail: string, currentPassword: string): Promise<EmailChangeResponse> {
     try {
-      console.log('🔧 Getting verification methods for:', identifier);
+      console.log('🔧 Changing email to:', newEmail);
       
-      const response = await fetch(`${this.baseUrl}/users/get-verification-methods`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier }),
-      });
-      
-      const data = await response.json();
-      console.log('✅ Verification methods response:', data);
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to get verification methods');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ Get verification methods error:', error);
-      throw new Error(error.message || 'Không thể lấy phương thức xác thực');
-    }
-  }
-
-  // Quên mật khẩu
-  async forgotPassword(identifier: string, method: 'email' | 'sms'): Promise<ForgotPasswordResponse> {
-    try {
-      console.log('🔧 Forgot password request:', { identifier, method });
-      
-      const response = await fetch(`${this.baseUrl}/users/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier, method }),
-      });
-      
-      const data = await response.json();
-      console.log('✅ Forgot password response:', data);
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to process forgot password request');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ Forgot password error:', error);
-      throw new Error(error.message || 'Không thể xử lý yêu cầu quên mật khẩu');
-    }
-  }
-
-  // Xác thực OTP SMS cho quên mật khẩu
-  async verifySMSOTP(identifier: string, otp: string): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('🔧 Verifying SMS OTP for forgot password:', { identifier, otp });
-      
-      const response = await fetch(`${this.baseUrl}/users/verify-sms-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier, otp }),
-      });
-      
-      const data = await response.json();
-      console.log('✅ SMS OTP verification response:', data);
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'SMS OTP verification failed');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ SMS OTP verification error:', error);
-      throw new Error(error.message || 'Xác thực OTP SMS thất bại');
-    }
-  }
-
-  // Đặt lại mật khẩu
-  async resetPassword(request: ResetPasswordRequest): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('🔧 Resetting password');
-      
-      const response = await fetch(`${this.baseUrl}/users/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-      
-      const data = await response.json();
-      console.log('✅ Reset password response:', data);
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to reset password');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ Reset password error:', error);
-      throw new Error(error.message || 'Không thể đặt lại mật khẩu');
-    }
-  }
-
-  // Gửi OTP cho thay đổi email
-  async sendEmailChangeOTP(email: string, isNewEmail: boolean = false): Promise<EmailChangeResponse> {
-    try {
-      console.log('🔧 Sending email change OTP:', { email, isNewEmail });
-      
-      const token = await this.getAuthToken();
+      const token = await AsyncStorage.getItem('token');
       if (!token) {
-        throw new Error('Authentication required');
+        throw new Error('Không tìm thấy token đăng nhập');
       }
       
-      const response = await fetch(`${this.baseUrl}/users/send-email-change-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email, isNewEmail }),
-      });
-      
-      const data = await response.json();
-      console.log('✅ Email change OTP response:', data);
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send email change OTP');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ Email change OTP error:', error);
-      throw new Error(error.message || 'Không thể gửi OTP thay đổi email');
-    }
-  }
-
-  // Thay đổi email
-  async changeEmail(
-    currentEmail: string,
-    newEmail: string,
-    currentEmailOtp: string,
-    newEmailOtp: string
-  ): Promise<{ success: boolean; message: string; user?: any }> {
-    try {
-      console.log('🔧 Changing email');
-      
-      const token = await this.getAuthToken();
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await fetch(`${this.baseUrl}/users/change-email`, {
+      const response = await fetch(`${this.baseUrl}/api/users/change-email`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          currentEmail,
-          newEmail,
-          currentEmailOtp,
-          newEmailOtp,
+        body: JSON.stringify({ 
+          newEmail: newEmail,
+          currentPassword: currentPassword
         }),
       });
       
-      const data = await response.json();
-      console.log('✅ Change email response:', data);
-      
+      // Check if response is ok before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to change email');
+        // Try to parse error response as JSON
+        let errorMessage = 'Failed to change email';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, get text response
+          const errorText = await response.text();
+          console.error('❌ Server returned non-JSON response:', errorText.substring(0, 200));
+          errorMessage = `Server error: ${response.status}`;
+        }
+        throw new Error(errorMessage);
       }
       
-      // Cập nhật user data nếu có
-      if (data.user) {
-        await this.updateUserData(data.user);
+      // Parse successful response
+      let data;
+      try {
+        data = await response.json();
+        console.log('✅ Change email response:', data);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        const responseText = await response.text();
+        console.error('❌ Raw response:', responseText.substring(0, 200));
+        throw new Error('Invalid server response format');
       }
       
-      return data;
+      return {
+        success: true,
+        message: data.message,
+        email: newEmail
+      };
     } catch (error: any) {
       console.error('❌ Change email error:', error);
       throw new Error(error.message || 'Không thể thay đổi email');
     }
   }
 
-  // Kiểm tra trạng thái xác thực
-  async getVerificationStatus(): Promise<{ isVerified: boolean; email?: string }> {
+  // Xác thực đổi email
+  async verifyEmailChange(oldEmailOtp: string, newEmailOtp: string): Promise<EmailChangeResponse> {
     try {
-      console.log('🔧 Getting verification status');
+      console.log('🔧 Verifying email change OTPs');
       
-      const token = await this.getAuthToken();
+      const token = await AsyncStorage.getItem('token');
       if (!token) {
-        throw new Error('Authentication required');
+        throw new Error('Không tìm thấy token đăng nhập');
       }
       
-      const response = await fetch(`${this.baseUrl}/email-verification/verification-status`, {
+      const response = await fetch(`${this.baseUrl}/api/users/verify-email-change`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          old_email_otp: oldEmailOtp,
+          new_email_otp: newEmailOtp
+        }),
+      });
+      
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        // Try to parse error response as JSON
+        let errorMessage = 'Failed to verify email change';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, get text response
+          const errorText = await response.text();
+          console.error('❌ Server returned non-JSON response:', errorText.substring(0, 200));
+          errorMessage = `Server error: ${response.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Parse successful response
+      let data;
+      try {
+        data = await response.json();
+        console.log('✅ Email change verification response:', data);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        const responseText = await response.text();
+        console.error('❌ Raw response:', responseText.substring(0, 200));
+        throw new Error('Invalid server response format');
+      }
+      
+      return {
+        success: true,
+        message: data.message,
+        email: data.new_email
+      };
+    } catch (error: any) {
+      console.error('❌ Email change verification error:', error);
+      throw new Error(error.message || 'Không thể xác thực thay đổi email');
+    }
+  }
+
+  // Gửi OTP cho quên mật khẩu
+  async sendForgotPasswordOTP(email: string): Promise<EmailVerificationResponse> {
+    try {
+      console.log('🔧 Sending forgot password OTP to:', email);
+      
+      const response = await fetch(`${this.baseUrl}/api/users/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      console.log('✅ Forgot password OTP response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send forgot password OTP');
+      }
+      
+      return {
+        success: true,
+        message: data.message
+      };
+    } catch (error: any) {
+      console.error('❌ Forgot password OTP error:', error);
+      throw new Error(error.message || 'Không thể gửi OTP quên mật khẩu');
+    }
+  }
+
+  // Xác thực OTP quên mật khẩu
+  async verifyForgotPasswordOTP(email: string, otp: string, newPassword: string): Promise<OTPVerificationResponse> {
+    try {
+      console.log('🔧 Verifying forgot password OTP');
+      
+      const response = await fetch(`${this.baseUrl}/api/users/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email,
+          otp,
+          new_password: newPassword
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('✅ Forgot password verification response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to reset password');
+      }
+      
+      return {
+        success: true,
+        message: data.message
+      };
+    } catch (error: any) {
+      console.error('❌ Forgot password verification error:', error);
+      throw new Error(error.message || 'Không thể đặt lại mật khẩu');
+    }
+  }
+
+  // Lấy thông tin user hiện tại
+  async getCurrentUser(): Promise<any> {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Không tìm thấy token đăng nhập');
+      }
+      
+      const response = await fetch(`${this.baseUrl}/api/users/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
       
-      const data = await response.json();
-      console.log('✅ Verification status response:', data);
-      
+      // Check if response is ok before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to get verification status');
+        // Try to parse error response as JSON
+        let errorMessage = 'Failed to get user profile';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, get text response
+          const errorText = await response.text();
+          console.error('❌ Server returned non-JSON response:', errorText.substring(0, 200));
+          errorMessage = `Server error: ${response.status}`;
+        }
+        throw new Error(errorMessage);
       }
       
-      return data;
+      // Parse successful response
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        const responseText = await response.text();
+        console.error('❌ Raw response:', responseText.substring(0, 200));
+        throw new Error('Invalid server response format');
+      }
+      
+      return data.user;
     } catch (error: any) {
-      console.error('❌ Get verification status error:', error);
-      throw new Error(error.message || 'Không thể kiểm tra trạng thái xác thực');
+      console.error('❌ Get current user error:', error);
+      throw new Error(error.message || 'Không thể lấy thông tin người dùng');
     }
   }
 
-  // Helper methods
-  private async storeAuthData(data: any) {
+  // Gửi lại OTP xác thực email
+  async resendVerificationOTP(email: string): Promise<EmailVerificationResponse> {
     try {
-      await AsyncStorage.multiSet([
-        ['access_token', data.token],
-        ['user_data', JSON.stringify(data.user)],
-        ['is_verified', 'true'],
-      ]);
-      console.log('✅ Auth data stored successfully');
-    } catch (error) {
-      console.error('❌ Error storing auth data:', error);
-      throw error;
+      console.log('🔧 Resending verification OTP to:', email);
+      
+      const response = await fetch(`${this.baseUrl}/api/users/resend-verification-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      console.log('✅ Resend verification OTP response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to resend verification OTP');
+      }
+      
+      return {
+        success: true,
+        message: data.message
+      };
+    } catch (error: any) {
+      console.error('❌ Resend verification OTP error:', error);
+      throw new Error(error.message || 'Không thể gửi lại OTP xác thực');
     }
   }
 
-  private async getAuthToken(): Promise<string | null> {
+  // Xác thực OTP email
+  async verifyEmailOTP(email: string, otp: string): Promise<OTPVerificationResponse> {
     try {
-      return await AsyncStorage.getItem('access_token');
-    } catch (error) {
-      console.error('❌ Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  private async updateUserData(user: any) {
-    try {
-      await AsyncStorage.setItem('user_data', JSON.stringify(user));
-      console.log('✅ User data updated successfully');
-    } catch (error) {
-      console.error('❌ Error updating user data:', error);
+      console.log('🔧 Verifying email OTP');
+      
+      const response = await fetch(`${this.baseUrl}/api/users/verify-email-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email,
+          otp
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('✅ Email verification response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to verify email OTP');
+      }
+      
+      return {
+        success: true,
+        message: data.message,
+        user: data.user
+      };
+    } catch (error: any) {
+      console.error('❌ Email verification error:', error);
+      throw new Error(error.message || 'Không thể xác thực email');
     }
   }
 }

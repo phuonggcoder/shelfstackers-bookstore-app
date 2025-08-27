@@ -1,4 +1,5 @@
 import AvoidKeyboardDummyView from "@/components/AvoidKeyboardDummyView";
+import EmailVerificationLogin from "@/components/EmailVerificationLogin";
 import GoogleSignInWithAccountPicker from "@/components/GoogleSignInWithAccountPicker";
 import OTPLogin from "@/components/OTPLogin";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +20,7 @@ import { configureGoogleSignIn } from "../../config/googleSignIn";
 import { useAuth } from "../../context/AuthContext";
 import { useUnifiedModal } from "../../context/UnifiedModalContext";
 import { authService } from "../../services/authService";
+import emailService from "../../services/emailService";
 import { convertGoogleSignInResponse } from "../../utils/authUtils";
 
 export default function Login() {
@@ -30,7 +32,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [authMethod, setAuthMethod] = useState<"main" | "otp">("main");
+  const [authMethod, setAuthMethod] = useState<"main" | "otp" | "email-verification">("main");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
   // Cấu hình Google Sign-In với Firebase
   useEffect(() => {
@@ -56,6 +59,18 @@ export default function Login() {
 
     try {
       setIsLoading(true);
+      
+      // Kiểm tra trạng thái verification trước khi đăng nhập
+      const verificationStatus = await authService.checkUserVerification(email);
+      
+      if (!verificationStatus.is_verified) {
+        // User chưa xác thực email, chuyển sang màn hình verification
+        setPendingVerificationEmail(email);
+        setAuthMethod("email-verification");
+        return;
+      }
+      
+      // User đã xác thực, tiến hành đăng nhập bình thường
       const response = await authService.login({ email: email, password });
       await signIn(response);
       showAlert("Đăng nhập thành công", "Chào mừng bạn!", "OK", "success");
@@ -123,12 +138,47 @@ export default function Login() {
     setAuthMethod("main");
   };
 
+  // Hàm xử lý thành công email verification
+  const handleEmailVerificationSuccess = async (userData: any) => {
+    try {
+      // Sau khi xác thực thành công, tiến hành đăng nhập
+      const response = await authService.login({ email: pendingVerificationEmail, password });
+      await signIn(response);
+      showAlert("Đăng nhập thành công", "Chào mừng bạn!", "OK", "success");
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      showErrorToast("Lỗi", "Không thể đăng nhập sau khi xác thực");
+    }
+  };
+
+  // Hàm gửi lại OTP cho email verification
+  const handleResendVerificationOTP = async () => {
+    try {
+      await emailService.resendVerificationOTP(pendingVerificationEmail);
+      showSuccessToast("Thành công", "OTP đã được gửi lại!");
+    } catch (error: any) {
+      showErrorToast("Lỗi", error.message || "Không thể gửi lại OTP");
+    }
+  };
+
   // Hiển thị OTP Login nếu authMethod là 'otp'
   if (authMethod === "otp") {
     return (
       <OTPLogin
         onLoginSuccess={handleOTPLoginSuccess}
         onBack={handleBackToMain}
+      />
+    );
+  }
+
+  // Hiển thị Email Verification nếu authMethod là 'email-verification'
+  if (authMethod === "email-verification") {
+    return (
+      <EmailVerificationLogin
+        email={pendingVerificationEmail}
+        onVerificationSuccess={handleEmailVerificationSuccess}
+        onBack={handleBackToMain}
+        onResendOTP={handleResendVerificationOTP}
       />
     );
   }
@@ -227,9 +277,9 @@ export default function Login() {
               </View>
               <Text style={styles.rememberText}>{t("rememberLogin")}</Text>
             </TouchableOpacity>
-            {/* <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
               <Text style={styles.forgotText}>{t("forgotPassword")}</Text>
-            </TouchableOpacity> */}
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity

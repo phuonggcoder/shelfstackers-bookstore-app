@@ -1,376 +1,448 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Modal,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
-import EmailChangeVerification from './EmailChangeVerification';
+import { useUnifiedModal } from '../context/UnifiedModalContext';
+import emailService from '../services/emailService';
 
 interface EmailChangeSettingsProps {
   currentEmail: string;
   onEmailChangeSuccess: (newEmail: string) => void;
-  visible: boolean;
   onClose: () => void;
 }
+
+type EmailChangeStep = 'form' | 'verification' | 'success';
 
 const EmailChangeSettings: React.FC<EmailChangeSettingsProps> = ({
   currentEmail,
   onEmailChangeSuccess,
-  visible,
   onClose,
 }) => {
-  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const { showErrorToast, showSuccessToast } = useUnifiedModal();
+  
+  const [currentStep, setCurrentStep] = useState<EmailChangeStep>('form');
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [oldEmailOtp, setOldEmailOtp] = useState('');
+  const [newEmailOtp, setNewEmailOtp] = useState('');
 
-  const handleEmailChangeSuccess = (newEmail: string) => {
-    onEmailChangeSuccess(newEmail);
-    setIsChangingEmail(false);
-    onClose();
-    
-    Alert.alert(
-      'Thành công',
-      `Email đã được thay đổi thành: ${newEmail}`,
-      [{ text: 'OK' }]
-    );
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
-  const handleStartEmailChange = () => {
-    setIsChangingEmail(true);
-  };
-
-  const handleBackToSettings = () => {
-    setIsChangingEmail(false);
-  };
-
-  const handleSendOTP = async (email: string, type: 'current' | 'new') => {
-    try {
-      // TODO: Implement API call to send OTP
-      // await emailService.sendOTP(email, type);
-      
-      Alert.alert(
-        'Thành công',
-        `Mã OTP đã được gửi đến ${email}`,
-        [{ text: 'OK' }]
-      );
-    } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Không thể gửi OTP. Vui lòng thử lại');
+  const handleRequestEmailChange = async () => {
+    if (!newEmail || !currentPassword) {
+      showErrorToast('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      return;
     }
-  };
 
-  const handleVerifyOTP = async (email: string, otp: string, type: 'current' | 'new') => {
+    if (!validateEmail(newEmail)) {
+      showErrorToast('Lỗi', 'Email mới không hợp lệ');
+      return;
+    }
+
+    if (newEmail.toLowerCase() === currentEmail.toLowerCase()) {
+      showErrorToast('Lỗi', 'Email mới phải khác email hiện tại');
+      return;
+    }
+
     try {
-      // TODO: Implement API call to verify OTP
-      // const result = await emailService.verifyOTP(email, otp, type);
+      setIsLoading(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await emailService.changeEmail(newEmail, currentPassword);
       
-      // For demo, accept any 6-digit OTP
-      if (otp.length === 6 && /^\d{6}$/.test(otp)) {
-        return { success: true, message: 'Xác thực thành công' };
-      } else {
-        throw new Error('Mã OTP không đúng. Vui lòng thử lại.');
+      if (response.success) {
+        setCurrentStep('verification');
+        showSuccessToast('Thành công', 'OTP đã được gửi đến cả hai email');
       }
     } catch (error: any) {
-      throw new Error(error.message || 'Mã OTP không đúng. Vui lòng thử lại.');
+      showErrorToast('Lỗi', error.message || 'Không thể thay đổi email');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isChangingEmail) {
+  const handleVerifyEmailChange = async () => {
+    if (!oldEmailOtp || !newEmailOtp) {
+      showErrorToast('Lỗi', 'Vui lòng nhập đầy đủ mã OTP');
+      return;
+    }
+
+    if (oldEmailOtp.length !== 6 || newEmailOtp.length !== 6) {
+      showErrorToast('Lỗi', 'Mã OTP phải có 6 số');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      const response = await emailService.verifyEmailChange(oldEmailOtp, newEmailOtp);
+      
+      if (response.success) {
+        setCurrentStep('success');
+        showSuccessToast('Thành công', 'Email đã được thay đổi thành công');
+        
+        setTimeout(() => {
+          onEmailChangeSuccess(response.email || newEmail);
+          onClose();
+        }, 2000);
+      }
+    } catch (error: any) {
+      showErrorToast('Lỗi', error.message || 'Không thể xác thực thay đổi email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToForm = () => {
+    setCurrentStep('form');
+    setOldEmailOtp('');
+    setNewEmailOtp('');
+  };
+
+  // Render verification step
+  if (currentStep === 'verification') {
     return (
-      <EmailChangeVerification
-        currentEmail={currentEmail}
-        onEmailChangeSuccess={handleEmailChangeSuccess}
-        onBack={handleBackToSettings}
-        onSendOTP={handleSendOTP}
-        onVerifyOTP={handleVerifyOTP}
-      />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBackToForm}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Xác thực thay đổi email</Text>
+          </View>
+
+          <View style={styles.content}>
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle" size={24} color="#2196F3" />
+              <Text style={styles.infoText}>
+                Vui lòng nhập mã OTP đã được gửi đến cả hai email để xác thực thay đổi.
+              </Text>
+            </View>
+
+            <View style={styles.otpSection}>
+              <Text style={styles.sectionTitle}>Mã OTP từ email cũ</Text>
+              <Text style={styles.emailText}>{currentEmail}</Text>
+              <TextInput
+                style={styles.otpInput}
+                placeholder="Nhập 6 số OTP"
+                value={oldEmailOtp}
+                onChangeText={setOldEmailOtp}
+                keyboardType="numeric"
+                maxLength={6}
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.otpSection}>
+              <Text style={styles.sectionTitle}>Mã OTP từ email mới</Text>
+              <Text style={styles.emailText}>{newEmail}</Text>
+              <TextInput
+                style={styles.otpInput}
+                placeholder="Nhập 6 số OTP"
+                value={newEmailOtp}
+                onChangeText={setNewEmailOtp}
+                keyboardType="numeric"
+                maxLength={6}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.verifyButton, isLoading && styles.disabledButton]}
+              onPress={handleVerifyEmailChange}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.verifyButtonText}>Xác thực thay đổi</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
+  // Render success step
+  if (currentStep === 'success') {
+    return (
+      <View style={styles.successContainer}>
+        <View style={styles.successContent}>
+          <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+          <Text style={styles.successTitle}>Thay đổi email thành công!</Text>
+          <Text style={styles.successMessage}>
+            Email của bạn đã được thay đổi thành công.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Render form step
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.container}>
-        {/* Header */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={onClose}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Thay đổi email</Text>
-          <View style={styles.placeholder} />
+          <Text style={styles.title}>Thay đổi email</Text>
         </View>
 
-        {/* Content */}
         <View style={styles.content}>
-          {/* Current Email Display */}
-          <View style={styles.currentEmailSection}>
-            <Text style={styles.sectionTitle}>Email hiện tại</Text>
-            <View style={styles.emailContainer}>
-              <Ionicons name="mail" size={20} color="#667eea" />
-              <Text style={styles.emailText}>{currentEmail}</Text>
-            </View>
-          </View>
-
-          {/* Information */}
-          <View style={styles.infoSection}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="information-circle" size={24} color="#667eea" />
-            </View>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Quy trình thay đổi email</Text>
-              <Text style={styles.infoDescription}>
-                Để thay đổi email, bạn cần xác thực email hiện tại và email mới để đảm bảo tính bảo mật.
-              </Text>
-            </View>
-          </View>
-
-          {/* Steps */}
-          <View style={styles.stepsSection}>
-            <Text style={styles.stepsTitle}>Các bước thực hiện:</Text>
-            
-            <View style={styles.stepItem}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>1</Text>
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Nhập email mới</Text>
-                <Text style={styles.stepDescription}>
-                  Nhập địa chỉ email mới mà bạn muốn sử dụng
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.stepItem}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>2</Text>
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Xác thực email hiện tại</Text>
-                <Text style={styles.stepDescription}>
-                  Nhập mã OTP được gửi đến email hiện tại
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.stepItem}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>3</Text>
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Xác thực email mới</Text>
-                <Text style={styles.stepDescription}>
-                  Nhập mã OTP được gửi đến email mới
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Warning */}
-          <View style={styles.warningSection}>
-            <View style={styles.warningIcon}>
-              <Ionicons name="warning" size={20} color="#ff9500" />
-            </View>
-            <Text style={styles.warningText}>
-              Lưu ý: Sau khi thay đổi email, bạn sẽ cần sử dụng email mới để đăng nhập vào tài khoản.
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={24} color="#2196F3" />
+            <Text style={styles.infoText}>
+              Để thay đổi email, bạn cần xác thực cả email cũ và email mới bằng mã OTP.
             </Text>
           </View>
-        </View>
 
-        {/* Action Button */}
-        <View style={styles.actionContainer}>
+          <View style={styles.currentEmailSection}>
+            <Text style={styles.sectionTitle}>Email hiện tại</Text>
+            <View style={styles.currentEmailCard}>
+              <Ionicons name="mail" size={20} color="#666" />
+              <Text style={styles.currentEmailText}>{currentEmail}</Text>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email mới <Text style={styles.requiredText}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập email mới"
+              value={newEmail}
+              onChangeText={setNewEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Mật khẩu hiện tại <Text style={styles.requiredText}>*</Text></Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Nhập mật khẩu hiện tại"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <TouchableOpacity
-            style={styles.changeEmailButton}
-            onPress={handleStartEmailChange}
+            style={[styles.changeButton, isLoading && styles.disabledButton]}
+            onPress={handleRequestEmailChange}
+            disabled={isLoading}
           >
-            <Ionicons name="mail-open" size={20} color="#fff" />
-            <Text style={styles.changeEmailButtonText}>Bắt đầu thay đổi email</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.changeButtonText}>Gửi mã xác thực</Text>
+            )}
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    marginBottom: 30,
+    marginTop: 20,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 8,
+    marginRight: 16,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#333',
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
     flex: 1,
-    padding: 20,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#e3f2fd',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#1976d2',
+    lineHeight: 20,
   },
   currentEmailSection: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  emailContainer: {
+  currentEmailCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+  },
+  currentEmailText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  requiredText: {
+    color: '#e74c3c',
+  },
+  input: {
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    backgroundColor: '#f8f9fa',
+  },
+  passwordContainer: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+  },
+  changeButton: {
+    backgroundColor: '#667eea',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  changeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  otpSection: {
+    marginBottom: 24,
   },
   emailText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  infoSection: {
-    flexDirection: 'row',
-    backgroundColor: '#e3f2fd',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 30,
-  },
-  infoIcon: {
-    marginRight: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1976d2',
-    marginBottom: 4,
-  },
-  infoDescription: {
-    fontSize: 14,
-    color: '#1976d2',
-    lineHeight: 20,
-  },
-  stepsSection: {
-    marginBottom: 30,
-  },
-  stepsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#667eea',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  stepNumberText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  stepDescription: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
-  warningSection: {
-    flexDirection: 'row',
-    backgroundColor: '#fff3cd',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
+  otpInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 18,
+    backgroundColor: '#f8f9fa',
+    textAlign: 'center',
+    letterSpacing: 8,
   },
-  warningIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#856404',
-    lineHeight: 20,
-  },
-  actionContainer: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-  },
-  changeEmailButton: {
-    flexDirection: 'row',
+  verifyButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#667eea',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: 20,
   },
-  changeEmailButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  verifyButtonText: {
     color: '#fff',
-    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  successContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  successContent: {
+    alignItems: 'center',
+    maxWidth: 300,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
 

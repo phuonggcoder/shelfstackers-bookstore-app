@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useAvatar } from '../../context/AvatarContext';
+import EmailUpdateModal from '../../components/EmailUpdateModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -127,6 +128,7 @@ const SettingsScreen = () => {
   const { avatarUri } = useAvatar();
   const [localDetail, setLocalDetail] = React.useState<any>(null);
   const [displayName, setDisplayName] = useState('');
+  const [showEmailUpdate, setShowEmailUpdate] = useState(false);
 
   useEffect(() => {
     const loadName = async () => {
@@ -157,6 +159,11 @@ const SettingsScreen = () => {
     navigation.navigate('index' as never); // Tab Home
   };
 
+  const handleEmailUpdateSuccess = () => {
+    // Refresh user data if needed
+    console.log('Email updated successfully');
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
@@ -178,6 +185,11 @@ const SettingsScreen = () => {
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => navigation.navigate('user-detail' as never)}>
             <Ionicons name="person-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
             <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>{t('profile')}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
+          </TouchableOpacity>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={() => setShowEmailUpdate(true)}>
+            <Ionicons name="mail-outline" size={22} color="#3255FB" style={{marginRight:12}}/>
+            <Text style={{fontSize:16,fontWeight:'600',color:'#222'}}>Cập nhật email</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{marginLeft:'auto'}}/>
           </TouchableOpacity>
           <TouchableOpacity style={{flexDirection:'row',alignItems:'center',padding:16}} onPress={()=>navigation.navigate('vouchers' as never)}>
@@ -250,12 +262,20 @@ const SettingsScreen = () => {
            <Text style={styles.logoutText}>{t('logout')}</Text>
          </TouchableOpacity>
         
-        {/* Spacer to ensure button is not hidden */}
-        <View style={{ height: 20 }} />
-      </View>
-    </ScrollView>
-  );
-};
+                 {/* Spacer to ensure button is not hidden */}
+         <View style={{ height: 20 }} />
+       </View>
+
+       {/* Email Update Modal */}
+       <EmailUpdateModal
+         visible={showEmailUpdate}
+         onClose={() => setShowEmailUpdate(false)}
+         onSuccess={handleEmailUpdateSuccess}
+         currentEmail={user?.email || ''}
+       />
+     </ScrollView>
+   );
+ };
 
 export default function ProfileScreen() {
   const { user, isLoading } = useAuth();

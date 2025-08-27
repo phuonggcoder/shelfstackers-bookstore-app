@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import BookGrid2Col from '../components/BookGrid2Col';
-import BookGrid3Col from '../components/BookGrid3Col';
-import BookGrid4Col from '../components/BookGrid4Col';
+import OptimizedBookItem from '../components/OptimizedBookItem';
 import api from '../services/api';
 import { Book, Category } from '../types';
+import { safeIncludes, safeToLowerCase } from '../utils/safeStringUtils';
 
 const { width } = Dimensions.get('window');
 const SORT_OPTIONS = [
@@ -173,10 +172,10 @@ const FilteredBooksScreen = () => {
   // Lọc realtime theo searchText
   const searchedBooks = useMemo(() => {
     if (!searchText.trim()) return filteredBooks;
-    const q = searchText.toLowerCase();
+    const q = safeToLowerCase(searchText);
     return filteredBooks.filter(book =>
-      book.title.toLowerCase().includes(q) ||
-      (book.author && book.author.toLowerCase().includes(q))
+      safeIncludes(book.title, q) ||
+      safeIncludes(book.author, q)
     );
   }, [filteredBooks, searchText]);
   const pagedBooks = searchedBooks.slice((page - 1) * pageSize, page * pageSize);
@@ -623,9 +622,27 @@ const FilteredBooksScreen = () => {
   } catch (e) {}
 
   // Hàm chuyển sang trang chi tiết sách
-  const handleBookPress = (book: Book) => {
+  const handleBookPress = useCallback((book: Book) => {
     router.push({ pathname: '/book/[id]', params: { id: book._id } });
-  };
+  }, [router]);
+
+  // Optimized renderItem function
+  const renderBookItem = useCallback(({ item }: { item: Book }) => {
+    const ITEM_WIDTH = (width - 32 - (itemPerRow - 1) * 12) / itemPerRow;
+    let fixedHeight = 300;
+    if (itemPerRow === 3) fixedHeight = 210;
+    else if (itemPerRow === 4) fixedHeight = 170;
+
+    return (
+      <OptimizedBookItem
+        book={item}
+        onPress={handleBookPress}
+        itemWidth={ITEM_WIDTH}
+        fixedHeight={fixedHeight}
+        itemPerRow={itemPerRow}
+      />
+    );
+  }, [handleBookPress, itemPerRow, width]);
   return (
     <SafeAreaView style={[styles.container, { paddingTop: 0, paddingBottom: 0 }]}> 
       {/* Header: nút back + thanh tìm kiếm */}
@@ -680,17 +697,17 @@ const FilteredBooksScreen = () => {
           contentContainerStyle={{ ...styles.listContent, paddingBottom: 24 + insets.bottom + 50 }}
           columnWrapperStyle={{ justifyContent: 'center', marginHorizontal: 4 }}
           style={{ zIndex: 1 }}
-          renderItem={({ item }) => {
-            let Comp: React.ComponentType<{ book: Book; onPress?: (book: Book) => void }> = BookGrid2Col;
-            let fixedHeight = 300;
-            if (itemPerRow === 3) { Comp = BookGrid3Col; fixedHeight = 210; }
-            else if (itemPerRow === 4) { Comp = BookGrid4Col; fixedHeight = 170; }
-            return (
-              <View style={{ width: ITEM_WIDTH, marginBottom: 18, marginHorizontal: 4, height: fixedHeight }}>
-                <Comp book={item} onPress={handleBookPress} />
-              </View>
-            );
-          }}
+          renderItem={renderBookItem}
+          getItemLayout={(data, index) => ({
+            length: itemPerRow === 2 ? 300 : itemPerRow === 3 ? 210 : 170,
+            offset: (itemPerRow === 2 ? 300 : itemPerRow === 3 ? 210 : 170) * Math.floor(index / itemPerRow),
+            index,
+          })}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={12}
+          updateCellsBatchingPeriod={50}
           ListEmptyComponent={
             <View style={{alignItems:'center', marginTop:48}}>
               <Ionicons name="book-outline" size={64} color="#bdc3c7" style={{marginBottom:8}} />

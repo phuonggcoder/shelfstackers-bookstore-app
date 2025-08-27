@@ -8,9 +8,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BookCarousel from "../../components/BookCarousel";
 import CoverFlowCarousel3D from "../../components/CoverFlowCarousel3D";
 import HomeTopSection from '../../components/HomeTopSection';
+import VoucherNotification from "../../components/VoucherNotification";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import { useUnifiedModal } from "../../context/UnifiedModalContext";
+import { useHomeLoading } from "../../hooks/useHomeLoading";
+import PullToRefreshLoadingScreen from "../../screens/PullToRefreshLoadingScreen";
 import api from "../../services/api";
 import { Campaign } from "../../types";
 
@@ -26,6 +29,15 @@ const Index = () => {
   const [simpleFilter, setSimpleFilter] = useState<{ price: number; sort: 'az' | 'za' | null } | null>(null);
   const [hasShownLoginPopup, setHasShownLoginPopup] = useState(false);
   const insets = useSafeAreaInsets();
+  
+  // Loading state management
+  const { 
+    isLoading: homeLoading, 
+    showLoadingScreen, 
+    startLoading, 
+    stopLoading, 
+    handlePullToRefresh 
+  } = useHomeLoading();
 
   // Slide-down cue state
   const [showSlideCue, setShowSlideCue] = useState(false);
@@ -73,7 +85,9 @@ const Index = () => {
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
+    // Show loading screen immediately - đè toàn bộ layout
+    startLoading(5000);
+    
     try {
       // Refresh all data
       await Promise.all([
@@ -130,13 +144,20 @@ const Index = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top","left","right","bottom"]}>
+      {/* Loading Screen Overlay */}
+      <PullToRefreshLoadingScreen
+        isVisible={showLoadingScreen}
+        duration={5000}
+        onSlideUp={stopLoading}
+      />
+      
       {/** merge bottom safe area into content style so nav doesn't cover content */}
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={mergedContentStyle}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={false} onRefresh={onRefresh} />
         }
         onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
           const offsetY = e.nativeEvent.contentOffset.y;
@@ -169,6 +190,13 @@ const Index = () => {
           campaigns={campaigns}
           campaignsLoading={campaignsLoading}
           onApplySimpleFilter={setSimpleFilter}
+        />
+
+        {/* Voucher Notification */}
+        <VoucherNotification
+          onVoucherPress={() => router.push('/voucher-selection' as any)}
+          showCount={true}
+          maxCount={3}
         />
         
         {/* Featured Books Section với Cover Flow Carousel */}

@@ -1,217 +1,500 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+import AddressMapSearch from '../components/AddressMapSearch';
 
-interface AddressSuggestion {
-  place_id: number;
-  lat: string;
-  lon: string;
-  display_name: string;
-  address?: {
-    house_number?: string;
-    road?: string;
-    suburb?: string;
-    city_district?: string;
-    city?: string;
-    postcode?: string;
-    country?: string;
+interface LocationData {
+  province?: {
+    code: string;
+    name: string;
+    fullName: string;
   };
+  district?: {
+    code: string;
+    name: string;
+    fullName: string;
+    provinceId: string;
+  };
+  ward?: {
+    code: string;
+    name: string;
+    fullName: string;
+    districtId: string;
+  };
+  // Các trường cho luồng vị trí hiện tại
+  isFromCurrentLocation?: boolean;
+  latlong?: {
+    lat: number;
+    lng: number;
+  };
+  streetAddress?: string;
+  displayName?: string;
+  address?: any;
 }
 
-const AddressDetail = () => {
-  const { t } = useTranslation();
+interface AddressSuggestion {
+  lat: number;
+  lng: number;
+  display_name: string;
+  address: any;
+}
+
+export default function AddressDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
-  const [searchQuery, setSearchQuery] = useState('');
+  const [locationData, setLocationData] = useState<LocationData>({});
+  const [streetAddress, setStreetAddress] = useState('');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<AddressSuggestion | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<AddressSuggestion | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mapCenter, setMapCenter] = useState({ lat: 10.8231, lng: 106.6297 }); // TP.HCM default
+  const [mapReady, setMapReady] = useState(false);
+  const webViewRef = useRef<any>(null);
+  const lastRequestTime = useRef<number>(0);
 
-  const ward = params.ward as string;
-  const district = params.district as string;
-  const province = params.province as string;
+  // Rate limiting
+  const rateLimitedRequest = useCallback(async (url: string) => {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime.current;
+    
+    if (timeSinceLastRequest < 1000) {
+      const waitTime = 1000 - timeSinceLastRequest;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    lastRequestTime.current = Date.now();
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'shelfstackers-app/1.0 (https://www.openstreetmap.org)',
+        'Accept': 'application/json',
+        'Accept-Language': 'vi,en;q=0.9',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return response.json();
+  }, []);
 
-  const searchAddress = async (query: string) => {
-    if (!query.trim() || query.length < 2) {
+  // Khởi tạo dữ liệu từ params
+  useEffect(() => {
+    if (params.location) {
+      try {
+        const location = JSON.parse(decodeURIComponent(params.location as string));
+        setLocationData(location);
+        console.log('Location data received:', location);
+        
+        // LUỒNG 2: Từ autocomplete - Chỉ có province/district/ward
+        if (!location.isFromCurrentLocation && location.ward && location.district && location.province) {
+          console.log('Processing autocomplete flow');
+          // Tìm tọa độ trung tâm của ward để load map
+          initializeMapCenter(location);
+        }
+      } catch (error) {
+        console.error('Error parsing location data:', error);
+        Alert.alert('Lỗi', 'Không thể xử lý dữ liệu địa chỉ');
+      }
+    }
+  }, [params.location]);
+
+  // Khởi tạo tọa độ trung tâm map
+  const initializeMapCenter = useCallback(async (location: LocationData) => {
+    try {
+      setIsLoading(true);
+      console.log('Initializing map center for:', location);
+      
+      // Tìm tọa độ trung tâm của ward
+      const wardQuery = `${location.ward?.name}, ${location.district?.name}, ${location.province?.name}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(wardQuery)}&countrycodes=vn&limit=1&addressdetails=1`;
+      
+      console.log('Searching for ward center:', wardQuery);
+      const data = await rateLimitedRequest(url);
+      console.log('Ward center search result:', data);
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        const newCenter = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
+        console.log('Setting map center to:', newCenter);
+        setMapCenter(newCenter);
+        
+        // Di chuyển map đến vị trí mới
+        moveMapToLocation(newCenter.lat, newCenter.lng, 15);
+      } else {
+        console.warn('No ward center found, using default location');
+        // Fallback to default location
+        const defaultCenter = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
+        setMapCenter(defaultCenter);
+        moveMapToLocation(defaultCenter.lat, defaultCenter.lng, 10);
+      }
+    } catch (error) {
+      console.error('Error initializing map center:', error);
+      // Fallback to default location
+      const defaultCenter = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
+      setMapCenter(defaultCenter);
+      moveMapToLocation(defaultCenter.lat, defaultCenter.lng, 10);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [rateLimitedRequest]);
+
+  // Di chuyển map đến vị trí
+  const moveMapToLocation = useCallback((lat: number, lng: number, zoom: number = 17) => {
+    if (!webViewRef.current || !mapReady) {
+      console.log('Map not ready, retrying in 1 second...');
+      setTimeout(() => moveMapToLocation(lat, lng, zoom), 1000);
+      return;
+    }
+
+    console.log('Moving map to location:', { lat, lng, zoom });
+    try {
+      // Use the new moveToLocation function
+      if (webViewRef.current.moveToLocation) {
+        webViewRef.current.moveToLocation(lat, lng, zoom);
+      } else {
+        // Fallback to injectJavaScript
+        const script = `
+          if (window.map) {
+            console.log('Moving map to location:', ${lat}, ${lng}, ${zoom});
+            window.map.setView([${lat}, ${lng}], ${zoom}, {
+              animate: true,
+              duration: 1.0
+            });
+            
+            // Force a redraw to ensure the map updates
+            setTimeout(() => {
+              if (window.map) {
+                window.map.invalidateSize();
+              }
+            }, 100);
+          } else {
+            console.log('Map not available yet');
+          }
+        `;
+        webViewRef.current.injectJavaScript(script);
+      }
+    } catch (error) {
+      console.error('Error moving map:', error);
+    }
+  }, [mapReady]);
+
+  // Tìm kiếm địa chỉ với autocomplete
+  const searchAddress = useCallback(async (query: string) => {
+    if (!query.trim() || !locationData.ward || !locationData.district || !locationData.province) {
       setSuggestions([]);
       return;
     }
 
-    setLoading(true);
     try {
       // Tìm kiếm trong phạm vi ward đã chọn
-      const searchArea = `${ward}, ${district}, ${province}`;
-      const fullQuery = `${query}, ${searchArea}`;
+      const searchQuery = `${query}, ${locationData.ward.name}, ${locationData.district.name}, ${locationData.province.name}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(searchQuery)}&countrycodes=vn&limit=10&addressdetails=1&bounded=1`;
       
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&countrycodes=vn&limit=15&addressdetails=1`;
+      const data = await rateLimitedRequest(url);
       
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'shelfstackers-app/1.0 (youremail@example.com)'
+      const results = data
+        .filter((item: any) => {
+          const address = item.address;
+          // Kiểm tra xem kết quả có thuộc ward đã chọn không
+          return address && 
+                 (address.suburb === locationData.ward?.name || 
+                  address.neighbourhood === locationData.ward?.name ||
+                  address.city_district === locationData.ward?.name) &&
+                 address.county === locationData.district?.name &&
+                 address.state === locationData.province?.name;
+        })
+        .map((item: any) => ({
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          display_name: item.display_name,
+          address: item.address
+        }));
+
+      setSuggestions(results);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSuggestions([]);
+    }
+  }, [locationData, rateLimitedRequest]);
+
+  // Lấy vị trí hiện tại
+  const getCurrentLocation = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.log('Getting current location...');
+      
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần quyền truy cập vị trí', 'Vui lòng cấp quyền vị trí để sử dụng tính năng này');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+        distanceInterval: 10
+      });
+
+      const lat = location.coords.latitude;
+      const lng = location.coords.longitude;
+      
+      console.log('Current location obtained:', { lat, lng });
+
+      // Kiểm tra xem vị trí có nằm trong ward đã chọn không
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`;
+      console.log('Reverse geocoding URL:', url);
+      
+      const data = await rateLimitedRequest(url);
+      console.log('Reverse geocoding result:', data);
+
+      if (data && data.address) {
+        const address = data.address;
+        console.log('Address details:', address);
+        
+        const isInWard = address.suburb === locationData.ward?.name || 
+                        address.neighbourhood === locationData.ward?.name ||
+                        address.city_district === locationData.ward?.name;
+
+        console.log('Is in ward:', isInWard, 'Ward name:', locationData.ward?.name);
+
+        if (!isInWard && locationData.ward?.name) {
+          Alert.alert(
+            'Vị trí nằm ngoài phạm vi', 
+            `Vị trí hiện tại của bạn nằm ngoài phạm vi ${locationData.ward?.name}. Bạn có muốn tiếp tục sử dụng vị trí này không?`,
+            [
+              { text: 'Hủy', style: 'cancel' },
+              { 
+                text: 'Tiếp tục', 
+                onPress: () => {
+                  console.log('User chose to continue with out-of-bounds location');
+                  setSelectedLocation({
+                    lat,
+                    lng,
+                    display_name: data.display_name,
+                    address: data.address
+                  });
+                  moveMapToLocation(lat, lng, 17);
+                }
+              }
+            ]
+          );
+          return;
         }
-      });
-      
-      const data = await response.json();
-      
-      // Lọc kết quả để chỉ hiển thị những địa chỉ trong phạm vi ward
-      const filteredData = data.filter((item: AddressSuggestion) => {
-        const address = item.address || {};
-        const itemWard = address.suburb || address.city_district || '';
-        const itemDistrict = address.city || '';
-        const displayName = item.display_name || '';
+
+        // Vị trí nằm trong ward hoặc không có ward restriction, cập nhật
+        console.log('Setting selected location to current position');
+        setSelectedLocation({
+          lat,
+          lng,
+          display_name: data.display_name,
+          address: data.address
+        });
         
-        // Kiểm tra xem địa chỉ có thuộc ward và district đã chọn không
-        const inSelectedArea = itemWard.includes(ward) || 
-                              itemDistrict.includes(district) ||
-                              displayName.includes(ward) || 
-                              displayName.includes(district);
+        // Cập nhật map center và di chuyển map
+        setMapCenter({ lat, lng });
         
-        return inSelectedArea;
-      });
-      
-      // Nếu không có kết quả lọc được, vẫn hiển thị một số kết quả gốc
-      if (filteredData.length === 0 && data.length > 0) {
-        setSuggestions(data.slice(0, 5));
+        // Đợi map sẵn sàng rồi mới di chuyển
+        setTimeout(() => {
+          moveMapToLocation(lat, lng, 17);
+        }, 500);
+        
+        Alert.alert('Thành công', 'Đã cập nhật vị trí hiện tại của bạn');
       } else {
-        setSuggestions(filteredData);
+        console.warn('No address data from reverse geocoding');
+        // Still set the location even without address data
+        setSelectedLocation({
+          lat,
+          lng,
+          display_name: `Vị trí hiện tại (${lat.toFixed(6)}, ${lng.toFixed(6)})`,
+          address: null
+        });
+        
+        // Cập nhật map center và di chuyển map
+        setMapCenter({ lat, lng });
+        
+        // Đợi map sẵn sàng rồi mới di chuyển
+        setTimeout(() => {
+          moveMapToLocation(lat, lng, 17);
+        }, 500);
+        
+        Alert.alert('Thành công', 'Đã cập nhật vị trí hiện tại của bạn');
       }
     } catch (error) {
-      console.error('Error searching address:', error);
-      setSuggestions([]);
+      console.error('Error getting location:', error);
+      Alert.alert('Lỗi', 'Không thể lấy vị trí hiện tại. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
+  }, [locationData, rateLimitedRequest, moveMapToLocation]);
 
-  // Load gợi ý ban đầu khi vào trang
-  useEffect(() => {
-    loadDefaultSuggestions();
+  // Xử lý sự kiện từ map
+  const onMapSelect = useCallback((data: any) => {
+    if (data && data.type === 'position_update') {
+      // Cập nhật vị trí từ marker trên map
+      setSelectedLocation(prev => prev ? {
+        ...prev,
+        lat: data.lat,
+        lng: data.lon
+      } : null);
+    } else if (data && data.type === 'confirm') {
+      // Người dùng xác nhận vị trí trên map
+      setSelectedLocation({
+        lat: data.lat,
+        lng: data.lon,
+        display_name: data.display_name || '',
+        address: data.address
+      });
+    } else if (data && data.type === 'map_ready') {
+      setMapReady(true);
+    }
   }, []);
 
+  // Xác nhận và lưu địa chỉ
+  const confirmAddress = useCallback(() => {
+    if (!streetAddress.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết');
+      return;
+    }
+
+    if (!locationData.province || !locationData.ward) {
+      Alert.alert('Lỗi', 'Thiếu thông tin tỉnh/thành phố hoặc phường/xã');
+      return;
+    }
+
+    // Kiểm tra xem đã có latlong chưa
+    if (!selectedLocation) {
+      Alert.alert(
+        'Cần cập nhật vị trí',
+        'Để tính phí vận chuyển chính xác, vui lòng cập nhật vị trí của bạn. Bạn có muốn sử dụng vị trí hiện tại không?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { 
+            text: 'Cập nhật vị trí', 
+            onPress: () => {
+              console.log('User chose to update location');
+              getCurrentLocation();
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    // Tạo địa chỉ theo format yêu cầu
+    const addressData = {
+      // Thông tin người nhận (sẽ được điền ở trang add-address)
+      fullName: '', // Sẽ được điền sau
+      phone: '', // Sẽ được điền sau
+      email: '', // Không bắt buộc
+      
+      // Thông tin địa chỉ
+      street: streetAddress.trim(),
+      
+      // Thông tin hành chính
+      ward: {
+        code: locationData.ward.code,
+        name: locationData.ward.name,
+        districtId: locationData.ward.districtId,
+        fullName: locationData.ward.fullName
+      },
+      province: {
+        code: locationData.province.code,
+        name: locationData.province.name
+      },
+      district: locationData.district ? {
+        code: locationData.district.code,
+        name: locationData.district.name,
+        provinceId: locationData.district.provinceId
+      } : undefined,
+      
+      // Tọa độ
+      location: selectedLocation ? {
+        type: { type: 'Point' },
+        coordinates: [selectedLocation.lng, selectedLocation.lat] // [longitude, latitude]
+      } : undefined,
+      
+      // Dữ liệu OSM
+      osm: selectedLocation ? {
+        lat: selectedLocation.lat,
+        lng: selectedLocation.lng,
+        displayName: selectedLocation.display_name,
+        raw: selectedLocation.address
+      } : undefined,
+      
+      // Địa chỉ đầy đủ (tự động sinh)
+      fullAddress: `${streetAddress.trim()}, ${locationData.ward.name}, ${locationData.district?.name || ''}, ${locationData.province.name}`.replace(/,\s*,/g, ',').replace(/^,\s*/, '').replace(/,\s*$/, ''),
+      
+      // Thông tin khác
+      adminType: 'new',
+      isDefault: false,
+      note: '',
+      isDraft: false
+    };
+
+    // Chuyển về trang add-address với dữ liệu đã chuẩn bị
+    const payload = encodeURIComponent(JSON.stringify(addressData));
+    router.push(`/add-address?address=${payload}`);
+  }, [streetAddress, locationData, selectedLocation, router, getCurrentLocation]);
+
+  // Debounced search
   useEffect(() => {
-    if (searchQuery.trim().length >= 2) {
-      const timeoutId = setTimeout(() => {
-        searchAddress(searchQuery);
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    } else if (searchQuery.length === 0) {
-      // Hiển thị gợi ý mặc định khi chưa nhập gì
-      loadDefaultSuggestions();
+    const timer = setTimeout(() => {
+      searchAddress(streetAddress);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [streetAddress, searchAddress]);
+
+  // Update map when mapCenter changes
+  useEffect(() => {
+    if (mapReady && mapCenter) {
+      console.log('Map center changed, updating map:', mapCenter);
+      moveMapToLocation(mapCenter.lat, mapCenter.lng, 15);
     }
-  }, [searchQuery]);
+  }, [mapCenter, mapReady, moveMapToLocation]);
 
-  const loadDefaultSuggestions = async () => {
-    setLoading(true);
-    try {
-      const searchArea = `${ward}, ${district}, ${province}`;
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(searchArea)}&countrycodes=vn&limit=10&addressdetails=1`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'shelfstackers-app/1.0 (youremail@example.com)'
-        }
-      });
-      
-      const data = await response.json();
-      setSuggestions(data.slice(0, 5));
-    } catch (error) {
-      console.error('Error loading default suggestions:', error);
-      setSuggestions([]);
-    } finally {
-      setLoading(false);
+  // Xử lý khởi tạo map sau khi locationData đã được set
+  useEffect(() => {
+    if (locationData && !locationData.isFromCurrentLocation && locationData.ward && locationData.district && locationData.province) {
+      console.log('Initializing map for autocomplete flow');
+      initializeMapCenter(locationData);
     }
-  };
-
-  const handleSuggestionSelect = (suggestion: AddressSuggestion) => {
-    setSelectedSuggestion(suggestion);
-    
-    // Chỉ lấy số nhà và tên đường, không lấy full address
-    const address = suggestion.address || {};
-    const houseNumber = address.house_number || '';
-    const road = address.road || '';
-    const addressDetail = [houseNumber, road].filter(Boolean).join(' ');
-    
-    // Chuyển đến map picker với thông tin đã chọn
-    // Chỉ truyền addressDetail, không thay đổi ward/district/province
-    const payload = encodeURIComponent(JSON.stringify({
-      lat: suggestion.lat,
-      lng: suggestion.lon,
-      display_name: suggestion.display_name,
-      addressDetail: addressDetail || suggestion.display_name
-    }));
-    
-    router.push({
-      pathname: '/map-picker',
-      params: {
-        lat: suggestion.lat,
-        lng: suggestion.lon,
-        ward,
-        district,
-        province,
-        addressDetail: addressDetail || suggestion.display_name,
-        returnTo: 'address-detail',
-        preserveAddress: 'true' // Flag để giữ nguyên ward/district/province
-      }
-    });
-  };
-
-  const handleContinueWithInput = () => {
-    if (!searchQuery.trim()) return;
-    
-    // Tạo tọa độ mặc định cho ward (sẽ được cập nhật trong map picker)
-    const defaultLat = 10.8760444; // Tọa độ mặc định cho Hồ Chí Minh
-    const defaultLng = 106.6365252;
-    
-    router.push({
-      pathname: '/map-picker',
-      params: {
-        lat: String(defaultLat),
-        lng: String(defaultLng),
-        ward,
-        district,
-        province,
-        addressDetail: searchQuery.trim(),
-        returnTo: 'address-detail',
-        preserveAddress: 'true',
-        manualInput: 'true' // Flag để biết đây là input thủ công
-      }
-    });
-  };
+  }, [locationData, initializeMapCenter]);
 
   const renderSuggestion = ({ item }: { item: AddressSuggestion }) => (
     <TouchableOpacity
       style={styles.suggestionItem}
-      onPress={() => handleSuggestionSelect(item)}
+      onPress={() => {
+        setSelectedLocation(item);
+        setStreetAddress(item.display_name.split(',')[0] || ''); // Lấy phần đầu làm street address
+        setSuggestions([]);
+        moveMapToLocation(item.lat, item.lng, 17);
+      }}
     >
-      <View style={styles.suggestionIcon}>
-        <Ionicons name="location" size={20} color="#3255FB" />
-      </View>
-      <View style={styles.suggestionContent}>
-        <Text style={styles.suggestionTitle} numberOfLines={2}>
-          {item.display_name}
-        </Text>
-        <Text style={styles.suggestionSubtitle}>
-          {item.address?.house_number && `Số ${item.address.house_number}`}
-          {item.address?.road && `, ${item.address.road}`}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={16} color="#ccc" />
+      <Text style={styles.suggestionText}>{item.display_name}</Text>
     </TouchableOpacity>
   );
 
   return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.select({ ios: 'padding', android: 'height' })}
+    >
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -219,85 +502,109 @@ const AddressDetail = () => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Địa chỉ chi tiết</Text>
-        <View style={styles.placeholder} />
+          <TouchableOpacity 
+            onPress={getCurrentLocation}
+            style={[styles.locationButton, isLoading && styles.locationButtonDisabled]}
+            disabled={isLoading}
+          >
+            <Ionicons 
+              name={isLoading ? "hourglass" : "locate"} 
+              size={24} 
+              color={isLoading ? "#999" : "#3255FB"} 
+            />
+          </TouchableOpacity>
       </View>
 
-      {/* Ward Info */}
-      <View style={styles.wardInfo}>
-        <Text style={styles.wardInfoText}>
-          Tìm kiếm trong: {ward}, {district}, {province}
-        </Text>
-      </View>
+        {/* Location Info */}
+        {locationData.province && (
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationInfoText}>
+              {locationData.ward?.name}, {locationData.district?.name}, {locationData.province.name}
+            </Text>
+            {locationData.isFromCurrentLocation && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                <Ionicons name="location" size={16} color="#3255FB" />
+                <Text style={{ marginLeft: 4, color: '#3255FB', fontSize: 12 }}>Từ vị trí hiện tại</Text>
+              </View>
+            )}
+            {/* Location Status Indicator */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              <Ionicons 
+                name={selectedLocation ? "checkmark-circle" : "alert-circle"} 
+                size={16} 
+                color={selectedLocation ? "#4CAF50" : "#FF9800"} 
+              />
+              <Text style={{ 
+                marginLeft: 4, 
+                color: selectedLocation ? '#4CAF50' : '#FF9800', 
+                fontSize: 12 
+              }}>
+                {selectedLocation ? 'Đã có vị trí' : 'Chưa có vị trí - cần cập nhật'}
+              </Text>
+            </View>
+          </View>
+        )}
 
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+        {/* Address Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Địa chỉ chi tiết (số nhà, tên đường)</Text>
           <TextInput
-            style={styles.searchInput}
-            placeholder="Nhập số nhà, tên đường..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
+            style={styles.addressInput}
+            placeholder="Nhập địa chỉ chi tiết..."
+            value={streetAddress}
+            onChangeText={setStreetAddress}
+            autoFocus={true}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
       {/* Suggestions */}
-      <View style={styles.content}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3255FB" />
-            <Text style={styles.loadingText}>Đang tìm kiếm...</Text>
-          </View>
-        ) : suggestions.length > 0 ? (
+          {suggestions.length > 0 && (
           <FlatList
             data={suggestions}
             renderItem={renderSuggestion}
-            keyExtractor={(item) => item.place_id.toString()}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.suggestionsList}
+              keyExtractor={(item, index) => `${item.lat}-${item.lng}-${index}`}
+              style={styles.suggestionsList}
+            />
+          )}
+        </View>
+
+        {/* Map */}
+        <View style={styles.mapContainer}>
+          <AddressMapSearch 
+            initialLat={mapCenter.lat} 
+            initialLon={mapCenter.lng} 
+            onSelect={onMapSelect}
+            ref={webViewRef}
           />
-                 ) : searchQuery.length >= 2 ? (
-           <View style={styles.emptyContainer}>
-             <Ionicons name="search-outline" size={64} color="#ccc" />
-             <Text style={styles.emptyText}>Không tìm thấy địa chỉ</Text>
-             <Text style={styles.emptySubtext}>
-               Thử tìm kiếm với từ khóa khác
+          
+          {/* Selected Location Info */}
+          {selectedLocation && (
+            <View style={styles.selectedLocationInfo}>
+              <Text style={styles.selectedLocationText}>
+                Vị trí: {selectedLocation.display_name}
              </Text>
-           </View>
-        ) : (
-          <View style={styles.initialContainer}>
-            <Ionicons name="location-outline" size={64} color="#ccc" />
-            <Text style={styles.initialText}>Nhập địa chỉ để tìm kiếm</Text>
-            <Text style={styles.initialSubtext}>
-              Ví dụ: số nhà, tên đường, tên khu vực
+              <Text style={styles.selectedLocationText}>
+                Tọa độ: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
             </Text>
           </View>
         )}
              </View>
 
-       {/* Footer với nút tiếp tục */}
-       {searchQuery.trim().length >= 5 && (
+        {/* Confirm Button */}
          <View style={styles.footer}>
            <TouchableOpacity
-             style={styles.continueButton}
-             onPress={handleContinueWithInput}
+            style={[styles.confirmButton, (!streetAddress.trim() || !locationData.province) && styles.confirmButtonDisabled]}
+            onPress={confirmAddress}
+            disabled={!streetAddress.trim() || !locationData.province}
            >
-             <Text style={styles.continueButtonText}>
-               Tiếp theo
-             </Text>
+            <Text style={styles.confirmButtonText}>
+              {selectedLocation ? 'Tiếp tục' : 'Tiếp tục (cần cập nhật vị trí)'}
+            </Text>
            </TouchableOpacity>
          </View>
-       )}
      </SafeAreaView>
+    </KeyboardAvoidingView>
    );
- };
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -321,146 +628,103 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
-  placeholder: {
-    width: 40,
+  locationButton: {
+    padding: 8,
   },
-  wardInfo: {
+  locationButtonDisabled: {
+    opacity: 0.5,
+  },
+  locationInfo: {
     backgroundColor: '#f0f8ff',
-    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 16,
   },
-  wardInfoText: {
-    fontSize: 14,
+  locationInfoText: {
+    fontSize: 16,
     color: '#3255FB',
     fontWeight: '500',
     textAlign: 'center',
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#000',
-    paddingVertical: 4,
-  },
-  clearButton: {
-    padding: 4,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  suggestionsList: {
-    paddingVertical: 8,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputContainer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  addressInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  suggestionsList: {
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  suggestionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  suggestionIcon: {
-    marginRight: 12,
-  },
-  suggestionContent: {
-    flex: 1,
-  },
-  suggestionTitle: {
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 4,
-  },
-  suggestionSubtitle: {
+  suggestionText: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
   },
-  emptyContainer: {
+  mapContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  initialContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  initialText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  initialSubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  continueButton: {
-    backgroundColor: '#3255FB',
+    marginHorizontal: 16,
+    marginBottom: 16,
     borderRadius: 8,
-    paddingVertical: 12,
+    overflow: 'hidden',
+  },
+  selectedLocationInfo: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedLocationText: {
+    fontSize: 12,
+    color: '#333',
+    marginBottom: 2,
+  },
+  footer: {
     paddingHorizontal: 16,
-    marginTop: 16,
-    flexDirection: 'row',
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  confirmButton: {
+    backgroundColor: '#3255FB',
+    paddingVertical: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  continueButtonIcon: {
-    marginRight: 8,
+  confirmButtonDisabled: {
+    backgroundColor: '#ccc',
   },
-  continueButtonText: {
+  confirmButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  footer: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-});
-
-export default AddressDetail; 
+}); 

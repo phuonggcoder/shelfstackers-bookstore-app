@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { debounce } from 'lodash';
-import { validateAddress } from '../utils/validation';
 
 const BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 const CACHE_PREFIX = 'address_';
@@ -39,15 +38,51 @@ export interface Ward {
 }
 
 export interface AddressData {
-  province: Province;
-  district: District;
-  ward: Ward;
-  fullAddress: string;
-  addressCode: {
-    provinceCode: string;
-    districtCode: string;
-    wardCode: string;
+  // Thông tin người nhận (bắt buộc)
+  fullName: string;
+  phone: string;
+  email?: string;
+  
+  // Thông tin địa chỉ (bắt buộc)
+  street: string;
+  
+  // Thông tin hành chính (ít nhất 1 trong 2: ward HOẶC province)
+  province?: {
+    code: string;
+    name: string;
   };
+  district?: {
+    code: string;
+    name: string;
+    provinceId: string;
+  };
+  ward?: {
+    code: string;
+    name: string;
+    districtId: string;
+    fullName?: string;
+  };
+  
+  // Tọa độ (không bắt buộc)
+  location?: {
+    type: string;
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+  
+  // Dữ liệu OSM (không bắt buộc)
+  osm?: {
+    lat: number;
+    lng: number;
+    displayName: string;
+    raw: any;
+  };
+  
+  // Thông tin khác
+  adminType?: string;
+  isDefault?: boolean;
+  note?: string;
+  isDraft?: boolean;
+  fullAddress?: string;
 }
 
 export interface AutocompleteLocation {
@@ -329,110 +364,96 @@ class AddressService {
     }
   }
 
-  static async addAddress(token: string, addressData: {
-    fullName: string;
-    phone: string;
-    email?: string;
-    street: string;
-    province: Province;
-    district: District;
-    ward: Ward;
-    isDefault?: boolean;
-    note?: string;
-    type?: 'home' | 'office';
-    location?: { lat: number; lng: number };
-    osm?: {
-      lat: number;
-      lng: number;
-      displayName: string;
-      raw: any;
-    };
-  }): Promise<UserAddress> {
+  static async addAddress(token: string, addressData: AddressData): Promise<UserAddress> {
     try {
-      // Validate input data
-      const { isValid, errors } = validateAddress({
-        fullName: addressData.fullName,
-        phone: addressData.phone,
-        street: addressData.street,
-        province: addressData.province.name,
-        district: addressData.district.name,
-        ward: addressData.ward.name,
-        note: addressData.note
-      });
-
-      if (!isValid) {
-        throw new Error(`Address validation failed: ${Object.values(errors).join(', ')}`);
+      // Validate required fields
+      if (!addressData.fullName?.trim()) {
+        throw new Error('fullName is required');
+      }
+      if (!addressData.phone?.trim()) {
+        throw new Error('phone is required');
+      }
+      if (!addressData.street?.trim()) {
+        throw new Error('street is required');
+      }
+      
+      // Validate at least one of ward or province
+      const hasWard = Boolean(addressData.ward && (addressData.ward.code || addressData.ward.name));
+      const hasProvince = Boolean(addressData.province && (addressData.province.code || addressData.province.name));
+      if (!hasWard && !hasProvince) {
+        throw new Error('At least one of ward or province is required');
       }
 
-      // Đảm bảo province, district, ward là object đầy đủ
-      const provinceObj = {
-        code: addressData.province.code,
-        name: addressData.province.name,
-        type: addressData.province.type,
-        typeText: addressData.province.typeText,
-        slug: addressData.province.slug,
-        autocompleteType: addressData.province.autocompleteType
-      };
-      const districtObj = {
-        code: addressData.district.code,
-        name: addressData.district.name,
-        provinceId: addressData.district.provinceId || addressData.province.code,
-        type: addressData.district.type,
-        typeText: addressData.district.typeText,
-        autocompleteType: addressData.district.autocompleteType
-      };
-      const wardObj = {
-        code: addressData.ward.code,
-        name: addressData.ward.name,
-        districtId: addressData.ward.districtId || addressData.district.code,
-        type: addressData.ward.type,
-        typeText: addressData.ward.typeText,
-        autocompleteType: addressData.ward.autocompleteType,
-        fullName: addressData.ward.fullName,
-        path: addressData.ward.path
-      };
-
-      // autocomplete34 cho BE mapping
-      const autocomplete34 = {
-        province: {
-          code: provinceObj.code,
-          name: provinceObj.name,
-          type: provinceObj.type,
-          typeText: provinceObj.typeText
-        },
-        district: {
-          code: districtObj.code,
-          name: districtObj.name,
-          provinceId: districtObj.provinceId,
-          type: districtObj.type,
-          typeText: districtObj.typeText
-        },
-        ward: {
-          code: wardObj.code,
-          name: wardObj.name,
-          districtId: wardObj.districtId,
-          type: wardObj.type,
-          typeText: wardObj.typeText
-        }
-      };
-
-      const payload = {
+      // Prepare payload according to BE schema
+      const payload: any = {
         fullName: addressData.fullName.trim(),
-        phone: addressData.phone.trim().replace(/[^0-9]/g, ''),
+        phone: addressData.phone.trim(),
         street: addressData.street.trim(),
-        province: provinceObj,
-        district: districtObj,
-        ward: wardObj,
-        isDefault: !!addressData.isDefault,
-        note: (addressData.note || '').substring(0, 500),
-        type: addressData.type || 'home',
-        adminType: "new",
-        autocomplete34: autocomplete34,
-        // Add location and OSM data if provided
-        ...(addressData.location && { location: addressData.location }),
-        ...(addressData.osm && { osm: addressData.osm })
-        // Không gửi fullAddress, để BE tự sinh
+        adminType: 'new',
+        isDefault: addressData.isDefault || false,
+        note: addressData.note || '',
+        isDraft: addressData.isDraft || false
       };
+
+      // Add province if provided
+      if (addressData.province) {
+        payload.province = {
+          code: addressData.province.code,
+          name: addressData.province.name
+        };
+      }
+
+      // Add district if provided
+      if (addressData.district) {
+        payload.district = {
+          code: addressData.district.code,
+          name: addressData.district.name,
+          provinceId: addressData.district.provinceId
+        };
+      }
+
+      // Add ward if provided
+      if (addressData.ward) {
+        payload.ward = {
+          code: addressData.ward.code,
+          name: addressData.ward.name,
+          districtId: addressData.ward.districtId,
+          fullName: addressData.ward.fullName
+        };
+      }
+
+          // Add location if provided (GeoJSON format) - chỉ khi có coordinates hợp lệ
+    if (addressData.location && 
+        addressData.location.coordinates && 
+        Array.isArray(addressData.location.coordinates) &&
+        addressData.location.coordinates.length === 2 &&
+        !Number.isNaN(addressData.location.coordinates[0]) &&
+        !Number.isNaN(addressData.location.coordinates[1]) &&
+        addressData.location.coordinates[0] !== 0 &&
+        addressData.location.coordinates[1] !== 0) {
+      payload.location = {
+        type: addressData.location.type,
+        coordinates: addressData.location.coordinates
+      };
+    }
+
+          // Add OSM data if provided - chỉ khi có dữ liệu hợp lệ
+    if (addressData.osm && 
+        addressData.osm.lat && 
+        addressData.osm.lng &&
+        !Number.isNaN(addressData.osm.lat) &&
+        !Number.isNaN(addressData.osm.lng) &&
+        addressData.osm.lat !== 0 &&
+        addressData.osm.lng !== 0) {
+      payload.osm = {
+        lat: addressData.osm.lat,
+        lng: addressData.osm.lng,
+        displayName: addressData.osm.displayName,
+        raw: addressData.osm.raw
+      };
+    }
+
+      console.log('[AddressService] addAddress payload:', payload);
 
       const response = await axios.post(
         `${BASE_URL}/api/addresses`,
@@ -444,10 +465,10 @@ class AddressService {
           }
         }
       );
-  console.log('[AddressService] addAddress payload', payload);
-  console.log('[AddressService] addAddress response status', response.status);
-  console.log('[AddressService] addAddress response data', response.data);
-  return response.data;
+
+      console.log('[AddressService] addAddress response status:', response.status);
+      console.log('[AddressService] addAddress response data:', response.data);
+      return response.data;
     } catch (error: any) {
       console.error('Error adding address:', error);
       if (error.response) {

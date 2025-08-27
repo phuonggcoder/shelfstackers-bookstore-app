@@ -61,7 +61,7 @@ const mapUserResponse = (serverResponse: any): AuthResponse => {
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
-      console.log('🔧 login - sending credentials:', { username: credentials.username, password: '***' });
+      console.log('🔧 login - sending credentials:', { email: credentials.email, password: '***' });
       const response = await axios.post(`${API_URL}/login`, credentials);
       
       console.log('🔧 login - response status:', response.status);
@@ -289,7 +289,38 @@ export const authService = {
         error: error.message || 'Có lỗi xảy ra khi đăng nhập Google'
       };
     }
-  }
+  },
 
-  
+  // Kiểm tra trạng thái verification của user
+  checkUserVerification: async (email: string): Promise<{ is_verified: boolean; user?: any }> => {
+    try {
+      console.log('🔧 checkUserVerification - checking email:', email);
+      
+      const response = await axios.get(`${USER_URL}/verification-status`, {
+        params: { email }
+      });
+      
+      console.log('🔧 checkUserVerification - response:', response.data);
+      
+      if (response.data.success) {
+        return {
+          is_verified: response.data.verification?.is_verified || false,
+          user: response.data.verification
+        };
+      } else {
+        throw new Error(response.data.message || 'Không thể kiểm tra trạng thái verification');
+      }
+    } catch (error: any) {
+      console.log('🔧 checkUserVerification - error:', error);
+      
+      if (error.response?.status === 404) {
+        // User không tồn tại, coi như chưa verified
+        return { is_verified: false };
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else {
+        throw new Error('Không thể kiểm tra trạng thái verification');
+      }
+    }
+  }
 };

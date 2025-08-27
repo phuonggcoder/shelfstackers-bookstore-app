@@ -125,6 +125,7 @@ export const useOrderDetail = (orderId: string) => {
           fullAddress: shippingAddressRaw.fullAddress || ''
         },
         // Shipper information
+        assigned_shipper_id: order.assigned_shipper_id,
         assigned_shipper_name: order.assigned_shipper_name || order.assigned_shipper_id?.full_name || '',
         assigned_shipper_phone: order.assigned_shipper_phone || order.assigned_shipper_id?.phone_number || '',
         shipper_note: order.shipper_note || '',

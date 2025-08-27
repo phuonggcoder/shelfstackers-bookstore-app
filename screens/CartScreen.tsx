@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import { getBooksByCategory, getCart, removeFromCart, updateCartQuantity } from '../services/api';
+import { MultipleVoucherValidationResponse } from '../services/voucherService';
 import { Book } from '../types';
 import { formatVND, getBookImageUrl } from '../utils/format';
 
@@ -82,6 +83,7 @@ const CartScreen = () => {
   const [relatedCategory, setRelatedCategory] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [voucherResult, setVoucherResult] = useState<MultipleVoucherValidationResponse | null>(null);
 
   // Load selected items from AsyncStorage when coming from order review
   useEffect(() => {
@@ -98,7 +100,23 @@ const CartScreen = () => {
         console.error('Error loading selected items:', error);
       }
     };
-    loadSelectedItems();
+
+    // Load voucher result from AsyncStorage when coming from voucher selection
+    const loadVoucherResult = async () => {
+      try {
+        const voucherResultStr = await AsyncStorage.getItem('voucher_result');
+        if (voucherResultStr) {
+          const result = JSON.parse(voucherResultStr);
+          setVoucherResult(result);
+          // Clear the stored voucher result
+          await AsyncStorage.removeItem('voucher_result');
+        }
+      } catch (error) {
+        console.error('Error loading voucher result:', error);
+      }
+    };
+          loadSelectedItems();
+      loadVoucherResult();
   }, []);
 
   // Fetch cart
@@ -405,9 +423,24 @@ const CartScreen = () => {
           <Text style={styles.selectAllText}>{t('selectAll')}</Text>
         </Pressable>
         <View style={{ flex: 1, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', marginRight: 10 }}>
-          <TouchableOpacity style={styles.voucherBar} onPress={() => router.push('/allcategories')}>
+          <TouchableOpacity 
+            style={styles.voucherBar} 
+            onPress={() => {
+              // Store voucher callback in AsyncStorage for voucher selection screen
+              const voucherCallback = (result: MultipleVoucherValidationResponse) => {
+                setVoucherResult(result);
+              };
+              AsyncStorage.setItem('voucher_callback', JSON.stringify({
+                orderValue: calculateTotal(),
+                shippingCost: 30000
+              }));
+              router.push('/voucher-selection' as any);
+            }}
+          >
             <Ionicons name="pricetag-outline" size={22} color="#3255FB" style={{ marginRight: 8 }} />
-            <Text style={styles.voucherText}>{t('selectPromoCode')}</Text>
+            <Text style={styles.voucherText}>
+              {voucherResult ? `${voucherResult.results.length} voucher đã chọn` : t('selectPromoCode')}
+            </Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 4 }} />
           </TouchableOpacity>
           <Text style={styles.totalLabelSmall}>{t('total')}</Text>

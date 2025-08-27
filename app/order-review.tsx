@@ -9,15 +9,19 @@ import { useTranslation } from 'react-i18next';
 
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import CheckoutSummary from '../components/CheckoutSummary';
+import VoucherInput from '../components/VoucherInput';
+import VoucherSelector from '../components/VoucherSelector';
 import VoucherValidationPopup from '../components/VoucherValidationPopup';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { useUnifiedModal } from '../context/UnifiedModalContext';
 import AddressService from '../services/addressService';
 import { addToCart, getBookById, getCart } from '../services/api';
 import { createOrder } from '../services/orderService';
 import { PAYMENT_METHODS, PaymentMethod } from '../services/paymentService';
 import ShippingService, { ShippingAddress, ShippingFeeRequest } from '../services/shippingService';
-import { getAvailableVouchers, validateVoucher } from '../services/voucherService';
+import { getAvailableVouchers, MultipleVoucherValidationResponse, validateVoucher } from '../services/voucherService';
 import { formatVND, getBookImageUrl } from '../utils/format';
   // Khi quay lại màn hình, luôn lấy địa chỉ mới nhất từ AsyncStorage (nếu có)
 //  useFocusEffect(
@@ -52,6 +56,7 @@ export default function OrderReviewScreen() {
   );
   const { t } = useTranslation();
   const { token } = useAuth();
+  const { fetchCartCount } = useCart();
   const { showErrorToast, showWarningToast } = useUnifiedModal();
   const { bookId, ids, cartItems: cartItemsParam, totalAmount, itemCount } = useLocalSearchParams();
   const [book, setBook] = useState<any>(null);
@@ -83,6 +88,60 @@ export default function OrderReviewScreen() {
   });
   const [lastValidationTime, setLastValidationTime] = useState(0);
 
+  // State cho voucher system mới
+  const [appliedVouchers, setAppliedVouchers] = useState<Array<{
+    voucher: any;
+    discountAmount: number;
+  }>>([]);
+  const [showVoucherSelector, setShowVoucherSelector] = useState(false);
+  const [voucherResult, setVoucherResult] = useState<MultipleVoucherValidationResponse | null>(null);
+
+  // Voucher handlers cho system mới
+  const handleVoucherApplied = (voucher: any, discountAmount: number) => {
+    // Check if voucher type already exists
+    const existingVoucherIndex = appliedVouchers.findIndex(
+      item => item.voucher.voucher_type === voucher.voucher_type
+    );
+
+    if (existingVoucherIndex >= 0) {
+      // Replace existing voucher of same type
+      const newAppliedVouchers = [...appliedVouchers];
+      newAppliedVouchers[existingVoucherIndex] = { voucher, discountAmount };
+      setAppliedVouchers(newAppliedVouchers);
+    } else {
+      // Add new voucher
+      setAppliedVouchers(prev => [...prev, { voucher, discountAmount }]);
+    }
+  };
+
+  const handleVoucherRemoved = () => {
+    setAppliedVouchers([]);
+    setVoucherResult(null);
+  };
+
+  const handleVouchersSelected = (result: MultipleVoucherValidationResponse) => {
+    setVoucherResult(result);
+    
+    // Convert result to applied vouchers format
+    // Note: MultipleVoucherValidationResponse doesn't include voucher objects
+    // We'll need to fetch voucher details separately or modify the backend
+    const newAppliedVouchers = result.results
+      .filter(v => v.valid)
+      .map(v => ({
+        voucher: {
+          voucher_id: v.voucher_id,
+          voucher_type: v.voucher_type,
+          discount_amount: v.discount_amount
+        },
+        discountAmount: v.discount_amount,
+      }));
+    
+    setAppliedVouchers(newAppliedVouchers);
+  };
+
+  const handleEditVouchers = () => {
+    setShowVoucherSelector(true);
+  };
 
   // Load addresses
   useEffect(() => {
@@ -269,7 +328,7 @@ export default function OrderReviewScreen() {
     const loadVouchers = async () => {
       if (!token) return;
       try {
-        const vouchersData = await getAvailableVouchers(token);
+        const vouchersData = await getAvailableVouchers();
         setVouchers(vouchersData.vouchers || vouchersData || []);
       } catch (error: any) {
         console.error('Error loading vouchers:', error);
@@ -288,8 +347,9 @@ export default function OrderReviewScreen() {
 
   // Calculate totals
   // Luôn tính tổng tiền đơn hàng (subtotal) để validate voucher
-  const subtotal = cartItems.length > 0
-    ? cartItems.reduce((sum, item) => {
+  const subtotal = React.useMemo(() => {
+    if (cartItems.length > 0) {
+      return cartItems.reduce((sum, item) => {
         if (!item || !item.book) {
           return sum;
         }
@@ -298,10 +358,14 @@ export default function OrderReviewScreen() {
         const itemTotal = price * quantity;
         console.log(`Item calculation: ${item.book.title} - Price: ${price}, Quantity: ${quantity}, Total: ${itemTotal}`);
         return sum + itemTotal;
-      }, 0)
-    : (Number(book?.price) || 0);
+      }, 0);
+    } else if (book && book.price !== undefined) {
+      return Number(book.price) || 0;
+    }
+    return 0;
+  }, [cartItems, book]);
 
-  console.log('Subtotal calculation:', { subtotal, cartItemsLength: cartItems.length, bookPrice: book?.price });
+  console.log('Subtotal calculation:', { subtotal, cartItemsLength: cartItems.length, bookPrice: book?.price, hasBook: !!book });
 
   const shippingFee = shipping === 'free' ? 0 : 30000;
   const discount = selectedVoucher
@@ -326,7 +390,7 @@ export default function OrderReviewScreen() {
         setSelectedVoucher(validateRes.voucher);
         setManualVoucherError('');
       } else {
-        setManualVoucherError(validateRes.msg || 'Mã không hợp lệ hoặc không đủ điều kiện');
+        setManualVoucherError(validateRes.message || 'Mã không hợp lệ hoặc không đủ điều kiện');
       }
     } catch (e: any) {
       setManualVoucherError(e.message || 'Không thể kiểm tra mã');
@@ -444,7 +508,7 @@ export default function OrderReviewScreen() {
           console.log('Voucher validation result:', voucherValidation);
           
           if (!voucherValidation.valid) {
-            showErrorToast('Lỗi voucher', voucherValidation.msg || 'Voucher không hợp lệ hoặc đã hết hạn.');
+            showErrorToast('Lỗi voucher', voucherValidation.message || 'Voucher không hợp lệ hoặc đã hết hạn.');
             return;
           }
         } catch (error: any) {
@@ -476,32 +540,82 @@ export default function OrderReviewScreen() {
         };
         
         const toAddress: ShippingAddress = {
-          street: address.street || '',
-          ward: address.ward?.name || address.ward || '',
-          district: address.district?.name || address.district || '',
-          province: address.province?.name || address.province || '',
-          latitude: address.latitude,
-          longitude: address.longitude
+          street: address.street || address.fullAddress || '',
+          ward: address.ward?.name || '',
+          district: address.district?.name || '',
+          province: address.province?.name || '',
+          latitude: address.location?.coordinates?.[1] || address.osm?.lat || 0,
+          longitude: address.location?.coordinates?.[0] || address.osm?.lng || 0
         };
         
-        // Calculate total weight of items
+        // Calculate total weight of items with default weight
         let totalWeight = 0;
+        const defaultWeight = 0.5; // 500g default weight per item
+        
         if (cartItems.length > 0) {
-          totalWeight = cartItems.reduce((sum, item) => sum + (item.book.weight || 0.5) * item.quantity, 0);
+          totalWeight = cartItems.reduce((sum, item) => {
+            const itemWeight = item.book.weight || defaultWeight;
+            console.log(`📦 Item weight: ${item.book.title} = ${itemWeight}kg (default: ${!item.book.weight})`);
+            return sum + itemWeight * item.quantity;
+          }, 0);
         } else if (book) {
-          totalWeight = book.weight || 0.5;
+          totalWeight = book.weight || defaultWeight;
+          console.log(`📦 Single book weight: ${book.title} = ${totalWeight}kg (default: ${!book.weight})`);
         }
+        
+        console.log(`📦 Total weight calculation: ${totalWeight}kg`);
         
         const shippingRequest: ShippingFeeRequest = {
           fromAddress,
           toAddress,
           weight: totalWeight,
-          carrier: 'GHN' // Default to GHN
+          carrier: 'GHN', // Default to GHN
+          // Add new parameters for total price calculation
+          subtotal: subtotal,
+          voucher_code_order: selectedOrderVoucher?.voucher_id,
+          voucher_code_shipping: selectedShippingVoucher?.voucher_id
         };
         
-        const shippingResult = await ShippingService.calculateShippingFeeAPI(shippingRequest);
-        if (shippingResult.success && shippingResult.fees.length > 0) {
-          shippingFee = shippingResult.fees[0].fee; // Use the cheapest option
+        // Try API first, fallback to local calculation
+        try {
+          console.log('Calling shipping API with request:', JSON.stringify(shippingRequest, null, 2));
+          const shippingResult = await ShippingService.calculateShippingFeeAPI(shippingRequest, token);
+          console.log('Shipping API response:', JSON.stringify(shippingResult, null, 2));
+          
+          if (shippingResult.success && shippingResult.fees && shippingResult.fees.length > 0) {
+            // Use total price from API if available, otherwise use shipping fee only
+            if (shippingResult.priceBreakdown) {
+              shippingFee = shippingResult.priceBreakdown.final_shipping_fee;
+              console.log('✅ Using API total price calculation:', {
+                subtotal: shippingResult.priceBreakdown.subtotal,
+                order_discount: shippingResult.priceBreakdown.order_discount_amount,
+                final_amount: shippingResult.priceBreakdown.final_amount,
+                shipping_fee: shippingResult.priceBreakdown.shipping_fee,
+                shipping_discount: shippingResult.priceBreakdown.shipping_discount_amount,
+                final_shipping_fee: shippingResult.priceBreakdown.final_shipping_fee,
+                total_price: shippingResult.priceBreakdown.total_price
+              });
+            } else {
+              shippingFee = shippingResult.fees[0].fee; // Use the cheapest option
+              console.log('✅ Using API shipping fee:', shippingFee);
+            }
+          } else {
+            console.log('⚠️ API returned no fees, using local calculation');
+            // Fallback to local calculation
+            const localResult = await ShippingService.calculateShippingFee(shippingRequest);
+            if (localResult.success && localResult.fees.length > 0) {
+              shippingFee = localResult.fees[0].fee;
+              console.log('✅ Using local shipping fee:', shippingFee);
+            }
+          }
+        } catch (apiError) {
+          console.log('❌ Shipping API failed, using local calculation:', apiError);
+          // Fallback to local calculation
+          const localResult = await ShippingService.calculateShippingFee(shippingRequest);
+          if (localResult.success && localResult.fees.length > 0) {
+            shippingFee = localResult.fees[0].fee;
+            console.log('✅ Using fallback shipping fee:', shippingFee);
+          }
         }
       } catch (error) {
         console.error('Error calculating shipping fee:', error);
@@ -509,16 +623,19 @@ export default function OrderReviewScreen() {
         shippingFee = 15000;
       }
 
-      // Create order using the correct API endpoint
-      const orderData = {
-        address_id: address._id,
-        payment_method: selectedPaymentMethod,
-        subtotal: Number(subtotal),
-        shipping_fee: shippingFee,
-        total: Number(subtotal) + shippingFee,
-        ...(selectedOrderVoucher && { voucher_code_order: selectedOrderVoucher.voucher_id }),
-        ...(selectedShippingVoucher && { voucher_code_shipping: selectedShippingVoucher.voucher_id })
-      };
+      // Fix address location type before creating order
+      console.log('Original address location:', address?.location);
+      const fixedAddress = fixLocationType(address);
+      console.log('Fixed address location:', fixedAddress?.location);
+      
+              // Create order using the updated API endpoint with total price calculation
+        const orderData = {
+          address_id: fixedAddress._id,
+          payment_method: selectedPaymentMethod,
+          // Backend will calculate total price including shipping fee and vouchers
+          ...(selectedOrderVoucher && { voucher_code_order: selectedOrderVoucher.voucher_id }),
+          ...(selectedShippingVoucher && { voucher_code_shipping: selectedShippingVoucher.voucher_id })
+        };
 
       // Add book_id for single book purchase (buy now)
       if (cartItems.length === 0 && book) {
@@ -533,14 +650,15 @@ export default function OrderReviewScreen() {
       }
 
       console.log('Order data being sent:', orderData);
-      console.log('Order data details:', {
-        address_id: orderData.address_id,
-        payment_method: orderData.payment_method,
-        book_id: orderData.book_id,
-        quantity: orderData.quantity,
-        cart_items: orderData.cart_items,
-        voucher_code: orderData.voucher_code
-      });
+              console.log('Order data details:', {
+          address_id: orderData.address_id,
+          payment_method: orderData.payment_method,
+          book_id: orderData.book_id,
+          quantity: orderData.quantity,
+          cart_items: orderData.cart_items,
+          voucher_code_order: orderData.voucher_code_order,
+          voucher_code_shipping: orderData.voucher_code_shipping
+        });
       const response = await createOrder(token, orderData);
       console.log('Order created successfully:', response);
 
@@ -562,14 +680,13 @@ export default function OrderReviewScreen() {
       }
 
       // Điều hướng sang trang ZaloPay nếu có order_url
-      // Sau khi đặt hàng thành công, xóa từng sản phẩm đã chọn khỏi giỏ hàng nếu là từ cart
-      if (cartItems.length > 0 && token) {
-        for (const item of cartItems) {
-          try {
-            await import('../services/api').then(apiModule => apiModule.removeFromCart(token, item.book._id));
-          } catch (e) {
-            console.warn('Không thể xóa sản phẩm khỏi giỏ:', item.book.title, e);
-          }
+      // Backend đã tự động xóa giỏ hàng sau khi đặt hàng thành công
+      // Cập nhật cart count về 0
+      if (token) {
+        try {
+          await fetchCartCount(token);
+        } catch (error) {
+          console.warn('Không thể cập nhật cart count:', error);
         }
       }
       if (zaloPayData?.order_url) {
@@ -577,12 +694,14 @@ export default function OrderReviewScreen() {
         return;
       }
 
-      // Nếu payment method là PAYOS, điều hướng tới màn PayOS để lấy link/QR
-      if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
-        // cast to any to avoid typed-route union restrictions
-        (router.replace as any)(`/payos?orderId=${orderId}&amount=${total}`);
-        return;
-      }
+              // Nếu payment method là PAYOS, điều hướng tới màn PayOS để lấy link/QR
+        if (selectedPaymentMethod === PAYMENT_METHODS.PAYOS) {
+          // Use total price from API response if available
+          const paymentAmount = response.total_price_final || response.order?.total_amount || total;
+          // cast to any to avoid typed-route union restrictions
+          (router.replace as any)(`/payos?orderId=${orderId}&amount=${paymentAmount}`);
+          return;
+        }
 
       // Điều hướng sang trang thành công nếu không có ZaloPay hoặc PayOS
       router.replace({ pathname: '/order-success', params: { orderId } });
@@ -630,6 +749,23 @@ export default function OrderReviewScreen() {
 
   // Helper function to validate image URL
 
+  // Helper function to fix location type for order creation
+  const fixLocationType = (address: any) => {
+    if (!address || !address.location) return address;
+    
+    // Fix location type if it's a string instead of object
+    if (typeof address.location.type === 'string') {
+      return {
+        ...address,
+        location: {
+          ...address.location,
+          type: { type: address.location.type } // Convert string to object with type property
+        }
+      };
+    }
+    
+    return address;
+  };
 
   const formatAddressText = (addr: any) => {
     if (!addr) return '';
@@ -880,39 +1016,16 @@ export default function OrderReviewScreen() {
           </TouchableOpacity>
         )}
         
-        {/* --- VOUCHER SELECT ROW (hiển thị trên màn chính, giống payment) --- */}
+        {/* --- VOUCHER SECTION (NEW SYSTEM) --- */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>{t('orderReview.voucherCode')}</Text>
+          <Text style={styles.sectionLabel}>Voucher</Text>
         </View>
-        <TouchableOpacity
-          style={styles.paymentSelectBtn}
-          onPress={openVoucherModal}
-        >
-          <Ionicons name="pricetag-outline" size={20} color="#bbb" style={{ marginRight: 8 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: selectedOrderVoucher || selectedShippingVoucher ? '#FF5722' : '#888', fontWeight: 'bold' }}>
-              {(selectedOrderVoucher || selectedShippingVoucher)
-                ? [selectedOrderVoucher?.title || selectedOrderVoucher?.voucher_id, selectedShippingVoucher?.title || selectedShippingVoucher?.voucher_id].filter(Boolean).join(' + ')
-                : t('orderReview.selectVoucher')}
-            </Text>
-            {/* Hiển thị mô tả và mức giảm cho từng loại nếu có */}
-            {selectedOrderVoucher && (
-              <Text style={{ color: '#4CAF50', fontSize: 13, fontWeight: 'bold' }}>
-                {selectedOrderVoucher.voucher_type === 'percent'
-                  ? `${t('orderReview.discountPercent', { value: selectedOrderVoucher.discount_value })}`
-                  : `${t('orderReview.discountAmount', { value: formatVND(selectedOrderVoucher.discount_value) })}`}
-              </Text>
-            )}
-            {selectedShippingVoucher && (
-              <Text style={{ color: '#2196F3', fontSize: 13, fontWeight: 'bold' }}>
-                {selectedShippingVoucher.voucher_type === 'percent'
-                  ? `${t('orderReview.shippingDiscountPercent', { value: selectedShippingVoucher.discount_value })}`
-                  : `${t('orderReview.shippingDiscountAmount', { value: formatVND(selectedShippingVoucher.discount_value) })}`}
-              </Text>
-            )}
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#888" style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
+        <VoucherInput
+          orderValue={subtotal}
+          onVoucherApplied={handleVoucherApplied}
+          onVoucherRemoved={handleVoucherRemoved}
+          appliedVoucher={appliedVouchers[0]?.voucher}
+        />
         {/* --- PHƯƠNG THỨC THANH TOÁN (GỌN GÀNG, DẠNG MODAL) --- */}
         <View style={styles.sectionRow}>
           <Text style={styles.sectionLabel}>{t('orderReview.paymentMethod')}</Text>
@@ -1155,13 +1268,14 @@ export default function OrderReviewScreen() {
           </TouchableOpacity>
         </Modal>
         
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>{t('orderReview.orderSummary')}</Text>
-        </View>
-        <View style={styles.summaryRow}><Text>{t('orderReview.subtotal')}</Text><Text>{formatVND(subtotal)}</Text></View>
-        <View style={styles.summaryRow}><Text>{t('orderReview.discount')}</Text><Text style={{ color: '#4CAF50' }}>- {formatVND(discount)}</Text></View>
-        <View style={styles.summaryRow}><Text>{t('orderReview.shippingFee')}</Text><Text style={{ color: '#3255FB' }}>{shippingFee === 0 ? t('orderReview.freeShipping') : formatVND(shippingFee)}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.grandTotal}>{t('orderReview.total')}</Text><Text style={styles.grandTotal}>{formatVND(total)}</Text></View>
+        {/* Order Summary with Vouchers */}
+        <CheckoutSummary
+          subtotal={subtotal}
+          shippingFee={shippingFee}
+          appliedVouchers={appliedVouchers}
+          onEditVouchers={handleEditVouchers}
+          showVoucherSection={true}
+        />
         
       </ScrollView>
       
@@ -1179,6 +1293,15 @@ export default function OrderReviewScreen() {
 
       {/* Pending Payment Dialog */}
       {renderPendingPaymentDialog()}
+
+      {/* Voucher Selector Modal */}
+      <VoucherSelector
+        visible={showVoucherSelector}
+        orderValue={subtotal}
+        shippingCost={shippingFee}
+        onVouchersSelected={handleVouchersSelected}
+        onClose={() => setShowVoucherSelector(false)}
+      />
 
     </SafeAreaView>
   );

@@ -1,32 +1,117 @@
 import axios from 'axios';
 import { getApiUrl, getAuthHeaders } from '../config/api';
 
-export type Voucher = {
+export type VoucherType = 'discount' | 'shipping';
+export type DiscountType = 'fixed' | 'percentage';
+
+export interface Voucher {
   _id: string;
   voucher_id: string;
-  voucher_type: 'percentage' | 'fixed';
-  discount_value: number;
+  voucher_type: VoucherType;
+  discount_type?: DiscountType; // Chỉ cho discount voucher
+  discount_value?: number; // Chỉ cho discount voucher
+  shipping_discount?: number; // Chỉ cho shipping voucher
   min_order_value: number;
-  max_discount_value?: number;
+  max_discount_value?: number; // Chỉ cho percentage discount
   usage_limit: number;
+  usage_count: number;
   max_per_user: number;
   start_date: string;
   end_date: string;
+  used_by: Array<{
+    user: string;
+    order: string;
+    used_at: string;
+    discount_amount: number;
+  }>;
   is_active: boolean;
-  notes?: string;
-  title?: string;
-  description?: string;
-};
+  is_deleted: boolean;
+  description: string;
+  isValid?: boolean;
+  remainingUsage?: number;
+}
 
+export interface VoucherValidationRequest {
+  voucher_id: string;
+  user_id: string;
+  order_value: number;
+  shipping_cost?: number;
+}
 
+export interface VoucherValidationResponse {
+  success: boolean;
+  valid: boolean;
+  voucher?: Voucher;
+  discount_amount?: number;
+  final_amount?: number;
+  message: string;
+}
+
+export interface MultipleVoucherValidationRequest {
+  vouchers: Array<{
+    voucher_id: string;
+    voucher_type: VoucherType;
+  }>;
+  user_id: string;
+  order_value: number;
+  shipping_cost: number;
+}
+
+export interface MultipleVoucherValidationResponse {
+  success: boolean;
+  results: Array<{
+    voucher_id: string;
+    voucher_type: VoucherType;
+    valid: boolean;
+    discount_amount: number;
+    message: string;
+  }>;
+  summary: {
+    order_value: number;
+    total_discount: number;
+    final_amount: number;
+    vouchers_applied: number;
+  };
+}
+
+export interface VoucherUsageRequest {
+  voucher_id: string;
+  user_id: string;
+  order_id: string;
+  order_value: number;
+  shipping_cost?: number;
+}
+
+export interface MultipleVoucherUsageRequest {
+  vouchers: Array<{
+    voucher_id: string;
+    voucher_type: VoucherType;
+  }>;
+  user_id: string;
+  order_id: string;
+  order_value: number;
+  shipping_cost: number;
+}
 
 // Voucher Management
-export const getAvailableVouchers = async (token: string, minOrderValue?: number) => {
+export const getAvailableVouchers = async (token?: string, minOrderValue?: number, voucherType?: VoucherType) => {
   try {
-    // Try new endpoint first
-    const response = await axios.get(getApiUrl('/api/vouchers/available'), {
-      headers: getAuthHeaders(token)
-    });
+    let url = getApiUrl('/api/vouchers/available');
+    const params = new URLSearchParams();
+    
+    if (voucherType) {
+      params.append('voucher_type', voucherType);
+    }
+    if (minOrderValue) {
+      params.append('min_order_value', minOrderValue.toString());
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    // Public endpoint - không cần auth headers
+    const response = await axios.get(url);
     
     console.log('getAvailableVouchers response:', response.data);
     
@@ -58,12 +143,16 @@ export const getVoucherDetails = async (token: string, voucherId: string) => {
   }
 };
 
-export const validateVoucher = async (token: string, voucherCode: string, orderTotal: number) => {
+// Validate single voucher
+export const validateVoucher = async (token: string, voucherCode: string, orderValue: number): Promise<VoucherValidationResponse> => {
   try {
-    const response = await axios.post(getApiUrl('/api/vouchers/validate'), {
-      voucher_code: voucherCode,
-      order_total: orderTotal
-    }, {
+    const request: VoucherValidationRequest = {
+      voucher_id: voucherCode,
+      user_id: '', // Will be set by backend
+      order_value: orderValue,
+    };
+    
+    const response = await axios.post(getApiUrl('/api/vouchers/validate'), request, {
       headers: getAuthHeaders(token)
     });
     console.log('validateVoucher response:', response.data);
@@ -71,6 +160,62 @@ export const validateVoucher = async (token: string, voucherCode: string, orderT
   } catch (error: any) {
     console.error('validateVoucher error:', error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to validate voucher');
+  }
+};
+
+// Validate multiple vouchers
+export const validateMultipleVouchers = async (token: string, request: MultipleVoucherValidationRequest): Promise<MultipleVoucherValidationResponse> => {
+  try {
+    const response = await axios.post(getApiUrl('/api/vouchers/validate-multiple'), request, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('validateMultipleVouchers response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('validateMultipleVouchers error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to validate multiple vouchers');
+  }
+};
+
+// Use single voucher
+export const useVoucher = async (token: string, request: VoucherUsageRequest) => {
+  try {
+    const response = await axios.post(getApiUrl('/api/vouchers/use'), request, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('useVoucher response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('useVoucher error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to use voucher');
+  }
+};
+
+// Use multiple vouchers
+export const useMultipleVouchers = async (token: string, request: MultipleVoucherUsageRequest) => {
+  try {
+    const response = await axios.post(getApiUrl('/api/vouchers/use-multiple'), request, {
+      headers: getAuthHeaders(token)
+    });
+    console.log('useMultipleVouchers response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('useMultipleVouchers error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to use multiple vouchers');
+  }
+};
+
+// Get user's voucher usage history
+export const getUserVoucherUsage = async (token: string, userId: string, page = 1, limit = 10) => {
+  try {
+    const response = await axios.get(getApiUrl(`/api/vouchers/my-usage/${userId}?page=${page}&limit=${limit}`), {
+      headers: getAuthHeaders(token)
+    });
+    console.log('getUserVoucherUsage response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('getUserVoucherUsage error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch user voucher usage');
   }
 };
 

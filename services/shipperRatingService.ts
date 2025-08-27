@@ -2,255 +2,249 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://server-shelf-stacker-w1ds.onrender.com';
 
-export interface ShipperRatingPrompt {
-  _id: string;
-  text: string;
-  category: 'positive' | 'negative' | 'neutral';
-}
-
-export interface CreateShipperRatingData {
-  orderId: string;
-  shipperId: string;
-  rating: number;
-  selectedPrompts?: string[];
-  comment?: string;
-  isAnonymous?: boolean;
-}
-
-export interface UpdateShipperRatingData {
-  rating?: number;
-  selectedPrompts?: string[];
-  comment?: string;
-  isAnonymous?: boolean;
-}
-
-export interface ShipperRating {
-  _id: string;
-  order_id: string | {
-    _id: string;
-    order_code?: string;
-  };
-  shipper_id: string | {
-    _id: string;
-    full_name?: string;
-    phone_number?: string;
-  };
-  user_id: string | {
-    _id: string;
-    name: string;
-    avatar?: string;
-  };
-  rating: number;
-  selected_prompts: string[];
-  comment?: string;
-  is_anonymous: boolean;
-  is_edited: boolean;
-  edited_at?: Date;
-  is_deleted: boolean;
-  deleted_at?: Date;
-  createdAt: string;
-  updatedAt: string;
-  timeAgo?: string;
-  order?: {
-    _id: string;
-    order_code?: string;
-  };
-  shipper?: {
-    _id: string;
-    full_name?: string;
-    phone_number?: string;
-  };
-  user?: {
-    _id: string;
-    name: string;
-    avatar?: string;
-  };
-}
-
-export interface ShipperRatingSummary {
-  averageRating: number;
-  totalRatings: number;
-  ratingCounts: {
-    1: number;
-    2: number;
-    3: number;
-    4: number;
-    5: number;
-  };
-  promptStats: {
-    [promptId: string]: number;
-  };
-}
-
-class ShipperRatingService {
-  private async getToken(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem('token');
-    } catch (error) {
-      console.error('Error getting token:', error);
-      return null;
-    }
-  }
-
-  private async makeRequest(endpoint: string, options: RequestInit = {}, token?: string): Promise<any> {
-    const authToken = token || await this.getToken();
-    console.log('ShipperRatingService - Making request to:', `${API_BASE_URL}/api${endpoint}`);
-    console.log('ShipperRatingService - Token:', authToken ? `${authToken.substring(0, 20)}...` : 'No token');
+// Helper function to make API requests
+async function makeRequest(endpoint: string, options: { method?: string; data?: any } = {}) {
+  try {
+    const token = await AsyncStorage.getItem('token');
     
     const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
-      ...options,
+      method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-        ...options.headers,
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
+      ...(options.data && { body: JSON.stringify(options.data) }),
     });
 
-    console.log('ShipperRatingService - Response status:', response.status);
-    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
 
     return response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
   }
+}
 
-  // Get rating prompts
-  async getPrompts(): Promise<ShipperRatingPrompt[]> {
+export interface ShipperRating {
+  _id: string;
+  order_id: string;
+  user_id: string;
+  shipper_id: string;
+  rating: number;
+  selected_prompts: string[];
+  comment: string;
+  is_anonymous: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RatingPrompt {
+  id: string;
+  text: string;
+  type: 'positive' | 'negative';
+}
+
+export interface CanRateResponse {
+  canRate: boolean;
+  reason?: string;
+  existingRating?: ShipperRating;
+  order?: {
+    _id: string;
+    order_id: string;
+    assigned_shipper_id: string;
+  };
+}
+
+class ShipperRatingService {
+  // Lấy danh sách prompts đánh giá
+  async getPrompts(): Promise<RatingPrompt[]> {
     try {
-      const response = await this.makeRequest('/shipper-ratings/prompts');
-      return response.data || response.prompts || [];
+      const response = await makeRequest('/shipper-ratings/prompts');
+      return response.data;
     } catch (error) {
       console.error('Error fetching prompts:', error);
       throw error;
     }
   }
 
-  // Create a new shipper rating
-  async createRating(ratingData: CreateShipperRatingData): Promise<ShipperRating> {
+  // Kiểm tra có thể đánh giá shipper không (compatibility endpoint)
+  async canRateShipper(orderId: string): Promise<CanRateResponse> {
     try {
-      const response = await this.makeRequest('/shipper-ratings/rate', {
-        method: 'POST',
-        body: JSON.stringify(ratingData),
-      });
-      return response.data || response.rating;
-    } catch (error) {
-      console.error('Error creating rating:', error);
+      const response = await makeRequest(`/shipper-ratings/can-rate/${orderId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error checking if can rate shipper:', error);
+
+      if (error.message?.includes('401')) {
+        return {
+          canRate: false,
+          reason: 'Unauthorized: Please login to rate shipper'
+        };
+      }
+
+      // Handle 404 error gracefully - endpoint might not be implemented yet
+      if (error.message?.includes('404') || error.message?.includes('HTTP error! status: 404')) {
+        console.warn('Shipper rating can-rate endpoint returned 404, using order endpoint as fallback.');
+        // Fallback to order endpoint
+        return this.checkRatingStatus(orderId);
+      }
+
       throw error;
     }
   }
 
-  // Get rating for a specific order
+  // Kiểm tra trạng thái đánh giá (fallback method)
+  async checkRatingStatus(orderId: string): Promise<CanRateResponse> {
+    try {
+      const response = await makeRequest(`/shipper-ratings/order/${orderId}`);
+      
+      // If we get a rating back, user cannot rate (already rated)
+      if (response.data && response.data._id) {
+        return {
+          canRate: false,
+          reason: 'Already rated this order',
+          existingRating: response.data
+        };
+      }
+
+      // If no rating exists, user can rate
+      return {
+        canRate: true,
+        reason: 'Can rate this order'
+      };
+    } catch (error: any) {
+      console.error('Error checking rating status:', error);
+
+      if (error.message?.includes('401')) {
+        return {
+          canRate: false,
+          reason: 'Unauthorized: Please login to rate shipper'
+        };
+      }
+
+      // Handle 404 error gracefully - no rating exists
+      if (error.message?.includes('404') || error.message?.includes('HTTP error! status: 404')) {
+        return {
+          canRate: true,
+          reason: 'No existing rating found'
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  // Lấy đánh giá của một đơn hàng cụ thể
   async getOrderRating(orderId: string): Promise<ShipperRating | null> {
     try {
-      const response = await this.makeRequest(`/shipper-ratings/order/${orderId}`);
-      return response.data || response.rating || null;
-    } catch (error) {
-      console.error('Error fetching order rating:', error);
+      const response = await makeRequest(`/shipper-ratings/order/${orderId}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        return null; // No rating exists
+      }
       throw error;
     }
   }
 
-  // Get all ratings for a shipper
-  async getShipperRatings(shipperId: string, page: number = 1, limit: number = 10): Promise<{
-    ratings: ShipperRating[];
-    total: number;
-    page: number;
-    limit: number;
-    hasMore: boolean;
-  }> {
+  // Tạo đánh giá shipper
+  async createRating(ratingData: {
+    order_id: string;
+    rating: number;
+    selected_prompts: string[];
+    comment: string;
+    is_anonymous: boolean;
+  }): Promise<ShipperRating> {
     try {
-      const response = await this.makeRequest(
-        `/shipper-ratings/shipper/${shipperId}?page=${page}&limit=${limit}`
-      );
-      return {
-        ratings: response.data?.ratings || response.ratings || [],
-        total: response.data?.total || response.total || 0,
-        page: response.data?.page || response.page || page,
-        limit: response.data?.limit || response.limit || limit,
-        hasMore: response.data?.hasMore || response.hasMore || false,
-      };
+      const response = await makeRequest('/shipper-ratings/rate', {
+        method: 'POST',
+        data: ratingData
+      });
+      return response.data;
     } catch (error) {
-      console.error('Error fetching shipper ratings:', error);
+      console.error('Error creating shipper rating:', error);
       throw error;
     }
   }
 
-  // Get shipper rating summary/statistics
-  async getShipperRatingSummary(shipperId: string): Promise<ShipperRatingSummary> {
+  // Cập nhật đánh giá (chỉ trong vòng 24h)
+  async updateRating(orderId: string, updateData: {
+    rating?: number;
+    selected_prompts?: string[];
+    comment?: string;
+    is_anonymous?: boolean;
+  }): Promise<ShipperRating> {
     try {
-      const response = await this.makeRequest(`/shipper-ratings/shipper/${shipperId}/summary`);
-      return response.data || response.summary;
+      const response = await makeRequest(`/shipper-ratings/update/${orderId}`, {
+        method: 'PUT',
+        data: updateData
+      });
+      return response.data;
     } catch (error) {
-      console.error('Error fetching shipper rating summary:', error);
+      console.error('Error updating shipper rating:', error);
       throw error;
     }
   }
 
-  // Get user's own ratings
+  // Xóa đánh giá (chỉ trong vòng 24h)
+  async deleteRating(orderId: string): Promise<void> {
+    try {
+      await makeRequest(`/shipper-ratings/delete/${orderId}`, {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      console.error('Error deleting shipper rating:', error);
+      throw error;
+    }
+  }
+
+  // Shipper xem đánh giá của mình
   async getMyRatings(page: number = 1, limit: number = 10): Promise<{
     ratings: ShipperRating[];
-    total: number;
-    page: number;
-    limit: number;
-    hasMore: boolean;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+    stats: {
+      total_ratings: number;
+      avg_rating: number;
+      total_orders: number;
+    };
+    delivered_orders: number;
   }> {
     try {
-      const response = await this.makeRequest(
-        `/shipper-ratings/my-ratings?page=${page}&limit=${limit}`
-      );
-      return {
-        ratings: response.data?.ratings || response.ratings || [],
-        total: response.data?.total || response.total || 0,
-        page: response.data?.page || response.page || page,
-        limit: response.data?.limit || response.limit || limit,
-        hasMore: response.data?.hasMore || response.hasMore || false,
-      };
+      const response = await makeRequest(`/shipper-ratings/my-ratings?page=${page}&limit=${limit}`);
+      return response.data;
     } catch (error) {
       console.error('Error fetching my ratings:', error);
       throw error;
     }
   }
 
-  // Update an existing rating
-  async updateRating(orderId: string, ratingData: UpdateShipperRatingData): Promise<ShipperRating> {
-    try {
-      const response = await this.makeRequest(`/shipper-ratings/update/${orderId}`, {
-        method: 'PUT',
-        body: JSON.stringify(ratingData),
-      });
-      return response.data || response.rating;
-    } catch (error) {
-      console.error('Error updating rating:', error);
-      throw error;
-    }
-  }
-
-  // Delete a rating
-  async deleteRating(orderId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await this.makeRequest(`/shipper-ratings/delete/${orderId}`, {
-        method: 'DELETE',
-      });
-      return response;
-    } catch (error) {
-      console.error('Error deleting rating:', error);
-      throw error;
-    }
-  }
-
-  // Check if user can rate a shipper for an order
-  async canRateShipper(orderId: string): Promise<{
-    canRate: boolean;
-    reason?: string;
-    existingRating?: ShipperRating;
+  // User xem rating của shipper (public)
+  async getShipperStats(shipperId: string): Promise<{
+    shipper_info: {
+      id: string;
+      full_name: string;
+      phone: string;
+    };
+    stats: {
+      total_ratings: number;
+      avg_rating: number;
+      delivered_orders: number;
+      rating_distribution: { [key: number]: number };
+    };
   }> {
     try {
-      const response = await this.makeRequest(`/shipper-ratings/can-rate/${orderId}`);
-      return response.data || response;
+      const response = await makeRequest(`/shipper-ratings/shipper/${shipperId}`);
+      return response.data;
     } catch (error) {
-      console.error('Error checking if can rate shipper:', error);
+      console.error('Error fetching shipper stats:', error);
       throw error;
     }
   }

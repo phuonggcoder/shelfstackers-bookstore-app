@@ -1,200 +1,279 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface Props {
-  initialQuery?: string;
   initialLat?: number;
   initialLon?: number;
-  // allowedBbox: [lat_min, lat_max, lon_min, lon_max]
   allowedBbox?: [number, number, number, number] | null;
   onSelect: (res: { lat: number; lon: number; display_name: string; address?: any; type?: string }) => void;
-  onClose?: () => void;
   onRequestLocation?: () => void;
 }
 
-const AddressMapSearch = forwardRef<any, Props>(({ initialQuery = '', initialLat, initialLon, allowedBbox = null, onSelect, onRequestLocation }, ref) => {
+const AddressMapSearch = forwardRef<any, Props>(({ 
+  initialLat, 
+  initialLon, 
+  allowedBbox = null, 
+  onSelect, 
+  onRequestLocation 
+}, ref) => {
   const webViewRef = useRef<any>(null);
-  const initialPosJson = (initialLat !== undefined && initialLon !== undefined) ? JSON.stringify({ lat: initialLat, lon: initialLon }) : 'null';
+  const [isLoading, setIsLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
+  
+  const initialPosJson = (initialLat !== undefined && initialLon !== undefined) 
+    ? JSON.stringify({ lat: initialLat, lon: initialLon }) 
+    : 'null';
   const allowedBboxJson = allowedBbox ? JSON.stringify(allowedBbox) : 'null';
 
   useImperativeHandle(ref, () => ({
     injectJavaScript: (script: string) => {
-      webViewRef.current?.injectJavaScript(script);
+      if (webViewRef.current && mapReady) {
+        webViewRef.current.injectJavaScript(script);
+      }
     }
   }));
 
-  const injectedJS = `
-    (function(){
-      // create map and UI with a fixed center marker and a confirm button
-      var L_script = document.createElement('script');
-      L_script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      document.head.appendChild(L_script);
-      var css = document.createElement('link');
-      css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(css);
-      var geocoderScript = document.createElement('script');
-      geocoderScript.src = 'https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js';
-      document.head.appendChild(geocoderScript);
-
-      function init() {
-        try {
-          // smoother mobile interaction options
-          var map = L.map('map', { zoomControl: true, tap: false, inertia: true, inertiaDeceleration: 3000, preferCanvas: true }).setView([14.0583,108.2772], 5);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19, maxNativeZoom: 19 }).addTo(map);
-
-          // Tạo geocoder với giới hạn phạm vi nếu có
-          var geocoderOptions = {
-            defaultMarkGeocode: false,
-            geocoder: L.Control.Geocoder.nominatim({ 
-              geocodingQueryParams: { 
-                countrycodes: 'vn',
-                limit: 5,
-                addressdetails: 1
-              } 
-            }),
-            placeholder: 'Tìm kiếm địa chỉ...',
-            errorMessage: 'Không tìm thấy địa chỉ',
-            showResultIcons: true,
-            suggestMinLength: 2,
-            suggestTimeout: 250
-          };
-
-          // Nếu có bbox giới hạn, thêm vào query params
-          if (window.ALLOWED_BBOX) {
+  // Optimized map initialization
+  const mapHTML = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Address Map</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <style>
+          html, body, #map {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          
+          #map {
+            position: relative;
+            overflow: hidden;
+          }
+          
+          .center-marker {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            z-index: 1000;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+          }
+          
+          .location-btn {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            z-index: 1001;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #3255FB;
+            box-shadow: 0 4px 12px rgba(50, 85, 251, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+          }
+          
+          .location-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(50, 85, 251, 0.4);
+          }
+          
+          .location-btn:active {
+            transform: scale(0.95);
+          }
+          
+          .location-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #3255FB;
+          }
+          
+          .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+          }
+          
+          .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3255FB;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map">
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+          </div>
+        </div>
+        
+        <script>
+          // Global variables
+          window.INITIAL_POS = ${initialPosJson};
+          window.ALLOWED_BBOX = ${allowedBboxJson};
+          window.map = null;
+          window.centerMarker = null;
+          window.locationBtn = null;
+          
+          // Initialize map when Leaflet is loaded
+          function initMap() {
             try {
-              var bbox = window.ALLOWED_BBOX;
-              geocoderOptions.geocoder.options.geocodingQueryParams.viewbox = bbox[2] + ',' + bbox[1] + ',' + bbox[3] + ',' + bbox[0];
-              geocoderOptions.geocoder.options.geocodingQueryParams.bounded = 1;
-            } catch (e) {
-              console.warn('Failed to set bbox for geocoder', e);
+              // Create map with optimized settings
+              window.map = L.map('map', {
+                zoomControl: true,
+                tap: false,
+                inertia: true,
+                inertiaDeceleration: 3000,
+                preferCanvas: true,
+                maxZoom: 18,
+                minZoom: 8
+              });
+              
+              // Add tile layer with optimized settings
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18,
+                maxNativeZoom: 18,
+                updateWhenIdle: true,
+                updateWhenZooming: false
+              }).addTo(window.map);
+              
+                             // Set initial view
+               if (window.INITIAL_POS) {
+                 console.log('Setting initial map position:', window.INITIAL_POS);
+                 window.map.setView([window.INITIAL_POS.lat, window.INITIAL_POS.lon], 17);
+               } else {
+                 console.log('Using default map position');
+                 window.map.setView([10.8231, 106.6297], 10); // TP.HCM default
+               }
+              
+              // Create center marker
+              createCenterMarker();
+              
+              // Create location button
+              createLocationButton();
+              
+              // Add event listeners
+              setupEventListeners();
+              
+              // Hide loading overlay
+              document.getElementById('loadingOverlay').style.display = 'none';
+              
+              // Notify React Native that map is ready
+              window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                type: 'map_ready' 
+              }));
+              
+            } catch (error) {
+              console.error('Error initializing map:', error);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                type: 'map_error', 
+                error: error.message 
+              }));
             }
           }
-
-          var geocoder = L.Control.geocoder(geocoderOptions).addTo(map);
-
-          // create a fixed center marker overlay and attach it to the map container
-          var centerMarker = document.createElement('div');
-          centerMarker.id = 'centerMarker';
-          centerMarker.style.position = 'absolute';
-          centerMarker.style.left = '50%';
-          centerMarker.style.top = '50%';
-          centerMarker.style.transform = 'translate(-50%, -100%)';
-          centerMarker.style.pointerEvents = 'none';
-          centerMarker.style.zIndex = 1000;
-          centerMarker.innerHTML = '<svg width="36" height="48" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C7.03 0 3 4.03 3 9c0 7.5 9 18 9 18s9-10.5 9-18c0-4.97-4.03-9-9-9zm0 12.25A3.25 3.25 0 1 1 12 5.75a3.25 3.25 0 0 1 0 6.5z" fill="#d00"/></svg>';
-          // attach marker into the map container to avoid reflows on body
-          map.getContainer().appendChild(centerMarker);
-
-          // Center on me button
-          var centerBtn = document.createElement('button');
-          centerBtn.id = 'centerBtn';
-          centerBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
-          centerBtn.style.position = 'absolute';
-          centerBtn.style.right = '10px';
-          centerBtn.style.bottom = '10px';
-          centerBtn.style.zIndex = 1001;
-          centerBtn.style.padding = '12px';
-          centerBtn.style.background = '#fff';
-          centerBtn.style.border = '2px solid #3255FB';
-          centerBtn.style.borderRadius = '50%';
-          centerBtn.style.boxShadow = '0 4px 12px rgba(50, 85, 251, 0.3)';
-          centerBtn.style.cursor = 'pointer';
-          centerBtn.style.transition = 'all 0.2s ease';
-          centerBtn.title = 'Định vị vị trí hiện tại';
           
-          // Add hover effect
-          centerBtn.addEventListener('mouseenter', function() {
-            this.style.transform = 'scale(1.1)';
-            this.style.boxShadow = '0 6px 16px rgba(50, 85, 251, 0.4)';
-          });
+          function createCenterMarker() {
+            const marker = document.createElement('div');
+            marker.className = 'center-marker';
+            marker.innerHTML = \`
+              <svg width="36" height="48" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 0C7.03 0 3 4.03 3 9c0 7.5 9 18 9 18s9-10.5 9-18c0-4.97-4.03-9-9-9zm0 12.25A3.25 3.25 0 1 1 12 5.75a3.25 3.25 0 0 1 0 6.5z" fill="#d00"/>
+              </svg>
+            \`;
+            document.getElementById('map').appendChild(marker);
+            window.centerMarker = marker;
+          }
           
-          centerBtn.addEventListener('mouseleave', function() {
-            this.style.transform = 'scale(1)';
-            this.style.boxShadow = '0 4px 12px rgba(50, 85, 251, 0.3)';
-          });
-          
-          // Add click effect
-          centerBtn.addEventListener('mousedown', function() {
-            this.style.transform = 'scale(0.95)';
-          });
-          
-          centerBtn.addEventListener('mouseup', function() {
-            this.style.transform = 'scale(1.1)';
-          });
-          
-          map.getContainer().appendChild(centerBtn);
-
-          // Center on me functionality
-          centerBtn.addEventListener('click', function() {
+          function createLocationButton() {
+            const btn = document.createElement('button');
+            btn.className = 'location-btn';
+            btn.title = 'Định vị vị trí hiện tại';
+            btn.innerHTML = \`
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            \`;
+            
+            btn.addEventListener('click', function() {
             // Show loading state
-            this.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="#3255FB" stroke-width="2" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416"><animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416" repeatCount="indefinite"/><animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416" repeatCount="indefinite"/></circle></svg>';
+              this.innerHTML = \`
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="#3255FB" stroke-width="2" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416">
+                    <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416" repeatCount="indefinite"/>
+                    <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416" repeatCount="indefinite"/>
+                  </circle>
+                </svg>
+              \`;
             this.style.pointerEvents = 'none';
             
-            // Gửi message để React Native xử lý geolocation
+              // Request location from React Native
             window.ReactNativeWebView.postMessage(JSON.stringify({ 
               type: 'request_location' 
             }));
             
             // Reset button after 3 seconds
             setTimeout(() => {
-              this.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
+                this.innerHTML = \`
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                \`;
               this.style.pointerEvents = 'auto';
             }, 3000);
           });
 
-          function postCenterSelection(extraName) {
-            var c = map.getCenter();
-            var lat = c.lat; var lon = c.lng;
-            // If an allowed bbox was provided, enforce it on confirm
-            try {
+            document.getElementById('map').appendChild(btn);
+            window.locationBtn = btn;
+          }
+          
+          function setupEventListeners() {
+            // Update position when map moves
+            window.map.on('moveend', function() {
+              const center = window.map.getCenter();
+              
+              // Check if position is within allowed bounds
               if (window.ALLOWED_BBOX) {
-                var b = window.ALLOWED_BBOX; // [lat_min, lat_max, lon_min, lon_max]
-                var latMin = parseFloat(b[0]);
-                var latMax = parseFloat(b[1]);
-                var lonMin = parseFloat(b[2]);
-                var lonMax = parseFloat(b[3]);
-                if (!(lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax)) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'oob', lat: lat, lon: lon }));
+                const [latMin, latMax, lonMin, lonMax] = window.ALLOWED_BBOX;
+                if (!(center.lat >= latMin && center.lat <= latMax && 
+                      center.lng >= lonMin && center.lng <= lonMax)) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    type: 'oob', 
+                    lat: center.lat, 
+                    lon: center.lng 
+                  }));
                   return;
                 }
               }
-            } catch (err) {
-              // ignore bbox parsing errors and continue
-            }
-
-            fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lon+'&addressdetails=1')
-              .then(function(r){ return r.json(); })
-              .then(function(data){
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'confirm', lat: lat, lon: lon, display_name: data.display_name || extraName || '', address: data.address || null }));
-              }).catch(function(){
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'confirm', lat: lat, lon: lon, display_name: extraName || '', address: null }));
-              });
-          }
-
-
-
-          // if initial position provided from React Native, center map there
-          try {
-            if (window.INITIAL_POS) {
-              var p = window.INITIAL_POS;
-              // use a moderate zoom to avoid heavy tile loading; user can zoom further
-              map.setView([p.lat, p.lon], 17);
-            }
-          } catch(e){}
-
-          // when geocoder returns a result, fly to that location for smooth animation
-          geocoder.on('markgeocode', function(e) {
-            var latlng = e.geocode.center;
-            map.flyTo(latlng, 17, { animate: true, duration: 0.6 });
-            // Auto-confirm when geocoder result is selected
-            postCenterSelection(e.geocode.name);
-          });
-
-          // Auto-update position when map is moved
-          map.on('moveend', function() {
-            var center = map.getCenter();
-            // Update current position without confirming
+              
+              // Send position update
             window.ReactNativeWebView.postMessage(JSON.stringify({ 
               type: 'position_update', 
               lat: center.lat, 
@@ -202,105 +281,187 @@ const AddressMapSearch = forwardRef<any, Props>(({ initialQuery = '', initialLat
             }));
           });
 
-          // reduce default event handlers that may conflict on mobile devices
-          map.off('click');
-        } catch(e) { console.warn(e); }
-      }
-
-      var readyInterval = setInterval(function(){
-        if(window.L && window.L.Control && window.L.Control.Geocoder) { clearInterval(readyInterval); init(); }
-      }, 200);
-    })();
-  `;
-
-  const html = `
-    <!doctype html>
-    <html>
-      <head>
-        <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0">
-        <style>html,body,#map{height:100%;margin:0;padding:0}</style>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-      </head>
-      <body>
-        <div id="map"></div>
-  <script>window.INITIAL_POS = ${initialPosJson}; window.ALLOWED_BBOX = ${allowedBboxJson};</script>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-        <script>
-          ${injectedJS}
+            // Handle map clicks for confirmation
+            window.map.on('click', function(e) {
+              const lat = e.latlng.lat;
+              const lng = e.latlng.lng;
+              
+              // Get address information
+              fetch(\`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=\${lat}&lon=\${lng}&addressdetails=1\`)
+                .then(response => response.json())
+                .then(data => {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    type: 'confirm', 
+                    lat: lat, 
+                    lon: lng, 
+                    display_name: data.display_name || '', 
+                    address: data.address || null 
+                  }));
+                })
+                .catch(error => {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    type: 'confirm', 
+                    lat: lat, 
+                    lon: lng, 
+                    display_name: '', 
+                    address: null 
+                  }));
+                });
+            });
+          }
+          
+          // Load Leaflet and initialize map
+          function loadLeaflet() {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = initMap;
+            document.head.appendChild(script);
+          }
+          
+          // Start loading when page is ready
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadLeaflet);
+          } else {
+            loadLeaflet();
+          }
         </script>
       </body>
     </html>
   `;
 
-  return (
-    <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        originWhitelist={["*"]}
-        source={{ html }}
-        style={{ height: 320 }}
-        javaScriptEnabled
-        domStorageEnabled
-        onMessage={(e) => {
-          try {
-            const msg = JSON.parse(e.nativeEvent.data);
+  const handleMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
             if (!msg || !msg.type) return;
             
-            // Handle location request
-            if (msg.type === 'request_location') {
+      switch (msg.type) {
+        case 'map_ready':
+          setMapReady(true);
+          setIsLoading(false);
+          break;
+          
+        case 'request_location':
               if (onRequestLocation) {
                 onRequestLocation();
               }
-              return;
-            }
-            
-            // Handle location update from React Native
-            if (msg.type === 'location_update') {
-              // Update map center to new location
-              if (webViewRef.current) {
+          break;
+          
+        case 'position_update':
+        case 'confirm':
+        case 'oob':
+          onSelect({ 
+            lat: msg.lat, 
+            lon: msg.lon, 
+            display_name: msg.display_name || '', 
+            address: msg.address, 
+            type: msg.type 
+          });
+          break;
+          
+        case 'map_error':
+          console.error('Map error:', msg.error);
+          setIsLoading(false);
+          break;
+      }
+    } catch (error) {
+      console.warn('Error parsing WebView message:', error);
+    }
+  };
+
+  // Handle location updates from React Native
+  useEffect(() => {
+    if (mapReady && webViewRef.current) {
                 const script = `
                   if (window.map) {
-                    console.log('Moving map to location_update:', ${msg.lat}, ${msg.lon});
-                    window.map.setView([${msg.lat}, ${msg.lon}], 17);
-                    
-                    // Trigger position update after map moves
-                    setTimeout(function() {
-                      var center = window.map.getCenter();
+          const center = window.map.getCenter();
                       window.ReactNativeWebView.postMessage(JSON.stringify({ 
                         type: 'position_update', 
                         lat: center.lat, 
                         lon: center.lng 
                       }));
-                    }, 500);
-                    
-                    // Reset center button
-                    var centerBtn = document.getElementById('centerBtn');
-                    if (centerBtn) {
-                      centerBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3255FB"/></svg>';
-                      centerBtn.style.pointerEvents = 'auto';
-                    }
+        }
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+  }, [mapReady]);
+
+  // Expose function to move map to location
+  useImperativeHandle(ref, () => ({
+    injectJavaScript: (script: string) => {
+      if (webViewRef.current && mapReady) {
+        webViewRef.current.injectJavaScript(script);
+      }
+    },
+    moveToLocation: (lat: number, lng: number, zoom: number = 17) => {
+      if (webViewRef.current && mapReady) {
+        const script = `
+          if (window.map) {
+            console.log('Moving map to location:', ${lat}, ${lng}, ${zoom});
+            window.map.setView([${lat}, ${lng}], ${zoom}, {
+              animate: true,
+              duration: 1.0
+            });
                   }
                 `;
                 webViewRef.current.injectJavaScript(script);
               }
-              return;
-            }
-                         
-            // forward select, confirm, and out-of-bounds (oob) messages
-            if (msg.type === 'select' || msg.type === 'confirm' || msg.type === 'oob' || msg.type === 'position_update') {
-              onSelect({ lat: msg.lat, lon: msg.lon, display_name: msg.display_name, address: msg.address, type: msg.type });
-            }
-          } catch (error) { 
-            console.warn('Error parsing WebView message:', error);
+    }
+  }), [mapReady]);
+
+  return (
+    <View style={styles.container}>
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3255FB" />
+        </View>
+      )}
+      <WebView
+        ref={webViewRef}
+        originWhitelist={["*"]}
+        source={{ html: mapHTML }}
+        style={styles.webview}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        startInLoadingState={false}
+        onMessage={handleMessage}
+        onLoadStart={() => setIsLoading(true)}
+        onLoadEnd={() => {
+          // Keep loading until map is ready
+          if (!mapReady) {
+            setTimeout(() => setIsLoading(false), 2000);
           }
         }}
+        scrollEnabled={false}
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
 });
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#fff' } });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+});
+
+AddressMapSearch.displayName = 'AddressMapSearch';
 
 export default AddressMapSearch;

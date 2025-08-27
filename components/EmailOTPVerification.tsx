@@ -2,24 +2,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface EmailOTPVerificationProps {
   email: string;
   onVerificationSuccess: (data: any) => void;
   onBack: () => void;
-  type?: 'registration' | 'email-change' | 'password-reset';
+  type?: 'registration' | 'email-change' | 'password-reset' | 'email-verification';
   onResendOTP?: () => Promise<void>;
   onVerifyOTP?: (otp: string) => Promise<any>;
 }
@@ -67,7 +67,7 @@ const EmailOTPVerification: React.FC<EmailOTPVerificationProps> = ({
   }, []);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (countdown > 0) {
       timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     }
@@ -112,11 +112,13 @@ const EmailOTPVerification: React.FC<EmailOTPVerificationProps> = ({
 
     try {
       if (onVerifyOTP) {
+        // Sử dụng custom verify function nếu có
         const result = await onVerifyOTP(otpToVerify);
+        // Gọi onVerificationSuccess với result từ API
         onVerificationSuccess(result);
       } else {
-        // Fallback logic nếu không có custom verify function
-        onVerificationSuccess({ success: true, otp: otpToVerify });
+        // Fallback: gọi onVerificationSuccess trực tiếp với OTP string
+        onVerificationSuccess(otpToVerify);
       }
     } catch (error: any) {
       setError(error.message || 'Mã OTP không đúng. Vui lòng thử lại');
@@ -233,7 +235,9 @@ const EmailOTPVerification: React.FC<EmailOTPVerificationProps> = ({
                 {otp.map((digit, index) => (
                   <TextInput
                     key={index}
-                    ref={(ref) => (inputRefs.current[index] = ref!)}
+                    ref={(ref) => {
+                      if (ref) inputRefs.current[index] = ref;
+                    }}
                     style={[
                       styles.otpInput,
                       focusedIndex === index && styles.otpInputFocused,
