@@ -1,50 +1,72 @@
-# Welcome to your Expo app 👋
+# Ứng dụng Quản lý Nhà sách ShelfStackers
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Ứng dụng web quản lý nhà sách được xây dựng bằng Java và Spring Boot. Dự án này nhằm mục đích cung cấp một hệ thống hiệu quả để quản lý các tác vụ cơ bản của một nhà sách, bao gồm quản lý kho sách, thông tin khách hàng và đơn hàng.
 
-## Get started
+## 🌟 Các Tính Năng Nổi Bật
 
-1. Install dependencies
+* **Quản lý Sách:** Xem, thêm, cập nhật và xóa thông tin sách trong kho.
+* **Quản lý Khách hàng:** Theo dõi và quản lý thông tin khách hàng.
+* **Quản lý Đơn hàng:** Xử lý và theo dõi các đơn hàng của khách.
+* **Chức năng Tìm kiếm & Lọc:** Dễ dàng tìm kiếm sách theo tên, tác giả hoặc thể loại.
+* **Giao diện thân thiện:** Giao diện người dùng trực quan, dễ dàng sử dụng.
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## 🛠️ Công Nghệ Sử Dụng
 
-   ```bash
-   npx expo start
-   ```
+Dự án được xây dựng dựa trên các công nghệ sau:
 
-In the output, you'll find options to open the app in a
+* **Back-end:**
+    * Java
+    * Spring Boot
+    * Spring Data JPA
+    * Spring Security (nếu có)
+* **Front-end:**
+    * React Native
+* **Cơ sở dữ liệu:**
+    * MongoDB, NodeJS 
+* **Quản lý dependencies:**
+    * npm, Gradle
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🚀 Hướng Dẫn Cài Đặt và Chạy Dự Án
 
-## Get a fresh project
+### 1. Yêu Cầu
 
-When you're ready, run:
+Đảm bảo rằng bạn đã cài đặt các công cụ sau trên máy tính của mình:
 
-```bash
-npm run reset-project
-```
+* Java Development Kit (JDK) 11 trở lên
+* Maven
+* Một hệ quản trị cơ sở dữ liệu (ví dụ: MySQL, PostgreSQL)
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Cài Đặt
 
-## Learn more
+1.  **Clone repository:**
+    ```bash
+    git clone [https://github.com/phuonggcoder/shelfstackers-bookstore-app.git](https://github.com/phuonggcoder/shelfstackers-bookstore-app.git)
+    cd shelfstackers-bookstore-app
+    ```
 
-To learn more about developing your project with Expo, look at the following resources:
+2.  **Cấu hình cơ sở dữ liệu:**
+    * Tạo một cơ sở dữ liệu mới (ví dụ: `shelfstackers_db`).
+    * Mở file `src/main/resources/application.properties` (hoặc `application.yml`).
+    * Cập nhật thông tin kết nối cơ sở dữ liệu của bạn:
+        ```properties
+        # Ví dụ cho MySQL
+        spring.datasource.url=jdbc:mysql://localhost:3306/shelfstackers_db
+        spring.datasource.username=root
+        spring.datasource.password=your_password
+        spring.jpa.hibernate.ddl-auto=update
+        ```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3.  **Build dự án:**
+    ```bash
+    mvn clean install
+    ```
 
-## Join the community
+4.  **Chạy ứng dụng:**
+     npm
 
-Join our community of developers creating universal apps.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**© 2025 - phuonggcoder**
